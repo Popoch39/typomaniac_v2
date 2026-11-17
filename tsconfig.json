@@ -1,4 +1,10 @@
 {
   "files": [],
-  "references": [{ "path": "packages/ui" }, { "path": "apps/frontend" }, { "path": "apps/api" }]
+  "references": [
+    { "path": "packages/ui" },
+    { "path": "packages/typing-engine" },
+    { "path": "packages/typing-engine/test" },
+    { "path": "apps/frontend" },
+    { "path": "apps/api" }
+  ]
 }
