@@ -53,7 +53,21 @@ test("RES-4: the WPM and the raw WPM are 0 when the duration is zero", () => {
   const game = createGame({ mode: "words", wordCount: 1 }, ["ab"]);
   const finished = applyEvent(game, { type: "insert", at: 250, text: "ab" });
 
-  expect(getResult(finished)).toMatchObject({ duration: 0, wpm: 0, rawWpm: 0 });
+  // Both letters at the same instant: 2 correct Frappes, no elapsed time, so no bucket and no rate.
+  expect(getResult(finished)).toEqual({
+    duration: 0,
+    wpm: 0,
+    rawWpm: 0,
+    accuracy: 100,
+    charCounts: { correct: 2, incorrect: 0, extra: 0, missed: 0, exactWords: 2 },
+    consistency: 0,
+    history: { wpm: [], keystrokeRate: [], errors: [] },
+    keyPressGaps: [],
+    keyHoldDurations: [],
+    keyConsistency: 0,
+    inactiveSeconds: 0,
+    inactiveAtEnd: true,
+  });
 });
 
 test("RES-5: asking for the Result of a Game that has not started is refused", () => {
