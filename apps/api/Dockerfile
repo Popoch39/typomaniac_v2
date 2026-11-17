@@ -8,6 +8,7 @@ COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/typing-engine/package.json ./packages/typing-engine/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 RUN bun install --frozen-lockfile --filter api
 
