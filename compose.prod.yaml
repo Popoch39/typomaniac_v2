@@ -1,6 +1,6 @@
 # Production stack: `docker compose -f compose.prod.yaml up -d --build`.
-# POSTGRES_PASSWORD, BETTER_AUTH_SECRET and BETTER_AUTH_URL have no default here: they must come
-# from the environment or a root .env.
+# POSTGRES_PASSWORD, BETTER_AUTH_SECRET, BETTER_AUTH_URL and the GitHub and Discord OAuth
+# credentials have no default here: they must come from the environment or a root .env.
 services:
   postgres:
     image: postgres:18.7-alpine
@@ -26,6 +26,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-typomaniac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-typomaniac}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?GITHUB_CLIENT_ID is required}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?GITHUB_CLIENT_SECRET is required}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:?DISCORD_CLIENT_ID is required}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:?DISCORD_CLIENT_SECRET is required}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:

@@ -6,4 +6,6 @@ export const createTestAuth = (db: Db) =>
   createAuth(db, {
     baseURL: "http://localhost",
     secret: "test-secret-of-at-least-32-characters",
+    github: { clientId: "test-github-id", clientSecret: "test-github-secret" },
+    discord: { clientId: "test-discord-id", clientSecret: "test-discord-secret" },
   });
