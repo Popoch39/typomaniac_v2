@@ -1,5 +1,6 @@
 import { SEPARATOR, type Game } from "./game.ts";
-import { countInBucket, cutIntoBuckets } from "./history.ts";
+import { countInBucket, cutIntoBuckets, type Bucket } from "./history.ts";
+import { countedKeyPresses, keyHoldDurations, keyPressGaps } from "./keys.ts";
 import { consistency, roundTo2, wordsPerMinute } from "./numbers.ts";
 
 export type CharCounts = {
@@ -22,6 +23,16 @@ export type Result = {
   /** 0 to 100, rounded to 2 decimals: how regular the keystroke rate was. */
   readonly consistency: number;
   readonly history: History;
+  /** Milliseconds between consecutive key presses: one entry less than there are presses. */
+  readonly keyPressGaps: readonly number[];
+  /** Milliseconds each key was held: one entry per key press, in the order of the presses. */
+  readonly keyHoldDurations: readonly number[];
+  /** 0 to 100, rounded to 2 decimals: how regular the gaps between key presses were. */
+  readonly keyConsistency: number;
+  /** Number of buckets of the Game without any key press, insertion or deletion. */
+  readonly inactiveSeconds: number;
+  /** Whether the last buckets of the Game hold no keystroke at all. */
+  readonly inactiveAtEnd: boolean;
 };
 
 /** One integer per bucket of the Game: one-second buckets counted from its start. */
@@ -35,6 +46,8 @@ export type History = {
 };
 
 const NO_CHARS: CharCounts = { correct: 0, incorrect: 0, extra: 0, missed: 0, exactWords: 0 };
+// How many buckets the final inactivity looks back on.
+const FINAL_BUCKETS = 5;
 
 export function getResult(game: Game): Result {
   if (game.startedAt === null || game.endedAt === null) {
@@ -50,7 +63,14 @@ export function getResult(game: Game): Result {
   // A game started on a signal can end without any keystroke: the ratio is then undefined.
   const accuracy =
     game.keystrokes.length === 0 ? 0 : (correctKeystrokes / game.keystrokes.length) * 100;
-  const history = buildHistory(game, game.startedAt, game.endedAt);
+  const { startedAt } = game;
+  // Only a words game gets a last, shorter bucket: a time game stops on its last whole second.
+  const buckets = cutIntoBuckets(game.endedAt - startedAt, game.config.mode === "words");
+  const history = buildHistory(game, buckets, startedAt);
+  const keyPresses = countedKeyPresses(game, startedAt);
+  const gaps = keyPressGaps(keyPresses, startedAt);
+  // A deletion is an activity too: the key that makes it is not always among the presses received.
+  const activityInstants = [...keyPresses, ...game.progress].map(({ at }) => at - startedAt);
 
   return {
     duration,
@@ -60,12 +80,18 @@ export function getResult(game: Game): Result {
     charCounts,
     consistency: consistency(history.keystrokeRate),
     history,
+    keyPressGaps: gaps,
+    keyHoldDurations: keyHoldDurations(game, keyPresses, startedAt),
+    // The last gap is left out, as Monkeytype does.
+    keyConsistency: consistency(gaps.slice(0, -1)),
+    inactiveSeconds: buckets.filter((bucket) => countInBucket(activityInstants, bucket) === 0)
+      .length,
+    // A rate of 0 is a bucket without any keystroke. Without any bucket, nothing shows the player typing.
+    inactiveAtEnd: history.keystrokeRate.slice(-FINAL_BUCKETS).every((rate) => rate === 0),
   };
 }
 
-function buildHistory(game: Game, startedAt: number, endedAt: number): History {
-  // Only a words game gets a last, shorter bucket: a time game stops on its last whole second.
-  const buckets = cutIntoBuckets(endedAt - startedAt, game.config.mode === "words");
+function buildHistory(game: Game, buckets: readonly Bucket[], startedAt: number): History {
   const keystrokeInstants = game.keystrokes.map((keystroke) => keystroke.at - startedAt);
   const errorInstants = game.keystrokes
     .filter((keystroke) => !keystroke.correct)

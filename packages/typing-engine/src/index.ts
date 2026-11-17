@@ -5,6 +5,7 @@ export type {
   GameConfig,
   GameEvent,
   GameStatus,
+  KeyPress,
   Keystroke,
   ProgressSample,
 } from "./game.ts";

@@ -22,6 +22,15 @@ export type ProgressSample = {
   readonly creditedChars: number;
 };
 
+/** A physical key going down, with the release that closed it. */
+export type KeyPress = {
+  /** Client timestamp in milliseconds. */
+  readonly at: number;
+  readonly code: string;
+  /** Client timestamp in milliseconds, `null` while the key is held. */
+  readonly releasedAt: number | null;
+};
+
 export type Game = {
   readonly config: GameConfig;
   readonly targetWords: readonly string[];
@@ -31,6 +40,8 @@ export type Game = {
   readonly keystrokes: readonly Keystroke[];
   /** One sample per insertion or deletion that changed the Game: what the WPM history is read from. */
   readonly progress: readonly ProgressSample[];
+  /** Every key press received, in the order received: the rhythm of the typing, never its content. */
+  readonly keyPresses: readonly KeyPress[];
   /** Client timestamp in milliseconds, `null` until the clock starts. */
   readonly startedAt: number | null;
   /** Client timestamp in milliseconds, `null` until the game is finished. */
@@ -40,6 +51,8 @@ export type Game = {
 /** `at` is the client timestamp in milliseconds. */
 export type GameEvent =
   | { readonly type: "start"; readonly at: number }
+  | { readonly type: "keyDown"; readonly at: number; readonly code: string }
+  | { readonly type: "keyUp"; readonly at: number; readonly code: string }
   | { readonly type: "insert"; readonly at: number; readonly text: string }
   | { readonly type: "delete"; readonly at: number; readonly unit: DeletionUnit }
   | { readonly type: "tick"; readonly at: number }
@@ -106,6 +119,7 @@ function newGame(config: GameConfig, targetWords: readonly string[]): Game {
     status: "ready",
     keystrokes: [],
     progress: [],
+    keyPresses: [],
     startedAt: null,
     endedAt: null,
   };
@@ -113,6 +127,8 @@ function newGame(config: GameConfig, targetWords: readonly string[]): Game {
 
 export function applyEvent(game: Game, event: GameEvent): Game {
   if (event.type === "start") return start(game, event.at);
+  if (event.type === "keyDown") return pressKey(game, event.code, event.at);
+  if (event.type === "keyUp") return releaseKey(game, event.code, event.at);
   if (event.type === "delete") return sampled(game, deleteInput(game, event.unit), event.at);
   if (event.type === "tick") return tick(game, event.at);
   if (event.type === "addWords") return addWords(game, event.words);
@@ -142,6 +158,24 @@ function start(game: Game, at: number): Game {
   // A signal cannot move a clock that is already running, nor reopen a finished game.
   if (game.status !== "ready") return game;
   return { ...game, status: "running", startedAt: at };
+}
+
+function pressKey(game: Game, code: string, at: number): Game {
+  if (game.status === "finished") return game;
+  // A key already held has lost its release on the way: its hold is closed by the new press.
+  const released = releaseKey(game, code, at);
+  return { ...released, keyPresses: [...released.keyPresses, { at, code, releasedAt: null }] };
+}
+
+function releaseKey(game: Game, code: string, at: number): Game {
+  const isHeld = (press: KeyPress) => press.code === code && press.releasedAt === null;
+  if (game.status === "finished" || !game.keyPresses.some(isHeld)) return game;
+  return {
+    ...game,
+    keyPresses: game.keyPresses.map((press) =>
+      isHeld(press) ? { ...press, releasedAt: at } : press,
+    ),
+  };
 }
 
 function tick(game: Game, at: number): Game {

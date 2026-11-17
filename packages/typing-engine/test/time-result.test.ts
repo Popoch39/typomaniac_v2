@@ -43,6 +43,12 @@ test("END-5: a time Game played to its ending Tick gives a complete Result, late
       keystrokeRate: [48, 24],
       errors: [0, 0],
     },
+    // No key Event was applied, and both buckets hold keystrokes.
+    keyPressGaps: [],
+    keyHoldDurations: [],
+    keyConsistency: 0,
+    inactiveSeconds: 0,
+    inactiveAtEnd: false,
   });
 });
 

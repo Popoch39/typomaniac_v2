@@ -162,6 +162,12 @@ test("END-3: a Game ended by a space on a wrong last word gives a complete Resul
       keystrokeRate: [72, 24],
       errors: [1, 2],
     },
+    // No key Event was applied, and both buckets hold keystrokes.
+    keyPressGaps: [],
+    keyHoldDurations: [],
+    keyConsistency: 0,
+    inactiveSeconds: 0,
+    inactiveAtEnd: false,
   });
 });
 

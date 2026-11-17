@@ -17,11 +17,15 @@ const DUEL_WORDS = ["cat", "dog"];
 const REPLAY_WORDS = ["cat", "dog", "emu"];
 const SIGNAL: GameEvent = { type: "start", at: 10_000 };
 
-// A words Game with a mistake corrected, a word validated wrong and a return to it.
+// A words Game with a mistake corrected, a word validated wrong and a return to it,
+// one key released and another one still held at the end.
 const WORDS_LOG: readonly GameEvent[] = [
   SIGNAL,
   { type: "tick", at: 11_000 },
+  { type: "keyDown", at: 11_190, code: "KeyC" },
   ...insertions("cx", 11_200, 150),
+  { type: "keyUp", at: 11_270, code: "KeyC" },
+  { type: "keyDown", at: 11_340, code: "KeyX" },
   { type: "delete", at: 11_600, unit: "char" },
   ...insertions("at dx ", 11_800, 150),
   { type: "delete", at: 12_800, unit: "word" },
@@ -66,6 +70,12 @@ test("DUEL-1: two Games on the same words and the same start signal give two ind
     consistency: 85.71,
     // "cat" after 1 s: 3 / 5 / (1 / 60) = 36. The 7 characters after 2 s: 42.
     history: { wpm: [36, 42], keystrokeRate: [36, 48], errors: [0, 0] },
+    // No key Event was applied, and both buckets hold keystrokes.
+    keyPressGaps: [],
+    keyHoldDurations: [],
+    keyConsistency: 0,
+    inactiveSeconds: 0,
+    inactiveAtEnd: false,
   });
   expect(getResult(secondFinished)).toEqual({
     duration: 5,
@@ -88,6 +98,11 @@ test("DUEL-1: two Games on the same words and the same start signal give two ind
       // "x" 3.5 s after the signal, the space on the wrong last word at 5 s.
       errors: [0, 0, 0, 1, 1],
     },
+    keyPressGaps: [],
+    keyHoldDurations: [],
+    keyConsistency: 0,
+    inactiveSeconds: 0,
+    inactiveAtEnd: false,
   });
 });
 
