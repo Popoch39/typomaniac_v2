@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { refuseUnverifiedEmail, requireAuthConfig } from "../src/auth.ts";
+import { requireAuthConfig } from "../src/modules/auth/config.ts";
+import { refuseUnverifiedEmail } from "../src/modules/auth/service.ts";
 
 const completeEnv = {
   BETTER_AUTH_SECRET: "a-secret-of-at-least-32-characters",

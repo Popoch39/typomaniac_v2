@@ -1,6 +1,7 @@
 import { createApp } from "./app.ts";
-import { createAuth, requireAuthConfig } from "./auth.ts";
 import { migrateDatabase, openDatabase, requireDatabaseUrl } from "./db/client.ts";
+import { requireAuthConfig } from "./modules/auth/config.ts";
+import { createAuth } from "./modules/auth/service.ts";
 
 // Resolved from the working directory: inside a compiled binary, import.meta.dir is a virtual path.
 const migrationsFolder = process.env.MIGRATIONS_DIR ?? "./drizzle";

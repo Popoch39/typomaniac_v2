@@ -1,16 +1,7 @@
 import { SQL } from "bun";
 import { DrizzleQueryError, eq } from "drizzle-orm";
-import { t } from "elysia";
-import type { Db } from "./db/client.ts";
-import { pseudoUniqueIndex, user } from "./db/schema.ts";
-
-export const pseudoSchema = t.String({
-  minLength: 3,
-  maxLength: 20,
-  pattern: "^[A-Za-z0-9_-]+$",
-  // Elysia's default validation response has another shape and loses its detail in production.
-  error: () => ({ code: "PSEUDO_INVALID" }),
-});
+import type { Db } from "../../db/client.ts";
+import { pseudoUniqueIndex, user } from "../../db/schema.ts";
 
 const reservedPseudos = new Set([
   "admin",

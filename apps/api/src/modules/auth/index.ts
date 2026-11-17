@@ -1,5 +1,5 @@
 import { Elysia, ElysiaStatus, status } from "elysia";
-import type { Auth } from "./auth.ts";
+import type { Auth } from "./service.ts";
 
 // Route options that guard a route. A separately defined route module must .use() this to get the options and their types.
 export const createProtection = (auth: Auth) => {

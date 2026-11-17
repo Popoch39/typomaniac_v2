@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { Elysia } from "elysia";
 import { createApp } from "../src/app.ts";
-import { createProtection } from "../src/protection.ts";
+import { createProtection } from "../src/modules/auth/index.ts";
 import { createTestAuth, signInJoueur } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 
