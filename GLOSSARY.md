@@ -33,7 +33,11 @@ _Avoid_ : action, message
 
 **Frappe** (`Keystroke`) :
 Insertion d'un caractère par le joueur, jugée correcte ou incorrecte.
-_Avoid_ : touche, appui, saisie
+_Avoid_ : saisie, keystroke
+
+**Appui** (`KeyPress`) :
+Geste physique du joueur sur une touche du clavier, du moment où il l'enfonce à celui où il la relâche. À la différence d'une Frappe, il n'écrit rien et n'est pas jugé : il décrit le rythme de la frappe, pas son contenu.
+_Avoid_ : pression, keypress, Frappe
 
 **Départ** :
 Événement qui fait partir l'horloge d'une Partie à un signal commun, au lieu de la première Frappe du joueur.
@@ -60,6 +64,10 @@ _Avoid_ : exactitude, accuracy
 **Constance** :
 Régularité de la vitesse du joueur au fil de la Partie, en pourcentage.
 _Avoid_ : consistance, régularité, consistency
+
+**Constance des touches** :
+Régularité du temps qui sépare les Appuis successifs du joueur, en pourcentage.
+_Avoid_ : constance des Frappes, key consistency
 
 **Inactivité** :
 Temps d'une Partie pendant lequel le joueur ne tape pas.

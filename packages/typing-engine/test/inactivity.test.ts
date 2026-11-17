@@ -20,7 +20,7 @@ function resultOfWord(word: string, instants: readonly number[]) {
   return getResult(finished);
 }
 
-test("AFK-1: the inactivity duration is the number of one-second buckets without any key press or insertion", () => {
+test("IDLE-1: the inactivity duration is the number of one-second buckets without any key press or insertion", () => {
   // Insertions at 0, 218, 437, 646 and 3108 ms, each one 8 ms after its key press.
   const typing = [0, 218, 437, 646, 3108].reduce((current, at, index) => {
     const pressed = applyEvent(current, { type: "keyDown", at: at - 8, code: "KeyA" });
@@ -37,7 +37,7 @@ test("AFK-1: the inactivity duration is the number of one-second buckets without
   expect(result.keyHoldDurations).toEqual([78, 78, 78, 78, 78]);
 });
 
-test("AFK-1: a bucket holding only a key press is not inactive", () => {
+test("IDLE-1: a bucket holding only a key press is not inactive", () => {
   const typing = typeText(timeGame(3), "a", 0, 0);
   // "Tab" inserts nothing: pressed 1.5 s after the start.
   const pressed = applyEvent(typing, { type: "keyDown", at: 1500, code: "Tab" });
@@ -48,7 +48,7 @@ test("AFK-1: a bucket holding only a key press is not inactive", () => {
   expect(result.inactiveSeconds).toBe(1);
 });
 
-test("AFK-1: a bucket holding only a deletion is not inactive", () => {
+test("IDLE-1: a bucket holding only a deletion is not inactive", () => {
   const typing = typeText(timeGame(3), "ab", 0, 100);
   const corrected = applyEvent(typing, { type: "delete", at: 1500, unit: "char" });
 
@@ -57,7 +57,7 @@ test("AFK-1: a bucket holding only a deletion is not inactive", () => {
   expect(result.inactiveSeconds).toBe(1);
 });
 
-test("AFK-1: a deletion that is ignored is not an activity", () => {
+test("IDLE-1: a deletion that is ignored is not an activity", () => {
   const started = applyEvent(timeGame(2), { type: "start", at: 0 });
   // Nothing to delete on the empty first word.
   const ignored = applyEvent(started, { type: "delete", at: 500, unit: "char" });
@@ -67,7 +67,7 @@ test("AFK-1: a deletion that is ignored is not an activity", () => {
   expect(result.inactiveSeconds).toBe(2);
 });
 
-test("AFK-1: the press kept from before the start counts in the first bucket", () => {
+test("IDLE-1: the press kept from before the start counts in the first bucket", () => {
   const pressed = applyEvent(timeGame(2), { type: "keyDown", at: 990, code: "KeyA" });
   const started = applyEvent(pressed, { type: "start", at: 1000 });
 
@@ -76,14 +76,14 @@ test("AFK-1: the press kept from before the start counts in the first bucket", (
   expect(result.inactiveSeconds).toBe(1);
 });
 
-test("AFK-1: the shorter last bucket of a words Game counts as one", () => {
+test("IDLE-1: the shorter last bucket of a words Game counts as one", () => {
   // Buckets ending at 1000, 2000 and 2500 ms, the second one empty.
   expect(resultOfWord("ab", [0, 2500]).inactiveSeconds).toBe(1);
   // Buckets ending at 1000 and 2000 ms: the last keystroke, at 2400 ms, is in none.
   expect(resultOfWord("ab", [0, 2400]).inactiveSeconds).toBe(1);
 });
 
-test("AFK-2: the final inactivity is true when the last 5 buckets hold no insertion", () => {
+test("IDLE-2: the final inactivity is true when the last 5 buckets hold no insertion", () => {
   const typing = typeText(timeGame(7), "abcdefghi", 0, 200);
 
   const result = getResult(applyEvent(typing, { type: "tick", at: 7000 }));
@@ -93,7 +93,7 @@ test("AFK-2: the final inactivity is true when the last 5 buckets hold no insert
   expect(result.inactiveSeconds).toBe(5);
 });
 
-test("AFK-2: the final inactivity is false when one of the last 5 buckets holds an insertion", () => {
+test("IDLE-2: the final inactivity is false when one of the last 5 buckets holds an insertion", () => {
   const typing = typeText(typeText(timeGame(6), "abcde", 0, 200), "f", 5500, 0);
 
   const result = getResult(applyEvent(typing, { type: "tick", at: 6000 }));
@@ -102,7 +102,7 @@ test("AFK-2: the final inactivity is false when one of the last 5 buckets holds 
   expect(result.inactiveAtEnd).toBe(false);
 });
 
-test("AFK-2: key presses and deletions in the last 5 buckets do not prevent the final inactivity", () => {
+test("IDLE-2: key presses and deletions in the last 5 buckets do not prevent the final inactivity", () => {
   const typing = typeText(timeGame(6), "abcde", 0, 100);
   const corrected = applyEvent(typing, { type: "delete", at: 3500, unit: "char" });
   const pressed = applyEvent(corrected, { type: "keyDown", at: 5500, code: "Tab" });
@@ -114,12 +114,12 @@ test("AFK-2: key presses and deletions in the last 5 buckets do not prevent the 
   expect(result.inactiveSeconds).toBe(3);
 });
 
-test("AFK-2: what is typed after the last bucket does not prevent the final inactivity", () => {
+test("IDLE-2: what is typed after the last bucket does not prevent the final inactivity", () => {
   // 7.3 s: no shorter last bucket, so the 7 buckets hold 1, 0, 0, 0, 0, 0, 0 insertions.
   expect(resultOfWord("ab", [0, 7300]).inactiveAtEnd).toBe(true);
 });
 
-test("AFK-3: a Game with fewer than 5 buckets is judged on all of them", () => {
+test("IDLE-3: a Game with fewer than 5 buckets is judged on all of them", () => {
   // Insertions per bucket: 1, 0, 1.
   expect(resultOfWord("ab", [0, 2500]).inactiveAtEnd).toBe(false);
 
@@ -128,7 +128,7 @@ test("AFK-3: a Game with fewer than 5 buckets is judged on all of them", () => {
   expect(getResult(applyEvent(started, { type: "tick", at: 2000 })).inactiveAtEnd).toBe(true);
 });
 
-test("AFK-3: a Game without any bucket is inactive at the end, with no inactive second", () => {
+test("IDLE-3: a Game without any bucket is inactive at the end, with no inactive second", () => {
   const result = resultOfWord("ab", [0, 400]);
 
   expect(result.inactiveAtEnd).toBe(true);
