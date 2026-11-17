@@ -33,6 +33,8 @@ Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-
 - Dans les tests : `createTestAuth(testDb.db)` (`test/helpers/auth.ts`) fabrique une instance sur la base du fichier de test.
 - L'adaptateur retrouve ses tables dans le schéma passé à Drizzle par `openDatabase`, sous les noms d'export `user`, `session`, `account`, `verification` de `src/db/schema.ts`. Ne pas les renommer.
 - L'intégration à Elysia suit `.agents/skills/elysiajs/references/better-auth.md` (`.mount(auth.handler)`, macro pour les routes protégées), pas la doc de Better Auth, écrite pour Elysia 1.
+- Route réservée aux Joueurs : l'option `signedIn: true` (`createProtection(auth)`, `src/protection.ts`) répond 401 sans session valide et donne `joueur` et `session` au handler. Un module de routes défini à part doit `.use(createProtection(auth))` pour avoir l'option et ses types.
+- Dans les tests : `signInJoueur(auth)` (`test/helpers/auth.ts`) crée un Joueur et rend `{ joueur, cookie }`, le cookie étant à passer dans l'en-tête `cookie` de la requête.
 - Importer un plugin par son sous-chemin (`better-auth/plugins/<nom>`), pas par `better-auth/plugins`, qui tire des modules gênants pour la compilation en binaire.
 
 ### Régénérer le schéma
