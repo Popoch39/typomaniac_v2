@@ -1,5 +1,6 @@
 # Production stack: `docker compose -f compose.prod.yaml up -d --build`.
-# POSTGRES_PASSWORD has no default here: it must come from the environment or a root .env.
+# POSTGRES_PASSWORD, BETTER_AUTH_SECRET and BETTER_AUTH_URL have no default here: they must come
+# from the environment or a root .env.
 services:
   postgres:
     image: postgres:18.7-alpine
@@ -23,6 +24,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-typomaniac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-typomaniac}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:

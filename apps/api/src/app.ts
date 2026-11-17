@@ -1,7 +1,13 @@
 import { Elysia } from "elysia";
+import type { Auth } from "./auth.ts";
 import type { Db } from "./db/client.ts";
 
-// The database is injected so tests can run each app against its own throwaway Postgres database.
-export const createApp = (db: Db) => new Elysia().decorate("db", db).get("/health", () => "ok");
+// The database and the auth instance are injected so tests can run each app against its own throwaway Postgres database.
+export const createApp = (db: Db, auth: Auth) =>
+  new Elysia()
+    .decorate("db", db)
+    // Mounted without a prefix: Better Auth routes on its own basePath (/api/auth).
+    .mount(auth.handler)
+    .get("/health", () => "ok");
 
 export type App = ReturnType<typeof createApp>;
