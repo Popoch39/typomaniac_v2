@@ -102,4 +102,38 @@ Le Résultat compare chaque mot à son Mot cible, position par position, jusqu'a
 Écarts connus sur le décompte :
 
 - La Précision et le décompte ne jugent pas l'espace d'un mot faux de la même façon : tapé à la position du Séparateur, il est une Frappe correcte (INS-6) mais un caractère incorrect (CHARS-3). C'est le comportement de Monkeytype.
-- `countChars` compte en trop, et non incorrecte, une lettre tapée à la position du Séparateur d'un mot non validé, et en trop un espace correct qui n'a pas validé le mot. Aucun de ces cas n'est atteignable dans une Partie `words` finie : tout mot avant le dernier est validé par un espace, et le dernier n'a pas de Séparateur. Le moteur ne les code pas encore.
+- `countChars` compte en trop, et non incorrecte, une lettre tapée à la position du Séparateur d'un mot non validé, et en trop un espace correct qui n'a pas validé le mot. Le premier cas est atteignable sur le mot actif d'une Partie `time` : c'est CHARS-8. Le second ne l'est pas, puisqu'un espace sur une saisie non vide valide toujours le mot (INS-6) : le moteur ne le code pas.
+
+## Mode `time`
+
+Les règles ci-dessus valent dans les deux Modes, sauf SEP-1, END-1 et END-3 qui portent sur le dernier mot d'une Partie `words` : une Partie `time` n'a pas de dernier mot.
+
+| Id     | Règle                                                                                                                                                                                         | Source                                                                                              |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| GAME-4 | En Mode `time`, la Partie se crée avec une durée en secondes et garde tous les mots de la liste.                                                                                              | `test/test-timer.ts` → `checkIfTimeIsUp` (`Config.time`)                                            |
+| GAME-5 | Créer une Partie `time` est refusé si la durée n'est pas un nombre fini strictement positif.                                                                                                  | Typomaniac (le Mode `time` sans fin de Monkeytype, `time = 0`, est hors périmètre)                  |
+| SEP-2  | En Mode `time`, tous les Mots cibles portent un Séparateur, y compris le dernier de la liste courante et les mots ajoutés.                                                                    | `test/words-generator.ts` → `areAllWordsGenerated`, `appendCommitCharacter`                         |
+| ADD-1  | Un ajout de mots allonge la liste des Mots cibles, avec une saisie vide par mot ajouté. Il ne touche ni aux saisies, ni au mot actif, ni au statut, ni à l'horloge, ni au journal.            | `test/test-logic.ts` → `addWord` ; `test/test-words.ts` → `Words.push`                              |
+| ADD-2  | En Mode `words`, un ajout de mots est ignoré : le dernier mot n'a pas de Séparateur, rien ne peut le suivre.                                                                                  | Typomaniac                                                                                          |
+| ADD-3  | En Mode `time`, valider le dernier mot disponible ne termine pas la Partie : le mot actif passe au-delà de la liste, et toute insertion est refusée sans Frappe jusqu'à un ajout de mots.     | Typomaniac, d'après `input/helpers/word-navigation.ts` → `goToNextWord` (voir l'hypothèse plus bas) |
+| TICK-1 | Un Tic reçu avant que l'horloge ait démarré ne démarre ni ne termine la Partie.                                                                                                               | `test/test-logic.ts` → `startTest` (la minuterie n'existe qu'une fois la Partie démarrée)           |
+| TICK-2 | En Mode `time`, un Tic dont le temps écoulé depuis le départ n'atteint pas la limite ne change pas la Partie.                                                                                 | `test/test-timer.ts` → `timerStep`, `checkIfTimeIsUp`                                               |
+| TICK-3 | En Mode `words`, un Tic ne termine jamais la Partie.                                                                                                                                          | `test/test-timer.ts` → `checkIfTimeIsUp`                                                            |
+| END-4  | En Mode `time`, la Partie se termine au premier Tic dont le temps écoulé depuis le départ atteint la limite. L'instant de fin est celui de ce Tic : la durée (RES-1) peut dépasser la limite. | `test/test-timer.ts` → `timerStep`, `checkIfTimeIsUp`, `clear` ; `test/test-logic.ts` → `finish`    |
+| END-5  | Les Frappes arrivées après la limite mais avant le Tic qui termine la Partie comptent dans la saisie, le journal et le Résultat.                                                              | `test/events/data.ts` → `cleanupData`                                                               |
+
+Décompte des caractères d'une Partie `time`, même source commune que CHARS-1 à CHARS-5 :
+
+| Id      | Règle                                                                                                                                                                                                                      |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CHARS-6 | En Mode `time`, les caractères non tapés du mot actif ne sont pas manqués, et si sa saisie est un début correct du Mot cible, ses caractères sont comptés comme caractères des mots tapés exactement, donc dans le WPM.    |
+| CHARS-7 | En Mode `time`, un mot actif dont la saisie n'est pas un début correct du Mot cible n'apporte aucun caractère au WPM, pas même ses premières lettres justes. Ses caractères comptent dans le WPM brut comme ceux d'un mot. |
+| CHARS-8 | Une lettre tapée à la position du Séparateur d'un mot qu'aucun espace n'a validé est en trop, et non incorrecte comme pour un mot validé (CHARS-4).                                                                        |
+| CHARS-9 | Les mots situés après le mot actif ne sont pas comptés : aucun de leurs caractères n'est manqué.                                                                                                                           |
+
+Hypothèse sur ADD-3 : Monkeytype garde une centaine de mots générés devant le mot actif, donc le mot actif n'y est jamais le dernier de la liste en Mode `time`. Le moteur reçoit ses mots par un Événement, donc le cas peut arriver. `goToNextWord` bloque alors la saisie en attendant le mot suivant : le moteur refuse de même les insertions, sans Frappe et sans démarrer l'horloge, et l'appelant est censé ajouter des mots avant d'en arriver là. Le mot validé garde son espace dans la saisie et se compte comme tout mot validé.
+
+Écarts connus sur le Mode `time` :
+
+- Monkeytype compte ses Tics sur une grille d'une seconde ancrée au départ et termine la Partie au Tic dont le numéro atteint la limite. Un Tic n'y est jamais traité avant son instant de grille : c'est le même instant que « le premier Tic dont le temps écoulé atteint la limite » (END-4). Le moteur ne compte pas les Tics, il compare l'horodatage du Tic au départ.
+- Monkeytype horodate la fin par `performance.now()` dans `finish`. Le moteur prend l'horodatage du Tic qui termine la Partie.

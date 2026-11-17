@@ -1,4 +1,6 @@
-export type GameConfig = { readonly mode: "words"; readonly wordCount: number };
+export type GameConfig =
+  | { readonly mode: "words"; readonly wordCount: number }
+  | { readonly mode: "time"; readonly seconds: number };
 
 export type GameStatus = "ready" | "running" | "finished";
 
@@ -27,7 +29,10 @@ export type Game = {
 };
 
 /** `at` is the client timestamp in milliseconds. */
-export type GameEvent = { readonly type: "insert"; readonly at: number; readonly text: string };
+export type GameEvent =
+  | { readonly type: "insert"; readonly at: number; readonly text: string }
+  | { readonly type: "tick"; readonly at: number }
+  | { readonly type: "addWords"; readonly words: readonly string[] };
 
 export const SEPARATOR = " ";
 const MAX_EXTRA_CHARS = 20;
@@ -51,6 +56,15 @@ const TYPABLE_SPACES: ReadonlySet<string> = new Set([
 ]);
 
 export function createGame(config: GameConfig, words: readonly string[]): Game {
+  if (config.mode === "time") {
+    if (!Number.isFinite(config.seconds) || config.seconds <= 0) {
+      throw new RangeError(
+        `A time game needs a strictly positive finite duration (seconds: ${config.seconds}).`,
+      );
+    }
+    // The text of a time game has no end: no word is the last one, so every word keeps its separator.
+    return newGame(config, words.map(withSeparator));
+  }
   const { wordCount } = config;
   if (!Number.isInteger(wordCount) || wordCount < 1 || words.length < wordCount) {
     throw new RangeError(
@@ -59,7 +73,15 @@ export function createGame(config: GameConfig, words: readonly string[]): Game {
   }
   const targetWords = words
     .slice(0, wordCount)
-    .map((word, index) => (index === wordCount - 1 ? word : word + SEPARATOR));
+    .map((word, index) => (index === wordCount - 1 ? word : withSeparator(word)));
+  return newGame(config, targetWords);
+}
+
+function withSeparator(word: string): string {
+  return word + SEPARATOR;
+}
+
+function newGame(config: GameConfig, targetWords: readonly string[]): Game {
   return {
     config,
     targetWords,
@@ -73,8 +95,28 @@ export function createGame(config: GameConfig, words: readonly string[]): Game {
 }
 
 export function applyEvent(game: Game, event: GameEvent): Game {
+  if (event.type === "tick") return tick(game, event.at);
+  if (event.type === "addWords") return addWords(game, event.words);
   // UTF-16 units, not code points: positions in a target word are counted the same way.
   return event.text.split("").reduce((current, char) => insertChar(current, char, event.at), game);
+}
+
+function tick(game: Game, at: number): Game {
+  const { config, startedAt } = game;
+  if (config.mode !== "time" || startedAt === null || game.status === "finished") return game;
+  // The end is not cut at the limit: whatever was typed before this Tick stays in the game.
+  if (at - startedAt < config.seconds * 1000) return game;
+  return { ...game, status: "finished", endedAt: at };
+}
+
+function addWords(game: Game, words: readonly string[]): Game {
+  // The last word of a words game has no separator: nothing can follow it.
+  if (game.config.mode !== "time" || game.status === "finished") return game;
+  return {
+    ...game,
+    targetWords: [...game.targetWords, ...words.map(withSeparator)],
+    inputs: [...game.inputs, ...words.map(() => "")],
+  };
 }
 
 function insertChar(game: Game, typedChar: string, at: number): Game {
@@ -82,7 +124,9 @@ function insertChar(game: Game, typedChar: string, at: number): Game {
 
   const char = TYPABLE_SPACES.has(typedChar) ? SEPARATOR : typedChar;
   const { activeWordIndex, targetWords } = game;
-  const target = targetWords[activeWordIndex] ?? "";
+  const target = targetWords[activeWordIndex];
+  // A time game whose words are all validated waits for more: nothing can be judged meanwhile.
+  if (target === undefined) return game;
   const input = game.inputs[activeWordIndex] ?? "";
   const validates = char === SEPARATOR;
   // Refused before being judged: it leaves no keystroke and does not start the clock.
@@ -90,7 +134,7 @@ function insertChar(game: Game, typedChar: string, at: number): Game {
   // A space is never refused here, so a full word can always be validated.
   if (!validates && input.length >= target.length + MAX_EXTRA_CHARS) return game;
 
-  const isLastWord = activeWordIndex === targetWords.length - 1;
+  const isLastWord = game.config.mode === "words" && activeWordIndex === targetWords.length - 1;
   // The last word has no separator: the space that validates it is judged, but never stored.
   const nextInput = validates && isLastWord ? input : input + char;
   const keystroke: Keystroke = {
