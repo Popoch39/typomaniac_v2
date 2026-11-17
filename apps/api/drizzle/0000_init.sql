@@ -1,0 +1,1 @@
+-- Empty baseline: Drizzle's migrator refuses to start without meta/_journal.json, which only exists once a migration has been generated.
