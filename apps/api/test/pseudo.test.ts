@@ -50,13 +50,30 @@ test.each([
   ["with a dot", "ada.lovelace"],
   ["ending with a line break", "adalovelace\n"],
   ["that is not a string", 12345],
+  ["that is missing", undefined],
 ])("a Pseudo %s is refused and leaves the Joueur without Pseudo", async (_rule, pseudo) => {
   const { joueur, cookie } = await signInJoueur(auth);
 
   const response = await choosePseudo(pseudo, cookie);
 
   expect(response.status).toBe(422);
+  expect(await response.json()).toEqual({ code: "PSEUDO_INVALID" });
   expect(await readProfile(cookie)).toEqual({ id: joueur.id, pseudo: null });
+});
+
+test("a badly formatted Pseudo gets the same answer in production", async () => {
+  const { cookie } = await signInJoueur(auth);
+  const nodeEnv = process.env.NODE_ENV;
+  // Elysia strips its default validation responses under this value, which the prod image sets.
+  process.env.NODE_ENV = "production";
+  try {
+    const response = await choosePseudo("ab", cookie);
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ code: "PSEUDO_INVALID" });
+  } finally {
+    process.env.NODE_ENV = nodeEnv;
+  }
 });
 
 test("a Pseudo of exactly 3 or 20 characters is accepted", async () => {

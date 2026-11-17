@@ -1,6 +1,5 @@
 import { makeSignature } from "better-auth/crypto";
-import type { Auth } from "../../src/auth.ts";
-import { createAuth } from "../../src/auth.ts";
+import { type Auth, createAuth } from "../../src/auth.ts";
 import type { Db } from "../../src/db/client.ts";
 
 // Each test file builds its own instance on its own database, like the app it is injected into.

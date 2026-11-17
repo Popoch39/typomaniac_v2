@@ -5,7 +5,7 @@ Un Invité devient Joueur en se connectant avec GitHub ou Discord, via Better Au
 ## Considered Options
 
 - **Email + mot de passe ou lien magique** : écartés. Il faudrait stocker des mots de passe, envoyer des emails (vérification, réinitialisation) et donc choisir un prestataire d'envoi. Les joueurs visés ont déjà un compte GitHub ou Discord.
-- **Un Joueur par fournisseur, liaison à la main** : écarté. Le même joueur se retrouverait avec deux Pseudos et deux historiques selon le bouton cliqué, et il faudrait un écran de gestion des fournisseurs liés.
+- **Un Joueur par fournisseur, liaison à la main** : écarté. Le même Joueur se retrouverait avec deux Pseudos et deux historiques selon le bouton cliqué, et il faudrait un écran de gestion des fournisseurs liés.
 - **Fusion sans exiger d'adresse vérifiée** : écartée. Il suffirait de déclarer l'adresse de quelqu'un chez un fournisseur pour entrer dans son Joueur.
 - **S'en tenir au contrôle par défaut de Better Auth pour le rattachement** (sans `trustedProviders`) : écarté. Il refuse bien une adresse non vérifiée, mais avec l'erreur générique `account_not_linked`, et il laisse créer un Joueur avec une adresse non vérifiée. Le refus passe par `user.validateUserInfo`, qui couvre les trois cas avec la même erreur.
 - **Plugin `username` de Better Auth pour le Pseudo** : écarté. Il sert à la connexion par pseudo + mot de passe, qu'on n'active pas, et il impose ses propres règles de format et ses routes.
@@ -18,5 +18,5 @@ Un Invité devient Joueur en se connectant avec GitHub ou Discord, via Better Au
 - Un Joueur dont l'adresse n'est plus vérifiée chez le fournisseur (adresse changée, pas encore confirmée) ne peut plus se connecter par ce fournisseur tant qu'il ne l'a pas vérifiée.
 - Avec `validateUserInfo`, Better Auth refuse de créer un Joueur hors d'une requête HTTP. Les tests ne peuvent donc pas passer par `internalAdapter.createUser`.
 - Le flux OAuth réel (redirection, consentement, callback) ne se teste pas automatiquement : les tests remplacent les API HTTP de GitHub et Discord, le reste se recette à la main avec une OAuth App GitHub et une app Discord de dev.
-- Il n'y a ni changement d'adresse ni suppression de compte. La suppression deviendra nécessaire avant une ouverture publique.
+- Il n'y a ni changement d'adresse ni suppression de Joueur. La suppression deviendra nécessaire avant une ouverture publique.
 - Le Pseudo, ses règles et sa route sont à notre charge : format, unicité sans tenir compte de la casse, noms réservés.
