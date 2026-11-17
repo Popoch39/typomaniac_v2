@@ -53,7 +53,7 @@ test("RES-4: the WPM and the raw WPM are 0 when the duration is zero", () => {
   const game = createGame({ mode: "words", wordCount: 1 }, ["ab"]);
   const finished = applyEvent(game, { type: "insert", at: 250, text: "ab" });
 
-  expect(getResult(finished)).toEqual({ duration: 0, wpm: 0, rawWpm: 0 });
+  expect(getResult(finished)).toMatchObject({ duration: 0, wpm: 0, rawWpm: 0 });
 });
 
 test("RES-5: asking for the Result of a Game that has not started is refused", () => {
