@@ -31,11 +31,17 @@ export type Game = {
 /** `at` is the client timestamp in milliseconds. */
 export type GameEvent =
   | { readonly type: "insert"; readonly at: number; readonly text: string }
+  | { readonly type: "delete"; readonly at: number; readonly unit: DeletionUnit }
   | { readonly type: "tick"; readonly at: number }
   | { readonly type: "addWords"; readonly words: readonly string[] };
 
+export type DeletionUnit = "char" | "word";
+
 export const SEPARATOR = " ";
 const MAX_EXTRA_CHARS = 20;
+// What a word deletion removes: the last run of non-blank characters with the blanks after it,
+// or the trailing blanks when the input has nothing else.
+const LAST_TYPED_BLOCK = /(?:\S+\s*|\s+)$/;
 // Monkeytype's own list, not a generic whitespace test: U+2000, U+2001, U+2005, U+2006, U+205F,
 // tab and newline are deliberately absent.
 const TYPABLE_SPACES: ReadonlySet<string> = new Set([
@@ -95,6 +101,7 @@ function newGame(config: GameConfig, targetWords: readonly string[]): Game {
 }
 
 export function applyEvent(game: Game, event: GameEvent): Game {
+  if (event.type === "delete") return deleteInput(game, event.unit);
   if (event.type === "tick") return tick(game, event.at);
   if (event.type === "addWords") return addWords(game, event.words);
   // UTF-16 units, not code points: positions in a target word are counted the same way.
@@ -158,4 +165,32 @@ function insertChar(game: Game, typedChar: string, at: number): Game {
   }
   if (!validates) return running;
   return { ...running, activeWordIndex: activeWordIndex + 1 };
+}
+
+function deleteInput(game: Game, unit: DeletionUnit): Game {
+  if (game.status === "finished") return game;
+
+  const { activeWordIndex } = game;
+  const input = game.inputs[activeWordIndex] ?? "";
+  if (input !== "") {
+    const nextInput = unit === "char" ? input.slice(0, -1) : input.replace(LAST_TYPED_BLOCK, "");
+    return withInput(game, activeWordIndex, nextInput);
+  }
+
+  const previousWordIndex = activeWordIndex - 1;
+  const previousInput = game.inputs[previousWordIndex] ?? "";
+  if (activeWordIndex === 0 || previousInput === game.targetWords[previousWordIndex]) return game;
+  // A validated word always ends with the space that validated it: going back takes it off.
+  const restoredInput = unit === "char" ? previousInput.slice(0, -1) : "";
+  return {
+    ...withInput(game, previousWordIndex, restoredInput),
+    activeWordIndex: previousWordIndex,
+  };
+}
+
+function withInput(game: Game, wordIndex: number, input: string): Game {
+  return {
+    ...game,
+    inputs: game.inputs.map((current, index) => (index === wordIndex ? input : current)),
+  };
 }
