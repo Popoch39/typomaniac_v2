@@ -149,6 +149,9 @@ test("RES-6: a time Game started on a signal and ended without any keystroke has
     rawWpm: 0,
     accuracy: 0,
     charCounts: { correct: 0, incorrect: 0, extra: 0, missed: 0, exactWords: 0 },
+    // Two empty seconds: a keystroke rate of 0 everywhere has no defined consistency.
+    consistency: 0,
+    history: { wpm: [0, 0], keystrokeRate: [0, 0], errors: [0, 0] },
   });
 });
 

@@ -15,6 +15,13 @@ export type Keystroke = {
   readonly correct: boolean;
 };
 
+export type ProgressSample = {
+  /** Client timestamp in milliseconds. */
+  readonly at: number;
+  /** Characters of the words typed exactly so far, plus the correct start of the active word. */
+  readonly creditedChars: number;
+};
+
 export type Game = {
   readonly config: GameConfig;
   readonly targetWords: readonly string[];
@@ -22,6 +29,8 @@ export type Game = {
   readonly activeWordIndex: number;
   readonly status: GameStatus;
   readonly keystrokes: readonly Keystroke[];
+  /** One sample per insertion or deletion that changed the Game: what the WPM history is read from. */
+  readonly progress: readonly ProgressSample[];
   /** Client timestamp in milliseconds, `null` until the clock starts. */
   readonly startedAt: number | null;
   /** Client timestamp in milliseconds, `null` until the game is finished. */
@@ -96,6 +105,7 @@ function newGame(config: GameConfig, targetWords: readonly string[]): Game {
     activeWordIndex: 0,
     status: "ready",
     keystrokes: [],
+    progress: [],
     startedAt: null,
     endedAt: null,
   };
@@ -103,11 +113,29 @@ function newGame(config: GameConfig, targetWords: readonly string[]): Game {
 
 export function applyEvent(game: Game, event: GameEvent): Game {
   if (event.type === "start") return start(game, event.at);
-  if (event.type === "delete") return deleteInput(game, event.unit);
+  if (event.type === "delete") return sampled(game, deleteInput(game, event.unit), event.at);
   if (event.type === "tick") return tick(game, event.at);
   if (event.type === "addWords") return addWords(game, event.words);
   // UTF-16 units, not code points: positions in a target word are counted the same way.
-  return event.text.split("").reduce((current, char) => insertChar(current, char, event.at), game);
+  const typed = event.text
+    .split("")
+    .reduce((current, char) => insertChar(current, char, event.at), game);
+  return sampled(game, typed, event.at);
+}
+
+function sampled(before: Game, after: Game, at: number): Game {
+  // An Event that was refused or ignored leaves no sample.
+  if (after === before) return after;
+  // The history credits the active word in both modes, whereas the Result only does in a time game.
+  const creditedChars = after.targetWords
+    .slice(0, after.activeWordIndex + 1)
+    .reduce((total, target, index) => {
+      const input = after.inputs[index] ?? "";
+      const credited =
+        index === after.activeWordIndex ? target.startsWith(input) : input === target;
+      return total + (credited ? input.length : 0);
+    }, 0);
+  return { ...after, progress: [...after.progress, { at, creditedChars }] };
 }
 
 function start(game: Game, at: number): Game {

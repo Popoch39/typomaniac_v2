@@ -1,4 +1,6 @@
 import { SEPARATOR, type Game } from "./game.ts";
+import { countInBucket, cutIntoBuckets } from "./history.ts";
+import { consistency, roundTo2, wordsPerMinute } from "./numbers.ts";
 
 export type CharCounts = {
   readonly correct: number;
@@ -17,6 +19,19 @@ export type Result = {
   /** Percentage, rounded to 2 decimals. */
   readonly accuracy: number;
   readonly charCounts: CharCounts;
+  /** 0 to 100, rounded to 2 decimals: how regular the keystroke rate was. */
+  readonly consistency: number;
+  readonly history: History;
+};
+
+/** One integer per bucket of the Game: one-second buckets counted from its start. */
+export type History = {
+  /** WPM reached at the end of each bucket, counted from the start of the Game. */
+  readonly wpm: readonly number[];
+  /** Keystrokes of each bucket alone, expressed in WPM. */
+  readonly keystrokeRate: readonly number[];
+  /** Incorrect keystrokes of each bucket. */
+  readonly errors: readonly number[];
 };
 
 const NO_CHARS: CharCounts = { correct: 0, incorrect: 0, extra: 0, missed: 0, exactWords: 0 };
@@ -28,10 +43,51 @@ export function getResult(game: Game): Result {
 
   // The speeds are computed from the rounded duration, as Monkeytype does.
   const duration = roundTo2((game.endedAt - game.startedAt) / 1000);
-  const { activeWordIndex } = game;
   // Cut short by the clock, the active word of a time game is credited for what was typed of it.
-  const creditsActiveWord = game.config.mode === "time";
-  const charCounts = game.targetWords
+  const charCounts = countChars(game, game.config.mode === "time");
+  const typedChars = charCounts.correct + charCounts.incorrect + charCounts.extra;
+  const correctKeystrokes = game.keystrokes.filter((keystroke) => keystroke.correct).length;
+  // A game started on a signal can end without any keystroke: the ratio is then undefined.
+  const accuracy =
+    game.keystrokes.length === 0 ? 0 : (correctKeystrokes / game.keystrokes.length) * 100;
+  const history = buildHistory(game, game.startedAt, game.endedAt);
+
+  return {
+    duration,
+    wpm: roundTo2(wordsPerMinute(charCounts.exactWords, duration)),
+    rawWpm: roundTo2(wordsPerMinute(typedChars, duration)),
+    accuracy: roundTo2(accuracy),
+    charCounts,
+    consistency: consistency(history.keystrokeRate),
+    history,
+  };
+}
+
+function buildHistory(game: Game, startedAt: number, endedAt: number): History {
+  // Only a words game gets a last, shorter bucket: a time game stops on its last whole second.
+  const buckets = cutIntoBuckets(endedAt - startedAt, game.config.mode === "words");
+  const keystrokeInstants = game.keystrokes.map((keystroke) => keystroke.at - startedAt);
+  const errorInstants = game.keystrokes
+    .filter((keystroke) => !keystroke.correct)
+    .map((keystroke) => keystroke.at - startedAt);
+
+  return {
+    wpm: buckets.map((bucket) => {
+      const reached = game.progress.filter((sample) => sample.at - startedAt <= bucket.until);
+      // Nothing typed yet when the bucket ends: a game started on a signal, before its first letter.
+      const creditedChars = reached.at(-1)?.creditedChars ?? 0;
+      return Math.round(wordsPerMinute(creditedChars, bucket.until / 1000));
+    }),
+    keystrokeRate: buckets.map((bucket) =>
+      Math.round(wordsPerMinute(countInBucket(keystrokeInstants, bucket), bucket.seconds)),
+    ),
+    errors: buckets.map((bucket) => countInBucket(errorInstants, bucket)),
+  };
+}
+
+export function countChars(game: Game, creditsActiveWord: boolean): CharCounts {
+  const { activeWordIndex } = game;
+  return game.targetWords
     .slice(0, activeWordIndex + 1)
     .map((target, index) =>
       countWordChars(
@@ -41,19 +97,6 @@ export function getResult(game: Game): Result {
       ),
     )
     .reduce(addCharCounts, NO_CHARS);
-  const typedChars = charCounts.correct + charCounts.incorrect + charCounts.extra;
-  const correctKeystrokes = game.keystrokes.filter((keystroke) => keystroke.correct).length;
-  // A game started on a signal can end without any keystroke: the ratio is then undefined.
-  const accuracy =
-    game.keystrokes.length === 0 ? 0 : (correctKeystrokes / game.keystrokes.length) * 100;
-
-  return {
-    duration,
-    wpm: roundTo2(wordsPerMinute(charCounts.exactWords, duration)),
-    rawWpm: roundTo2(wordsPerMinute(typedChars, duration)),
-    accuracy: roundTo2(accuracy),
-    charCounts,
-  };
 }
 
 function countWordChars(input: string, target: string, creditPartial: boolean): CharCounts {
@@ -85,13 +128,4 @@ function addCharCounts(total: CharCounts, word: CharCounts): CharCounts {
     missed: total.missed + word.missed,
     exactWords: total.exactWords + word.exactWords,
   };
-}
-
-function wordsPerMinute(chars: number, seconds: number): number {
-  if (seconds <= 0) return 0;
-  return chars / 5 / (seconds / 60);
-}
-
-function roundTo2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

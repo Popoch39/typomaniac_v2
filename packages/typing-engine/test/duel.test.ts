@@ -61,6 +61,11 @@ test("DUEL-1: two Games on the same words and the same start signal give two ind
     rawWpm: 42,
     accuracy: 100,
     charCounts: { correct: 7, incorrect: 0, extra: 0, missed: 0, exactWords: 7 },
+    // Keystrokes 0.5, 0.75 and 1 s after the signal, then 4 more: rates 36 and 48.
+    // Mean 42, deviation 6: c = 1 / 7, 100 × (1 − tanh(0.14384…)) = 85.71.
+    consistency: 85.71,
+    // "cat" after 1 s: 3 / 5 / (1 / 60) = 36. The 7 characters after 2 s: 42.
+    history: { wpm: [36, 42], keystrokeRate: [36, 48], errors: [0, 0] },
   });
   expect(getResult(secondFinished)).toEqual({
     duration: 5,
@@ -71,6 +76,18 @@ test("DUEL-1: two Games on the same words and the same start signal give two ind
     // 6 correct keystrokes out of 8: the wrong letter and the space that ends the Game are incorrect.
     accuracy: 75,
     charCounts: { correct: 6, incorrect: 1, extra: 0, missed: 0, exactWords: 4 },
+    // Rates 12, 24, 24, 24, 12: mean 19.2, deviation √34.56 = 5.8788, c = 0.30619,
+    // 100 × (1 − tanh(0.31629…)) = 69.38.
+    consistency: 69.38,
+    history: {
+      // Credited characters at each second: 1, 3, 5 ("cat d"), then 4 once "dx" is wrong.
+      // 12, 18, 20, 4 / 5 / (4 / 60) = 12 and 4 / 5 / (5 / 60) = 9.6.
+      wpm: [12, 18, 20, 12, 10],
+      // 1 keystroke on the first boundary, 2 per second after, and the final space alone.
+      keystrokeRate: [12, 24, 24, 24, 12],
+      // "x" 3.5 s after the signal, the space on the wrong last word at 5 s.
+      errors: [0, 0, 0, 1, 1],
+    },
   });
 });
 

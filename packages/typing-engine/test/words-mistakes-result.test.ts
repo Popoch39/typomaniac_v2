@@ -153,6 +153,15 @@ test("END-3: a Game ended by a space on a wrong last word gives a complete Resul
     rawWpm: 42,
     accuracy: 62.5,
     charCounts: { correct: 4, incorrect: 3, extra: 0, missed: 0, exactWords: 0 },
+    // Rates 72 and 24: mean 48, deviation 24, c = 0.5, 100 × (1 − tanh(0.54791…)) = 50.10.
+    consistency: 50.1,
+    history: {
+      // After 1 s "cax " is wrong and "do" starts "dog": 2 / 5 / (1 / 60) = 24. "dox" then earns nothing.
+      wpm: [24, 0],
+      // 6 keystrokes up to 1000 ms included, then "x" and the final space.
+      keystrokeRate: [72, 24],
+      errors: [1, 2],
+    },
   });
 });
 

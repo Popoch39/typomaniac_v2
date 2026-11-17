@@ -34,6 +34,15 @@ test("END-5: a time Game played to its ending Tick gives a complete Result, late
     rawWpm: 41.79,
     accuracy: 100,
     charCounts: { correct: 7, incorrect: 0, extra: 0, missed: 0, exactWords: 7 },
+    // Rates 48 and 24: mean 36, deviation 12, c = 1 / 3, 100 × (1 − tanh(0.34650…)) = 66.67.
+    consistency: 66.67,
+    history: {
+      // "cat " after 1 s: 4 / 5 / (1 / 60) = 48. "cat do" after 2 s: 6 / 5 / (2 / 60) = 36.
+      wpm: [48, 36],
+      // 4 keystrokes in the first second, 2 in the second one; the late "g" is in no bucket.
+      keystrokeRate: [48, 24],
+      errors: [0, 0],
+    },
   });
 });
 
