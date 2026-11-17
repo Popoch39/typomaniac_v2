@@ -30,6 +30,7 @@ export type Game = {
 
 /** `at` is the client timestamp in milliseconds. */
 export type GameEvent =
+  | { readonly type: "start"; readonly at: number }
   | { readonly type: "insert"; readonly at: number; readonly text: string }
   | { readonly type: "delete"; readonly at: number; readonly unit: DeletionUnit }
   | { readonly type: "tick"; readonly at: number }
@@ -101,11 +102,18 @@ function newGame(config: GameConfig, targetWords: readonly string[]): Game {
 }
 
 export function applyEvent(game: Game, event: GameEvent): Game {
+  if (event.type === "start") return start(game, event.at);
   if (event.type === "delete") return deleteInput(game, event.unit);
   if (event.type === "tick") return tick(game, event.at);
   if (event.type === "addWords") return addWords(game, event.words);
   // UTF-16 units, not code points: positions in a target word are counted the same way.
   return event.text.split("").reduce((current, char) => insertChar(current, char, event.at), game);
+}
+
+function start(game: Game, at: number): Game {
+  // A signal cannot move a clock that is already running, nor reopen a finished game.
+  if (game.status !== "ready") return game;
+  return { ...game, status: "running", startedAt: at };
 }
 
 function tick(game: Game, at: number): Game {

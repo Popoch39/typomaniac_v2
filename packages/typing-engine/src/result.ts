@@ -19,6 +19,8 @@ export type Result = {
   readonly charCounts: CharCounts;
 };
 
+const NO_CHARS: CharCounts = { correct: 0, incorrect: 0, extra: 0, missed: 0, exactWords: 0 };
+
 export function getResult(game: Game): Result {
   if (game.startedAt === null || game.endedAt === null) {
     throw new Error("The game is not finished: it has no result yet.");
@@ -38,16 +40,18 @@ export function getResult(game: Game): Result {
         creditsActiveWord && index === activeWordIndex,
       ),
     )
-    .reduce(addCharCounts);
+    .reduce(addCharCounts, NO_CHARS);
   const typedChars = charCounts.correct + charCounts.incorrect + charCounts.extra;
-  // A finished game has at least the keystroke that started it: the ratio is always defined.
   const correctKeystrokes = game.keystrokes.filter((keystroke) => keystroke.correct).length;
+  // A game started on a signal can end without any keystroke: the ratio is then undefined.
+  const accuracy =
+    game.keystrokes.length === 0 ? 0 : (correctKeystrokes / game.keystrokes.length) * 100;
 
   return {
     duration,
     wpm: roundTo2(wordsPerMinute(charCounts.exactWords, duration)),
     rawWpm: roundTo2(wordsPerMinute(typedChars, duration)),
-    accuracy: roundTo2((correctKeystrokes / game.keystrokes.length) * 100),
+    accuracy: roundTo2(accuracy),
     charCounts,
   };
 }
