@@ -1,3 +1,5 @@
+import { countChars, SEPARATOR } from "./chars.ts";
+
 export type GameConfig =
   | { readonly mode: "words"; readonly wordCount: number }
   | { readonly mode: "time"; readonly seconds: number };
@@ -38,7 +40,12 @@ export type Game = {
   readonly activeWordIndex: number;
   readonly status: GameStatus;
   readonly keystrokes: readonly Keystroke[];
-  /** One sample per insertion or deletion that changed the Game: what the WPM history is read from. */
+  /**
+   * One sample per insertion or deletion that changed the Game: what the WPM history is read from.
+   * Internal to the engine, not part of the contract duel rules read (the keystroke journal and
+   * the Result). It has to live on the Game: the history needs the input as it was at each second,
+   * and the journal holds no deletion to rebuild it from.
+   */
   readonly progress: readonly ProgressSample[];
   /** Every key press received, in the order received: the rhythm of the typing, never its content. */
   readonly keyPresses: readonly KeyPress[];
@@ -60,7 +67,6 @@ export type GameEvent =
 
 export type DeletionUnit = "char" | "word";
 
-export const SEPARATOR = " ";
 const MAX_EXTRA_CHARS = 20;
 // What a word deletion removes: the last run of non-blank characters with the blanks after it,
 // or the trailing blanks when the input has nothing else.
@@ -143,14 +149,7 @@ function sampled(before: Game, after: Game, at: number): Game {
   // An Event that was refused or ignored leaves no sample.
   if (after === before) return after;
   // The history credits the active word in both modes, whereas the Result only does in a time game.
-  const creditedChars = after.targetWords
-    .slice(0, after.activeWordIndex + 1)
-    .reduce((total, target, index) => {
-      const input = after.inputs[index] ?? "";
-      const credited =
-        index === after.activeWordIndex ? target.startsWith(input) : input === target;
-      return total + (credited ? input.length : 0);
-    }, 0);
+  const creditedChars = countChars(after, { creditActiveWord: true }).exactWords;
   return { ...after, progress: [...after.progress, { at, creditedChars }] };
 }
 
@@ -222,8 +221,7 @@ function insertChar(game: Game, typedChar: string, at: number): Game {
     correct: target[input.length] === char,
   };
   const running: Game = {
-    ...game,
-    inputs: game.inputs.map((current, index) => (index === activeWordIndex ? nextInput : current)),
+    ...withInput(game, activeWordIndex, nextInput),
     status: "running",
     keystrokes: [...game.keystrokes, keystroke],
     startedAt: game.startedAt ?? at,

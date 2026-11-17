@@ -1,3 +1,4 @@
+export type { CharCounts } from "./chars.ts";
 export { applyEvent, createGame } from "./game.ts";
 export type {
   DeletionUnit,
@@ -12,4 +13,4 @@ export type {
 export { getLiveStats } from "./live-stats.ts";
 export type { LiveStats } from "./live-stats.ts";
 export { getResult } from "./result.ts";
-export type { CharCounts, History, Result } from "./result.ts";
+export type { History, Result } from "./result.ts";

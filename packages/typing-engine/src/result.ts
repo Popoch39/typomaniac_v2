@@ -1,16 +1,8 @@
-import { SEPARATOR, type Game } from "./game.ts";
+import { measureTyping, type CharCounts } from "./chars.ts";
+import type { Game } from "./game.ts";
 import { countInBucket, cutIntoBuckets, type Bucket } from "./history.ts";
 import { countedKeyPresses, keyHoldDurations, keyPressGaps } from "./keys.ts";
 import { consistency, roundTo2, wordsPerMinute } from "./numbers.ts";
-
-export type CharCounts = {
-  readonly correct: number;
-  readonly incorrect: number;
-  readonly extra: number;
-  readonly missed: number;
-  /** Characters of the words typed exactly, separators included. */
-  readonly exactWords: number;
-};
 
 export type Result = {
   /** Seconds, rounded to 2 decimals. */
@@ -45,7 +37,6 @@ export type History = {
   readonly errors: readonly number[];
 };
 
-const NO_CHARS: CharCounts = { correct: 0, incorrect: 0, extra: 0, missed: 0, exactWords: 0 };
 // How many buckets the final inactivity looks back on.
 const FINAL_BUCKETS = 5;
 
@@ -57,15 +48,14 @@ export function getResult(game: Game): Result {
   // The speeds are computed from the rounded duration, as Monkeytype does.
   const duration = roundTo2((game.endedAt - game.startedAt) / 1000);
   // Cut short by the clock, the active word of a time game is credited for what was typed of it.
-  const charCounts = countChars(game, game.config.mode === "time");
-  const typedChars = charCounts.correct + charCounts.incorrect + charCounts.extra;
-  const correctKeystrokes = game.keystrokes.filter((keystroke) => keystroke.correct).length;
-  // A game started on a signal can end without any keystroke: the ratio is then undefined.
-  const accuracy =
-    game.keystrokes.length === 0 ? 0 : (correctKeystrokes / game.keystrokes.length) * 100;
+  const { charCounts, typedChars, accuracy } = measureTyping(game, {
+    creditActiveWord: game.config.mode === "time",
+  });
   const { startedAt } = game;
   // Only a words game gets a last, shorter bucket: a time game stops on its last whole second.
-  const buckets = cutIntoBuckets(game.endedAt - startedAt, game.config.mode === "words");
+  const buckets = cutIntoBuckets(game.endedAt - startedAt, {
+    withTail: game.config.mode === "words",
+  });
   const history = buildHistory(game, buckets, startedAt);
   const keyPresses = countedKeyPresses(game, startedAt);
   const gaps = keyPressGaps(keyPresses, startedAt);
@@ -108,50 +98,5 @@ function buildHistory(game: Game, buckets: readonly Bucket[], startedAt: number)
       Math.round(wordsPerMinute(countInBucket(keystrokeInstants, bucket), bucket.seconds)),
     ),
     errors: buckets.map((bucket) => countInBucket(errorInstants, bucket)),
-  };
-}
-
-export function countChars(game: Game, creditsActiveWord: boolean): CharCounts {
-  const { activeWordIndex } = game;
-  return game.targetWords
-    .slice(0, activeWordIndex + 1)
-    .map((target, index) =>
-      countWordChars(
-        game.inputs[index] ?? "",
-        target,
-        creditsActiveWord && index === activeWordIndex,
-      ),
-    )
-    .reduce(addCharCounts, NO_CHARS);
-}
-
-function countWordChars(input: string, target: string, creditPartial: boolean): CharCounts {
-  const exact = input === target;
-  const credited = creditPartial ? target.startsWith(input) : exact;
-  const validated = input.includes(SEPARATOR);
-  let correct = 0;
-  let incorrect = 0;
-  let extra = 0;
-  let missed = 0;
-  for (let index = 0; index < Math.max(input.length, target.length); index++) {
-    const typed = input[index];
-    const expected = target[index];
-    if (typed === undefined) missed += creditPartial ? 0 : 1;
-    // Until a space validates the word, a letter on the separator position overflows the word.
-    else if (expected === undefined || (expected === SEPARATOR && !validated)) extra++;
-    // A separator only counts as correct when it closes an exact word.
-    else if (typed !== expected || (typed === SEPARATOR && !exact)) incorrect++;
-    else correct++;
-  }
-  return { correct, incorrect, extra, missed, exactWords: credited ? input.length : 0 };
-}
-
-function addCharCounts(total: CharCounts, word: CharCounts): CharCounts {
-  return {
-    correct: total.correct + word.correct,
-    incorrect: total.incorrect + word.incorrect,
-    extra: total.extra + word.extra,
-    missed: total.missed + word.missed,
-    exactWords: total.exactWords + word.exactWords,
   };
 }

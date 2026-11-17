@@ -15,7 +15,10 @@ const BUCKET_MS = 1000;
  * One bucket per whole second elapsed, on a grid that starts with the Game. With `withTail`,
  * one more bucket runs up to the end when at least half a second is left.
  */
-export function cutIntoBuckets(durationMs: number, withTail: boolean): readonly Bucket[] {
+export function cutIntoBuckets(
+  durationMs: number,
+  { withTail }: { readonly withTail: boolean },
+): readonly Bucket[] {
   const wholeSeconds = Math.floor(durationMs / BUCKET_MS);
   const ends = Array.from({ length: wholeSeconds }, (_, index) => (index + 1) * BUCKET_MS);
   // The rest is read on the duration rounded to 2 decimals, as Monkeytype does: 3.996 s leaves none.
