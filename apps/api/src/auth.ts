@@ -68,7 +68,13 @@ export const createAuth = (db: Db, config: AuthConfig) =>
       github: config.github,
       discord: config.discord,
     },
-    user: { validateUserInfo: refuseUnverifiedEmail },
+    user: {
+      validateUserInfo: refuseUnverifiedEmail,
+      additionalFields: {
+        // input: false keeps Better Auth's own routes from setting it: only PUT /api/me/pseudo applies the Pseudo rules.
+        pseudo: { type: "string", required: false, input: false },
+      },
+    },
     account: {
       accountLinking: {
         // Trusting a provider makes Better Auth attach it without looking at emailVerified. It is only
