@@ -136,3 +136,42 @@ test("ACC-1: the accuracy of a time Game counts every keystroke up to the ending
 
   expect(getResult(finished).accuracy).toBe(75);
 });
+
+test("CHARS-8: a word the player went back to is no longer validated, and its letter on the separator position is extra", () => {
+  const game = createGame({ mode: "time", seconds: 2 }, ["cat", "dog"]);
+  // "catx " is validated, then the deletion goes back to it and takes its space off: "catx".
+  const back = applyEvent(typeText(game, "catx ", 0, 100), {
+    type: "delete",
+    at: 600,
+    unit: "char",
+  });
+
+  const finished = applyEvent(back, { type: "tick", at: 2000 });
+
+  expect(getResult(finished).charCounts).toEqual({
+    correct: 3,
+    incorrect: 0,
+    extra: 1,
+    missed: 0,
+    exactWords: 0,
+  });
+});
+
+test("CHARS-9: a word the player left by going back is not counted", () => {
+  const game = createGame({ mode: "time", seconds: 2 }, ["cat", "dog"]);
+  // "cax d", then "d" is deleted and a second deletion goes back to "cax".
+  const typing = typeText(game, "cax d", 0, 100);
+  const emptied = applyEvent(typing, { type: "delete", at: 600, unit: "char" });
+  const back = applyEvent(emptied, { type: "delete", at: 700, unit: "char" });
+
+  const finished = applyEvent(back, { type: "tick", at: 2000 });
+
+  // "cax" is the active word: "x" is incorrect, the separator and "dog " are not missed.
+  expect(getResult(finished).charCounts).toEqual({
+    correct: 2,
+    incorrect: 1,
+    extra: 0,
+    missed: 0,
+    exactWords: 0,
+  });
+});

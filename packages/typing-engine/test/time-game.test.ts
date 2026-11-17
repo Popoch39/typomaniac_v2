@@ -83,6 +83,16 @@ test("ADD-3: an insertion is refused while the active word waits for words, then
   expect(typing.keystrokes).toHaveLength(4);
 });
 
+test("ADD-3: a deletion while the active word waits for words goes back to an incorrect last word", () => {
+  const game = createGame({ mode: "time", seconds: 15 }, ["ab"]);
+  const waiting = typeText(game, "ax ", 0, 100);
+
+  const back = applyEvent(waiting, { type: "delete", at: 300, unit: "char" });
+
+  expect(back.activeWordIndex).toBe(0);
+  expect(back.inputs).toEqual(["ax"]);
+});
+
 test("ADD-3: an insertion on a time Game without any word is refused and does not start the clock", () => {
   const game = createGame({ mode: "time", seconds: 15 }, []);
 
