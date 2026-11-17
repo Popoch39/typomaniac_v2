@@ -13,6 +13,7 @@ const app = createApp(testDb.db, auth);
 test("an Invité asking for their profile is told they are not signed in", async () => {
   const response = await app.handle(new Request("http://localhost/api/me"));
   expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ code: "UNAUTHORIZED" });
 });
 
 test("a session cookie that Better Auth did not sign is refused", async () => {

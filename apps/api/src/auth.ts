@@ -29,6 +29,12 @@ export const createAuth = (db: Db, config: AuthConfig) =>
     secret: config.secret,
     // Front and API share one origin, with the API under /api.
     basePath: "/api/auth",
+    user: {
+      additionalFields: {
+        // input: false keeps Better Auth's own routes from setting it: only PUT /api/me/pseudo applies the Pseudo rules.
+        pseudo: { type: "string", required: false, input: false },
+      },
+    },
   });
 
 export type Auth = ReturnType<typeof createAuth>;
