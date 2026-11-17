@@ -23,6 +23,6 @@ COPY --from=build /app/server ./server
 # Migrations are applied by the server at startup, read from ./drizzle relative to WORKDIR.
 COPY --from=build /app/apps/api/drizzle ./drizzle
 ENV NODE_ENV=production
-# DATABASE_URL is required at runtime (see compose.prod.yaml).
+# The server refuses to start without the variables listed in apps/api/.env.example (compose.prod.yaml sets them).
 EXPOSE 3000
 CMD ["./server"]

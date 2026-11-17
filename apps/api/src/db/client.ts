@@ -1,6 +1,7 @@
 import { SQL } from "bun";
 import { drizzle } from "drizzle-orm/bun-sql";
 import { migrate } from "drizzle-orm/bun-sql/migrator";
+import * as schema from "./schema.ts";
 
 export const requireDatabaseUrl = () => {
   const url = process.env.DATABASE_URL;
@@ -8,7 +9,8 @@ export const requireDatabaseUrl = () => {
   return url;
 };
 
-export const openDatabase = (url: string) => drizzle({ client: new SQL(url) });
+// The schema is passed so Better Auth's Drizzle adapter can find its tables on the client.
+export const openDatabase = (url: string) => drizzle({ client: new SQL(url), schema });
 
 export type Db = ReturnType<typeof openDatabase>;
 
