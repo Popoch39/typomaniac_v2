@@ -29,12 +29,14 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 
 Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-auth/adapters/drizzle`, provider `pg`). Ses routes répondent sous `/api/auth` (santé : `GET /api/auth/ok`).
 
-- `src/auth.ts` exporte `createAuth(db, config)`, une fabrique : il n'y a pas d'instance globale à importer. `src/index.ts` lit la config avec `requireAuthConfig()` (qui refuse de démarrer sans `BETTER_AUTH_SECRET` ou `BETTER_AUTH_URL`), fabrique l'instance et l'injecte dans `createApp(db, auth)`.
+- `src/auth.ts` exporte `createAuth(db, config)`, une fabrique : il n'y a pas d'instance globale à importer. `src/index.ts` lit la config avec `requireAuthConfig()` (qui refuse de démarrer sans `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `DISCORD_CLIENT_ID` ou `DISCORD_CLIENT_SECRET`), fabrique l'instance et l'injecte dans `createApp(db, auth)`.
 - Dans les tests : `createTestAuth(testDb.db)` (`test/helpers/auth.ts`) fabrique une instance sur la base du fichier de test.
 - L'adaptateur retrouve ses tables dans le schéma passé à Drizzle par `openDatabase`, sous les noms d'export `user`, `session`, `account`, `verification` de `src/db/schema.ts`. Ne pas les renommer.
 - L'intégration à Elysia suit `.agents/skills/elysiajs/references/better-auth.md` (`.mount(auth.handler)`, macro pour les routes protégées), pas la doc de Better Auth, écrite pour Elysia 1.
 - Route réservée aux Joueurs : l'option `signedIn: true` (`createProtection(auth)`, `src/protection.ts`) répond 401 sans session valide et donne `joueur` et `session` au handler. Un module de routes défini à part doit `.use(createProtection(auth))` pour avoir l'option et ses types.
 - Dans les tests : `signInJoueur(auth)` (`test/helpers/auth.ts`) crée un Joueur et rend `{ joueur, cookie }`, le cookie étant à passer dans l'en-tête `cookie` de la requête.
+- Connexion par GitHub et Discord seulement, voir `docs/adr/0003-connexion-oauth-seul-fusion-par-email-verifie.md`. `refuseUnverifiedEmail` (`user.validateUserInfo`) refuse toute adresse que le fournisseur ne marque pas vérifiée. `trustedProviders` et la désactivation de `/link-social` n'ont de sens qu'avec lui : ne pas toucher à l'un sans relire l'ADR.
+- À cause de `validateUserInfo`, `internalAdapter.createUser` échoue hors d'une requête (`validation_context_missing`) : dans un test, passer par `signInJoueur` ou par le faux fournisseur de `test/oauth.test.ts`, qui remplace les API HTTP de GitHub et Discord et joue le vrai flux.
 - Importer un plugin par son sous-chemin (`better-auth/plugins/<nom>`), pas par `better-auth/plugins`, qui tire des modules gênants pour la compilation en binaire.
 
 ### Régénérer le schéma

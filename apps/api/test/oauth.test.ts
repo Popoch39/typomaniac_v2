@@ -1,4 +1,4 @@
-import { afterAll, expect, setSystemTime, spyOn, test } from "bun:test";
+import { afterAll, expect, setSystemTime, test } from "bun:test";
 import { createApp } from "../src/app.ts";
 import { createTestAuth } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -10,7 +10,7 @@ type Identity = { id: string; email: string; verified: boolean };
 
 // Stands in for GitHub and Discord: only their HTTP APIs are faked, the whole Better Auth flow runs for real.
 let identity: Identity;
-const providerFetch = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+const fakeProviders = async (input: string | URL | Request) => {
   const url = input instanceof Request ? input.url : String(input);
   switch (decodeURIComponent(url)) {
     case "https://github.com/login/oauth/access_token":
@@ -32,10 +32,12 @@ const providerFetch = spyOn(globalThis, "fetch").mockImplementation(async (input
     default:
       throw new Error(`Unexpected outgoing request to ${url}`);
   }
-});
+};
+const realFetch = globalThis.fetch;
+globalThis.fetch = Object.assign(fakeProviders, { preconnect: realFetch.preconnect });
 
 afterAll(async () => {
-  providerFetch.mockRestore();
+  globalThis.fetch = realFetch;
   await testDb.drop();
 });
 
@@ -59,9 +61,12 @@ const signInWith = async (provider: "github" | "discord", as: Identity) => {
   const state = new URL(url).searchParams.get("state");
 
   const callback = await app.handle(
-    new Request(`http://localhost/api/auth/callback/${provider}?code=provider-code&state=${state}`, {
-      headers: { cookie: cookieHeader(start) },
-    }),
+    new Request(
+      `http://localhost/api/auth/callback/${provider}?code=provider-code&state=${state}`,
+      {
+        headers: { cookie: cookieHeader(start) },
+      },
+    ),
   );
   return {
     redirect: new URL(callback.headers.get("location") ?? "", "http://localhost"),
@@ -147,6 +152,29 @@ const post = (path: string, body: unknown, cookie = "") =>
       body: JSON.stringify(body),
     }),
   );
+
+test("a Joueur whose address is no longer verified at the provider cannot sign in again", async () => {
+  await signInWith("discord", { id: "6001", email: "alan@example.com", verified: true });
+  const later = await signInWith("discord", {
+    id: "6001",
+    email: "alan@example.com",
+    verified: false,
+  });
+
+  expect(later.redirect.searchParams.get("error")).toBe("email_not_verified");
+  expect(await currentSession(later.cookie)).toBeNull();
+});
+
+test("a Joueur who signs out no longer has a session", async () => {
+  const { cookie } = await signInWith("github", {
+    id: "7001",
+    email: "barbara@example.com",
+    verified: true,
+  });
+
+  expect((await post("/sign-out", {}, cookie)).status).toBe(200);
+  expect(await currentSession(cookie)).toBeNull();
+});
 
 test("attaching a provider by hand is not offered: it would skip the address check", async () => {
   const { cookie } = await signInWith("github", {

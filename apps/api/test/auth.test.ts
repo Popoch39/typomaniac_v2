@@ -26,13 +26,10 @@ test.each([
   "GITHUB_CLIENT_SECRET",
   "DISCORD_CLIENT_ID",
   "DISCORD_CLIENT_SECRET",
-] as const)(
-  "startup is refused with a message naming %s when it is missing",
-  (name) => {
-    expect(() => requireAuthConfig({ ...completeEnv, [name]: undefined })).toThrow(name);
-    expect(() => requireAuthConfig({ ...completeEnv, [name]: "" })).toThrow(name);
-  },
-);
+] as const)("startup is refused with a message naming %s when it is missing", (name) => {
+  expect(() => requireAuthConfig({ ...completeEnv, [name]: undefined })).toThrow(name);
+  expect(() => requireAuthConfig({ ...completeEnv, [name]: "" })).toThrow(name);
+});
 
 describe.each(["create-user", "link-account", "sign-in"] as const)(
   "the address check, on %s",
@@ -51,4 +48,3 @@ describe.each(["create-user", "link-account", "sign-in"] as const)(
     });
   },
 );
-

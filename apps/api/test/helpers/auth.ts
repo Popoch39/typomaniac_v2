@@ -16,9 +16,10 @@ export const createTestAuth = (db: Db) =>
 // from the global "better-auth/plugins" entry, and it would have to sit in the production configuration.
 export const signInJoueur = async (auth: Auth, { email }: { email?: string } = {}) => {
   const { internalAdapter, authCookies, secret } = await auth.$context;
-  const joueur = await internalAdapter.createUser(
+  // createUser runs the address check, which Better Auth only allows inside a request.
+  const { user: joueur } = await internalAdapter.createOAuthUser(
     { name: "Ada", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true },
-    { method: "oauth", oauth: { providerId: "github" } },
+    { providerId: "github", accountId: crypto.randomUUID() },
   );
   const { token } = await internalAdapter.createSession(joueur.id);
   // Better Auth only accepts a session cookie signed with its secret.
