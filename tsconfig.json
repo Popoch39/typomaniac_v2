@@ -13,6 +13,7 @@
     { "path": "apps/frontend" },
     { "path": "apps/frontend/test" },
     { "path": "packages/redis" },
+    { "path": "packages/queue" },
     { "path": "apps/api" },
     { "path": "apps/matchmaker" }
   ]

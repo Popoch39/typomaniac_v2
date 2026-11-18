@@ -1,10 +1,10 @@
+import { tickMatchmaker } from "@repo/queue";
 import { openRedis, requireRedisUrl } from "@repo/redis";
 import { startMatchmaker } from "./matchmaker.ts";
 
 const redis = await openRedis(requireRedisUrl());
 
-// Nothing to pair yet: the Queue does not exist. The tick only proves this process leads.
-const matchmaker = startMatchmaker(redis, () => {});
+const matchmaker = startMatchmaker(redis, (now) => tickMatchmaker(redis, now));
 console.log("Matchmaker started");
 
 const shutDown = () => {

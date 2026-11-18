@@ -6,11 +6,15 @@ type Check = (value: unknown) => boolean;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const isNumber: Check = (value) => typeof value === "number" && Number.isFinite(value);
+const isString: Check = (value) => typeof value === "string";
 
 // What each type of message must carry, as the server's schemas send it.
 const FIELDS: Record<QueueServerMessage["type"], Record<string, Check>> = {
   queued: { queuedAt: isNumber, serverAt: isNumber },
-  removed: { reason: (value) => value === "replaced" },
+  proposed: { pairingId: isString, acceptWithinMs: isNumber },
+  requeued: { queuedAt: isNumber, serverAt: isNumber },
+  removed: { reason: (value) => value === "replaced" || value === "notAccepted" },
+  paired: { duelId: isString },
 };
 
 const isMessageType = (type: unknown): type is QueueServerMessage["type"] =>
