@@ -19,11 +19,14 @@
     "../src/features/duel/caret",
     "../src/features/duel/message",
     "../src/features/ranked/standing",
+    "../src/features/queue/clock",
+    "../src/features/queue/message",
     "../src/shared/api/describeApiError.ts"
   ],
   "references": [
     { "path": "../../../packages/typing-engine" },
     { "path": "../../../packages/duel-engine" },
-    { "path": "../../../packages/ranked-engine" }
+    { "path": "../../../packages/ranked-engine" },
+    { "path": "../../../packages/matchmaking-engine" }
   ]
 }

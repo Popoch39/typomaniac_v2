@@ -40,6 +40,14 @@ The window of a Player is the largest MMR gap, bounds included, at which another
 
 A pair names the Player considered first, then the Player found inside their window; pairs are returned in the order they were made. There is no rule against meeting the same Opponent twice in a row.
 
+## Messages
+
+The messages of the Queue socket are typed here, in `QueueServerMessage`, so that the server and the front share one definition.
+
+| Id        | Rule                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------- |
+| MESSAGE-1 | Every message is plain data: it passes through JSON unchanged, with no instant as a `Date`. |
+
 ## Purity
 
 | Id     | Rule                                                                                                                                        |

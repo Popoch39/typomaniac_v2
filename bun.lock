@@ -17,6 +17,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/duel-engine": "*",
+        "@repo/matchmaking-engine": "*",
         "@repo/ranked-engine": "*",
         "@repo/redis": "*",
         "@repo/typing-engine": "*",
@@ -39,6 +40,7 @@
       "dependencies": {
         "@elysia/eden": "2.0.0-rc.1",
         "@repo/duel-engine": "*",
+        "@repo/matchmaking-engine": "*",
         "@repo/ranked-engine": "*",
         "@repo/typing-engine": "*",
         "@tanstack/react-query": "^5.108.0",
