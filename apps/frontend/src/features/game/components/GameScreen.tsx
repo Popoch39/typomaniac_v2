@@ -1,4 +1,4 @@
-import { useGameStatus } from "../hooks/useGameStatus.ts";
+import { useIsGameFinished } from "../hooks/useIsGameFinished.ts";
 import { useRestartCount } from "../hooks/useRestartCount.ts";
 import { useRestartKey } from "../hooks/useRestartKey.ts";
 import { ConfigBar } from "./ConfigBar.tsx";
@@ -8,14 +8,14 @@ import { ResultPanel } from "./ResultPanel.tsx";
 import { TypingArea } from "./TypingArea.tsx";
 
 export function GameScreen() {
-  const status = useGameStatus();
+  const isFinished = useIsGameFinished();
   const restartCount = useRestartCount();
   const restartKeyRef = useRestartKey();
 
   return (
     <main ref={restartKeyRef} className="game-screen">
       <ConfigBar />
-      {status === "finished" ? <ResultPanel /> : <TypingArea key={restartCount} />}
+      {isFinished ? <ResultPanel /> : <TypingArea key={restartCount} />}
       <RestartButton />
     </main>
   );

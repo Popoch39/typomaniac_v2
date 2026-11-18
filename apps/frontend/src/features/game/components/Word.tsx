@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { useActiveWordScroll } from "../hooks/useActiveWordScroll.ts";
 import { useWord } from "../hooks/useWord.ts";
 import { Caret } from "./Caret.tsx";
@@ -9,16 +8,13 @@ type WordProps = {
 };
 
 export function Word({ index }: WordProps) {
-  const { letters, hasCaretAtEnd, isWrong } = useWord(index);
+  const { letterCount, hasCaretAtEnd, isWrong } = useWord(index);
   const scrollRef = useActiveWordScroll(index);
 
   return (
     <span ref={scrollRef} className={isWrong ? "word word-wrong" : "word"}>
-      {letters.map((letter, letterIndex) => (
-        <Fragment key={letterIndex}>
-          {letter.hasCaretBefore && <Caret />}
-          <Letter char={letter.char} state={letter.state} />
-        </Fragment>
+      {Array.from({ length: letterCount }, (_, letterIndex) => (
+        <Letter key={letterIndex} wordIndex={index} letterIndex={letterIndex} />
       ))}
       {hasCaretAtEnd && <Caret />}
     </span>

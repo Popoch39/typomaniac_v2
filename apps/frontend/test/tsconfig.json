@@ -10,6 +10,6 @@
     "emitDeclarationOnly": true,
     "verbatimModuleSyntax": true
   },
-  "include": [".", "../src/features/game/input"],
+  "include": [".", "../src/features/game/input", "../src/features/game/words/judgeLetter.ts"],
   "references": [{ "path": "../../../packages/typing-engine" }]
 }

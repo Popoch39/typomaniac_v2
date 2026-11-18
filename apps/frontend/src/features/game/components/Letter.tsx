@@ -1,10 +1,18 @@
-import type { LetterState } from "../hooks/useWord.ts";
+import { useLetter } from "../hooks/useLetter.ts";
+import { Caret } from "./Caret.tsx";
 
 type LetterProps = {
-  char: string;
-  state: LetterState;
+  wordIndex: number;
+  letterIndex: number;
 };
 
-export function Letter({ char, state }: LetterProps) {
-  return <span className={`letter letter-${state}`}>{char}</span>;
+export function Letter({ wordIndex, letterIndex }: LetterProps) {
+  const { char, state, hasCaretBefore } = useLetter(wordIndex, letterIndex);
+
+  return (
+    <>
+      {hasCaretBefore && <Caret />}
+      <span className={`letter letter-${state}`}>{char}</span>
+    </>
+  );
 }
