@@ -1,10 +1,26 @@
+import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import type { Redis } from "../../redis/client.ts";
 import { type PairingChange, pairingChannel } from "./service.ts";
 
 type Follower = {
   readonly playerId: string;
-  /** Handed each Pairing change that concerns the Player. */
-  readonly deliver: (change: PairingChange) => void;
+  readonly send: (message: QueueServerMessage) => void;
+  readonly close: () => void;
+};
+
+// Tells the Player's socket of the change, and closes it once the change takes them out of the Queue.
+const deliver = (follower: Follower, change: PairingChange, now: number) => {
+  const { send } = follower;
+  if (change.type === "proposed") {
+    const { pairingId, expiresAt } = change;
+    return send({ type: "proposed", pairingId, acceptWithinMs: Math.max(0, expiresAt - now) });
+  }
+  if (change.type === "requeued")
+    return send({ type: "requeued", queuedAt: change.queuedAt, serverAt: now });
+  if (change.type === "removed") send({ type: "removed", reason: "notAccepted" });
+  else send({ type: "paired", duelId: change.duelId });
+  // Either way the Queue is left: for good, or for the Duel.
+  follower.close();
 };
 
 /**
@@ -19,7 +35,7 @@ export const createPairingFeed = (redis: Redis) => {
   const listener = (raw: string) => {
     const change = JSON.parse(raw) as PairingChange;
     for (const follower of local) {
-      if (follower.playerId === change.playerId) follower.deliver(change);
+      if (follower.playerId === change.playerId) deliver(follower, change, Date.now());
     }
   };
 

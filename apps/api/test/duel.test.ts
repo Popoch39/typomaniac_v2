@@ -394,6 +394,58 @@ test("two Players on two API instances sharing Redis see each other arrive", asy
   }
 });
 
+test("the state is the first message a socket receives, even when the Opponent's arrival is relayed while it opens", async () => {
+  // The instance the creator opens on stalls the takeover of their opening until the opponent has
+  // arrived on the other instance, so the opponent's messages are relayed to it before its state.
+  const { promise: stalled, resolve: stall } = Promise.withResolvers<void>();
+  const { promise: released, resolve: release } = Promise.withResolvers<void>();
+  const client = new Proxy(testRedis.redis.client, {
+    get: (target, property) => {
+      if (property === "publish")
+        return async (channel: string, message: string) => {
+          if (message.includes('"takeover"')) {
+            stall();
+            await released;
+          }
+          return target.publish(channel, message);
+        };
+      const value: unknown = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const stalling = createApp(testDb.db, auth, { ...testRedis.redis, client }).listen(0);
+  try {
+    const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+    const opponentName = uniqueNickname();
+    const opponentCookie = await signInPlayerWithNickname(opponentName);
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const creatorOpening = openSocket(
+      `ws://localhost:${stalling.server?.port}/api/duels/${id}/socket`,
+      creatorCookie,
+    );
+    await stalled;
+    const opponent = await openSocket(duelSocketUrl(id), opponentCookie);
+    expect((await opponent.next()).type).toBe("state");
+    expect((await opponent.next()).type).toBe("countdown");
+
+    release();
+    const creator = await creatorOpening;
+    const received = [await creator.next(), await creator.next(), await creator.next()];
+    creator.close();
+    opponent.close();
+
+    expect(received[0]?.type).toBe("state");
+    // Held back until the state, not lost.
+    expect(received).toContainEqual({
+      type: "presence",
+      participant: { seat: 1, name: opponentName, connected: true },
+    });
+    expect(received.map(({ type }) => type)).toContain("countdown");
+  } finally {
+    await stalling.stop(true);
+  }
+});
+
 test("a Player reads who sits in a Duel, and is told when it does not exist", async () => {
   const creatorName = uniqueNickname();
   const cookie = await signInPlayerWithNickname(creatorName);

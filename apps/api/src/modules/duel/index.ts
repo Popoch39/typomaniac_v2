@@ -173,7 +173,15 @@ export const createDuelRoutes = (
             ws.send(message);
           };
           const connection = crypto.randomUUID();
-          const delivery = { seat: self.seat, connection, send, evict: () => ws.close() };
+          // The relay delivers from the join on, which comes before the state: what it delivers
+          // until then is held back, so that the state is always the first message of a socket.
+          let heldBack: ServerMessage[] | null = [];
+          const delivery = {
+            seat: self.seat,
+            connection,
+            send: (message: ServerMessage) => (heldBack ? heldBack.push(message) : send(message)),
+            evict: () => ws.close(),
+          };
           // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
           const anchorAt = lateStart ? startAt : (anchorAts[self.seat] ?? null);
           const entry: Seating = {
@@ -202,6 +210,8 @@ export const createDuelRoutes = (
             ranks: duel.ranks,
             journals,
           });
+          for (const message of heldBack) send(message);
+          heldBack = null;
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
           for (const event of lateStart ?? [])
             await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });

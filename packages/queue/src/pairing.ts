@@ -103,8 +103,8 @@ export type DuelCreation = {
 // The second acceptance creates the Duel in the step that records it: a Pairing is never accepted
 // by both without a Duel, and creating it needs no matchmaker. An acceptance counts only from a
 // Player of the Pairing, in time, whose entry still names it: one who left the Queue since has not
-// accepted. An entry is removed only while it names this Pairing, so a Player who left and came
-// back keeps their new one.
+// accepted, even if they had before leaving. An entry is removed only while it names this Pairing,
+// so a Player who left and came back keeps their new one.
 const ACCEPT = `
 local pairing = redis.call('HMGET', KEYS[1], 'player0', 'player1', 'expiresAt', 'accepted0', 'accepted1')
 if not pairing[1] or tonumber(pairing[3]) < tonumber(ARGV[3]) then return 'gone' end
@@ -115,7 +115,10 @@ end
 if not seat then return 'gone' end
 if redis.call('HGET', ARGV[4] .. ARGV[2], 'pairing') ~= ARGV[1] then return 'gone' end
 redis.call('HSET', KEYS[1], 'accepted' .. (seat - 1), '1')
-if not pairing[6 - seat] then return 'waiting' end
+local other = 3 - seat
+if not pairing[other + 3] or redis.call('HGET', ARGV[4] .. pairing[other], 'pairing') ~= ARGV[1] then
+  return 'waiting'
+end
 for hash = 5, #KEYS do
   redis.call('HSET', KEYS[hash], unpack(cjson.decode(ARGV[hash + 4])))
   redis.call('PEXPIRE', KEYS[hash], ARGV[7])

@@ -3,7 +3,7 @@ import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { createApp } from "../src/app.ts";
 import { readQueueEntry } from "../src/modules/queue/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
+import { createTestAuth, signInPlayer, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 import { openSocketOf, requestUpgrade } from "./helpers/socket.ts";
@@ -23,17 +23,6 @@ const queueSocketUrl = (from = origin) => `${from.replace(/^http/, "ws")}/api/qu
 const openQueueSocket = (cookie: string, from = origin) =>
   openSocketOf<QueueServerMessage, never>(queueSocketUrl(from), cookie);
 
-const signInPlayerWithNickname = async () => {
-  const { player, cookie } = await signInPlayer(auth);
-  const response = await fetch(`${origin}/api/me/nickname`, {
-    method: "PUT",
-    headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ nickname: `p_${crypto.randomUUID().slice(0, 8)}` }),
-  });
-  expect(response.status).toBe(200);
-  return { player, cookie };
-};
-
 const readQueue = (cookie?: string, from = origin) =>
   fetch(`${from}/api/queue`, { headers: cookie ? { cookie } : {} });
 const queuedAtOf = async (cookie: string, from = origin) => {
@@ -50,7 +39,7 @@ const hasLeft = async (cookie: string) => {
 };
 
 test("a Player with a Nickname who opens the Queue socket is told they are queued, with their instant of entry", async () => {
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   const before = Date.now();
 
   const socket = await openQueueSocket(cookie);
@@ -66,7 +55,7 @@ test("a Player with a Nickname who opens the Queue socket is told they are queue
 });
 
 test("a Player reads over HTTP whether they are queued, and since when", async () => {
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   expect(await queuedAtOf(cookie)).toBeNull();
 
   const socket = await openQueueSocket(cookie);
@@ -101,7 +90,7 @@ test("a Player without a Nickname is refused the Queue socket, and the HTTP rout
 });
 
 test("a plain request to the Queue socket queues nobody", async () => {
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
 
   const response = await fetch(`${origin}/api/queue/socket`, { headers: { cookie } });
 
@@ -110,7 +99,7 @@ test("a plain request to the Queue socket queues nobody", async () => {
 });
 
 test("closing the socket takes the Player out of the Queue", async () => {
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   const socket = await openQueueSocket(cookie);
   await socket.next();
 
@@ -120,7 +109,7 @@ test("closing the socket takes the Player out of the Queue", async () => {
 });
 
 test("a Player enters the Queue with the MMR of their Standing", async () => {
-  const { player, cookie } = await signInPlayerWithNickname();
+  const { player, cookie } = await signInPlayerWithNickname(auth, origin);
   await saveStanding(testDb.db, player.id, {
     mmr: 1337,
     duelsPlayed: 42,
@@ -139,7 +128,7 @@ test("a Player enters the Queue with the MMR of their Standing", async () => {
 });
 
 test("a Player who never played ranked enters the Queue with the MMR of a new Player", async () => {
-  const { player, cookie } = await signInPlayerWithNickname();
+  const { player, cookie } = await signInPlayerWithNickname(auth, origin);
 
   const socket = await openQueueSocket(cookie);
   await socket.next();
@@ -149,7 +138,7 @@ test("a Player who never played ranked enters the Queue with the MMR of a new Pl
 });
 
 test("a second socket of the same Player evicts the first, which is told and closed, and keeps their place", async () => {
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   const first = await openQueueSocket(cookie);
   const entered = await first.next();
   if (entered.type !== "queued") throw new Error(`Expected queued, got ${entered.type}`);
@@ -170,7 +159,7 @@ test("a second socket of the same Player evicts the first, which is told and clo
 test("a second socket on another API instance evicts the first", async () => {
   const other = createApp(testDb.db, auth, testRedis.redis).listen(0);
   const otherOrigin = `http://localhost:${other.server?.port}`;
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   const first = await openQueueSocket(cookie);
   const entered = await first.next();
   if (entered.type !== "queued") throw new Error(`Expected queued, got ${entered.type}`);
@@ -188,8 +177,8 @@ test("a second socket on another API instance evicts the first", async () => {
 });
 
 test("two Players are queued side by side: one entering evicts nobody else", async () => {
-  const ada = await signInPlayerWithNickname();
-  const bob = await signInPlayerWithNickname();
+  const ada = await signInPlayerWithNickname(auth, origin);
+  const bob = await signInPlayerWithNickname(auth, origin);
   const adaSocket = await openQueueSocket(ada.cookie);
   await adaSocket.next();
 
@@ -208,7 +197,7 @@ test("the Queue entry of a Player whose API instance stopped refreshing it expir
     entryExpiryMs: 150,
     refreshMs: 60_000,
   }).listen(0);
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   const socket = await openQueueSocket(cookie, `http://localhost:${stalled.server?.port}`);
   await socket.next();
   expect(await queuedAtOf(cookie)).not.toBeNull();
@@ -224,7 +213,7 @@ test("a queued Player stays queued past the expiry while their API instance hold
   const lively = createApp(testDb.db, auth, testRedis.redis, undefined, {
     entryExpiryMs: 150,
   }).listen(0);
-  const { cookie } = await signInPlayerWithNickname();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
   const socket = await openQueueSocket(cookie, `http://localhost:${lively.server?.port}`);
   const entered = await socket.next();
   if (entered.type !== "queued") throw new Error(`Expected queued, got ${entered.type}`);

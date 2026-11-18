@@ -5,7 +5,7 @@ import { createApp } from "../src/app.ts";
 import { readDuel } from "../src/modules/duel/service.ts";
 import { proposePairing, readQueueEntry, tickMatchmaker } from "../src/modules/queue/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
+import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 import { openSocket, openSocketOf, requestUpgrade } from "./helpers/socket.ts";
@@ -42,14 +42,7 @@ const openQueue = async (instances = 1) => {
     return { ...socket, queuedAt: queued.queuedAt };
   };
   const signIn = async (mmr?: number) => {
-    const { player, cookie } = await signInPlayer(auth);
-    const nickname = `p_${crypto.randomUUID().slice(0, 8)}`;
-    const response = await fetch(`${origin}/api/me/nickname`, {
-      method: "PUT",
-      headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ nickname }),
-    });
-    expect(response.status).toBe(200);
+    const { player, cookie, nickname } = await signInPlayerWithNickname(auth, origin);
     if (mmr !== undefined)
       await saveStanding(testDb.db, player.id, { mmr, duelsPlayed: 0, rank: null });
     return { id: player.id, nickname, cookie };
@@ -379,6 +372,30 @@ test("a Player who accepted, then closed the socket, is not queued again", async
 
   expect(await bobSocket.next()).toEqual({ type: "removed", reason: "notAccepted" });
   expect(await queue.queuedAtOf(ada)).toBeNull();
+});
+
+test("a Player who accepted, then closed the socket, is not paired by the other's acceptance", async () => {
+  const queue = await openQueue();
+  const ada = await queue.signIn();
+  const bob = await queue.signIn();
+  const adaSocket = await queue.enter(ada);
+  const bobSocket = await queue.enter(bob);
+  const proposedAt = Date.now();
+  await queue.tick(proposedAt);
+  await accept(adaSocket);
+  const { pairingId } = await nextProposal(bobSocket);
+  // Ada's acceptance is recorded before she leaves: a close taken first would turn it down.
+  await Bun.sleep(100);
+  adaSocket.close();
+  expect(await queue.hasLeft(ada)).toBe(true);
+
+  bobSocket.send({ type: "accept", pairingId });
+
+  expect(await bobSocket.staysSilent(100)).toBe(true);
+  await queue.tick(proposedAt + 10_000);
+  expect(await bobSocket.next()).toMatchObject({ type: "requeued", queuedAt: bobSocket.queuedAt });
+  expect(await queue.queuedAtOf(ada)).toBeNull();
+  bobSocket.close();
 });
 
 test("the time to accept is an option of the tick: past it, an acceptance comes too late", async () => {

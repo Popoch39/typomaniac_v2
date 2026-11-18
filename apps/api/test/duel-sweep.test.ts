@@ -8,7 +8,7 @@ import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts"
 import type { DuelOptions } from "../src/modules/duel/index.ts";
 import { createRelay } from "../src/modules/duel/relay.ts";
 import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
+import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 import { openSocket } from "./helpers/socket.ts";
@@ -38,16 +38,8 @@ const createInstances = async (count: number, options: DuelOptions, db: Db = tes
 
 const originOf = (app: App) => `http://localhost:${app.server?.port}`;
 
-const signInPlayerWithNickname = async (app: App) => {
-  const { cookie } = await signInPlayer(auth);
-  const response = await fetch(`${originOf(app)}/api/me/nickname`, {
-    method: "PUT",
-    headers: { "content-type": "application/json", cookie },
-    body: JSON.stringify({ nickname: `p_${crypto.randomUUID().slice(0, 8)}` }),
-  });
-  expect(response.status).toBe(200);
-  return cookie;
-};
+const signInCookie = async (app: App) =>
+  (await signInPlayerWithNickname(auth, originOf(app))).cookie;
 
 const openDuelSocket = (app: App, duelId: string, cookie: string) =>
   openSocket(`${originOf(app).replace(/^http/, "ws")}/api/duels/${duelId}/socket`, cookie);
@@ -61,10 +53,7 @@ const nextOfType = async <Type extends ServerMessage["type"]>(socket: Socket, ty
 
 // A Duel created on `app` with both Participants connected to it, up to the Countdown of its first Round.
 const startDuel = async (app: App) => {
-  const cookies = [
-    await signInPlayerWithNickname(app),
-    await signInPlayerWithNickname(app),
-  ] as const;
+  const cookies = [await signInCookie(app), await signInCookie(app)] as const;
   const created = await fetch(`${originOf(app)}/api/duels`, {
     method: "POST",
     headers: { cookie: cookies[0] },
@@ -322,7 +311,7 @@ test("a Custom Duel nobody joined still expires, and leaves no row and nothing t
   const { apps, redis, stop } = await createInstances(1, { expiryMs: 200 });
   const [app] = apps as [App];
   try {
-    const cookie = await signInPlayerWithNickname(app);
+    const cookie = await signInCookie(app);
     const created = await fetch(`${originOf(app)}/api/duels`, {
       method: "POST",
       headers: { cookie },
