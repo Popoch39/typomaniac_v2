@@ -96,6 +96,8 @@ export type DuelCreation = {
   readonly duelId: string;
   readonly hashes: readonly CreatedHash[];
   readonly expiryMs: number;
+  /** The sorted set the API sweeps its Duels from, and the instant this one is first due at. */
+  readonly due: { readonly key: string; readonly at: number };
 };
 
 // The second acceptance creates the Duel in the step that records it: a Pairing is never accepted
@@ -114,10 +116,11 @@ if not seat then return 'gone' end
 if redis.call('HGET', ARGV[4] .. ARGV[2], 'pairing') ~= ARGV[1] then return 'gone' end
 redis.call('HSET', KEYS[1], 'accepted' .. (seat - 1), '1')
 if not pairing[6 - seat] then return 'waiting' end
-for hash = 4, #KEYS do
+for hash = 5, #KEYS do
   redis.call('HSET', KEYS[hash], unpack(cjson.decode(ARGV[hash + 4])))
   redis.call('PEXPIRE', KEYS[hash], ARGV[7])
 end
+redis.call('ZADD', KEYS[4], ARGV[8], ARGV[6])
 for player = 1, 2 do
   local entry = ARGV[4] .. pairing[player]
   if redis.call('HGET', entry, 'pairing') == ARGV[1] then
@@ -146,10 +149,11 @@ export const acceptPairing = async (
 ): Promise<"waiting" | "paired" | "gone"> => {
   const accepted: string = await redis.client.eval(
     ACCEPT,
-    3 + creation.hashes.length,
+    4 + creation.hashes.length,
     pairingKey(redis, pairingId),
     pendingPairingsKey(redis),
     waitingKey(redis),
+    creation.due.key,
     ...creation.hashes.map(({ key }) => key),
     pairingId,
     playerId,
@@ -158,6 +162,7 @@ export const acceptPairing = async (
     pairingChannel(redis),
     creation.duelId,
     creation.expiryMs,
+    creation.due.at,
     ...creation.hashes.map(({ fields }) => JSON.stringify(Object.entries(fields).flat())),
   );
   if (accepted === "waiting" || accepted === "paired" || accepted === "gone") return accepted;
