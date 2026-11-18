@@ -26,6 +26,7 @@ import {
   isEventAccepted,
   readDuel,
   readJournals,
+  recordEnd,
   releaseSeat,
   replayGame,
   saveDuel,
@@ -62,7 +63,9 @@ export const createDuelRoutes = (
       startAt: duel.startAt,
       journals: await readJournals(redis, duelId),
     });
-    await relay.publish(duelId, null, { type: "end", results, outcomes });
+    const end = { type: "end", results, outcomes } as const;
+    await recordEnd(redis, duelId, end);
+    await relay.publish(duelId, null, end);
   };
 
   // Ends the Games whose clients went silent, at their start plus 30 seconds.
@@ -174,6 +177,7 @@ export const createDuelRoutes = (
           const countdown = { type: "countdown", startAt: start.startAt } as const;
           send(countdown);
           if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
+          if (duel.end) send(duel.end);
         },
         async message(ws, message) {
           const now = Date.now();

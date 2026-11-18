@@ -6,6 +6,7 @@ import {
   getOutcome,
   type Participant,
   type Seat,
+  type ServerMessage,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
 import {
@@ -40,7 +41,11 @@ export type Duel = {
   readonly playerIds: readonly (string | null)[];
   /** The announced Start instant in server time, `null` until the Countdown is announced. */
   readonly startAt: number | null;
+  /** What both Participants were told at the end, `null` until the Duel is finalised. */
+  readonly end: DuelEnd | null;
 };
+
+export type DuelEnd = Extract<ServerMessage, { type: "end" }>;
 
 const SEATS: readonly Seat[] = [0, 1];
 
@@ -121,12 +126,14 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
   const startAt = fields.startAt === undefined ? null : Number(fields.startAt);
+  const end = fields.end === undefined ? null : (JSON.parse(fields.end) as DuelEnd);
   return {
     words: JSON.parse(fields.words) as string[],
     participants,
     holderIds,
     playerIds,
     startAt,
+    end,
   };
 };
 
@@ -240,6 +247,16 @@ const CLAIM_FINALISATION = `
 if redis.call('HGET', KEYS[1], 'ended0') ~= '1' or redis.call('HGET', KEYS[1], 'ended1') ~= '1' then return 0 end
 return redis.call('HSETNX', KEYS[1], 'finalised', '1')
 `;
+
+// Does not recreate a Duel that expired meanwhile.
+const RECORD_END = `
+if redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'end', ARGV[1]) end
+`;
+
+/** Keeps the end of a finalised Duel, for a Participant who comes back after it. */
+export const recordEnd = async (redis: Redis, duelId: string, end: DuelEnd) => {
+  await redis.client.eval(RECORD_END, 1, duelKey(redis, duelId), JSON.stringify(end));
+};
 
 /** Whether this call claimed the finalisation of a Duel whose Games have both ended. */
 export const claimFinalisation = async (redis: Redis, duelId: string) => {

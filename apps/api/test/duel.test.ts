@@ -717,6 +717,26 @@ test("a finished Duel is saved with both Games, their Results, journals and Outc
   }
 });
 
+test("a Participant who comes back after the end of the Duel is handed the end again", async () => {
+  const { creator, opponent, reopenCreator, stop } = await startDuel(0);
+  try {
+    for (const socket of [creator, opponent]) {
+      socket.send({ type: "event", event: { type: "start", at: 10 } });
+      socket.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    }
+    const end = await nextEnd(creator);
+
+    creator.close();
+    const again = await reopenCreator();
+    const handedAgain = await nextEnd(again);
+    again.close();
+
+    expect(handedAgain).toEqual(end);
+  } finally {
+    await stop();
+  }
+});
+
 test("replaying a saved journal gives the saved Result", async () => {
   const { creator, opponent, duelId, words, stop } = await startDuel(0);
   try {
