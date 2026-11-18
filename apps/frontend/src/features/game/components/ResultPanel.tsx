@@ -1,18 +1,16 @@
 import { useResult } from "../hooks/useResult.ts";
+import { ResultDetails } from "./ResultDetails.tsx";
+import { ResultHeadline } from "./ResultHeadline.tsx";
+import { ResultJson } from "./ResultJson.tsx";
 
 export function ResultPanel() {
-  const { wpm, accuracy } = useResult();
+  const result = useResult();
 
   return (
-    <dl className="result-panel">
-      <div>
-        <dt>WPM</dt>
-        <dd>{wpm}</dd>
-      </div>
-      <div>
-        <dt>Accuracy</dt>
-        <dd>{accuracy}%</dd>
-      </div>
-    </dl>
+    <section className="result-panel">
+      <ResultHeadline result={result} />
+      <ResultDetails result={result} />
+      <ResultJson result={result} />
+    </section>
   );
 }

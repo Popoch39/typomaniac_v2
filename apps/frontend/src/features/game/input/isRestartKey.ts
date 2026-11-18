@@ -1,9 +1,6 @@
-/** What the browser reports in a keyboard event, as plain data so the check needs no DOM. */
-export type BrowserKey = {
-  readonly code: string;
-};
+import type { BrowserKey } from "./translateInput.ts";
 
 /** Whether a key restarts the Game; such a key must never reach the engine. */
-export function isRestartKey(key: BrowserKey): boolean {
+export function isRestartKey(key: Pick<BrowserKey, "code">): boolean {
   return key.code === "Tab";
 }
