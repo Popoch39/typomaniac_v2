@@ -1,8 +1,8 @@
 import { cn } from "../../../shared/lib/utils.ts";
-import type { LiveSide } from "../points/livePoints.ts";
+import type { LivePointsAndStats } from "../points/bothLivePointsAndStats.ts";
 
 type DuelLiveSideProps = {
-  readonly side: LiveSide & { readonly name: string | undefined };
+  readonly side: LivePointsAndStats & { readonly name: string | undefined };
   readonly className: string;
 };
 

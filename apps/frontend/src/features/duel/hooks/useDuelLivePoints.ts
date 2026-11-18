@@ -1,5 +1,5 @@
 import { useGameStore } from "../../game/store/useGameStore.ts";
-import { livePoints } from "../points/livePoints.ts";
+import { bothLivePointsAndStats } from "../points/bothLivePointsAndStats.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 import { useDuelParticipants } from "./useDuelParticipants.ts";
 
@@ -9,9 +9,9 @@ export function useDuelLivePoints() {
   const readAt = useGameStore((state) => state.readAt);
   const opponentGame = useDuelStore((state) => state.opponentGame);
   const { self, opponent } = useDuelParticipants();
-  const sides = livePoints(game, opponentGame, readAt);
+  const sides = bothLivePointsAndStats(game, opponentGame, readAt);
   return {
-    own: { ...sides.own, name: self?.name },
+    self: { ...sides.self, name: self?.name },
     opponent: { ...sides.opponent, name: opponent?.name },
   };
 }
