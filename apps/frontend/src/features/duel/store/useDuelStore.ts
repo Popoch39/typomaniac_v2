@@ -1,18 +1,13 @@
 import {
   DUEL_GAME_CONFIG,
-  type Outcome,
+  type FinishedRound,
   opponentSeat,
   type Participant,
+  type RoundOutcomes,
   type Seat,
   type ServerMessage,
 } from "@repo/duel-engine";
-import {
-  applyEvent,
-  createGame,
-  type Game,
-  type GameEvent,
-  type Result,
-} from "@repo/typing-engine";
+import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
 import { create } from "zustand";
 import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretStore.ts";
 import { eventTime, shiftEventTime } from "../../game/clock/eventTime.ts";
@@ -29,6 +24,8 @@ type DuelState = {
     | "waiting"
     | "countdown"
     | "running"
+    /** Between two Rounds, or after the last one: the Round that just ended is shown. */
+    | "roundEnd"
     | "finished"
     | "refused"
     | "disconnected";
@@ -36,6 +33,8 @@ type DuelState = {
   readonly participants: readonly Participant[];
   /** The current Round, which every Event sent to the server names. */
   readonly round: number | null;
+  /** The Rounds already finished, in order: the Round score is counted from them. */
+  readonly rounds: readonly FinishedRound[];
   /** The Target words of the current Round, empty until its Countdown is announced. */
   readonly words: readonly string[];
   /**
@@ -45,11 +44,8 @@ type DuelState = {
   readonly opponentGame: Game | null;
   /** Why the Participant could not take a seat, in words for the user. */
   readonly refusal: string | null;
-  /** The server's Results and Outcomes, indexed by seat, once both Games are finished. */
-  readonly end: {
-    readonly results: readonly [Result, Result];
-    readonly outcomes: readonly [Outcome, Outcome];
-  } | null;
+  /** The Outcomes of the Duel, indexed by seat, once the server has ended it. */
+  readonly end: { readonly outcomes: RoundOutcomes } | null;
   readonly join: (duelId: string) => void;
   readonly leave: () => void;
 };
@@ -90,6 +86,7 @@ const initialState = {
   seat: null,
   participants: [],
   round: null,
+  rounds: [],
   words: [],
   opponentGame: null,
   refusal: null,
@@ -131,17 +128,28 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     load(useDuelClockStore.getState().clockOffset);
   };
 
+  // Counts down to the Start of the next Round while the Round that just ended is shown. Nothing
+  // starts from here: the Countdown message brings the Target words, and schedules the Start.
+  const showNextStart = (startAt: number) =>
+    useDuelCountdownStore.getState().schedule(startAt, () => undefined);
+
   const receive = (message: ServerMessage) => {
     if (message.type === "state") {
       const opponentJournal = message.journals[opponentSeat(message.seat)];
       // Only an accepted start opens a journal: a non-empty one means the Participant is back
       // mid-Game, which resumes with the Countdown that follows, once the announced Start is known.
       resumedJournal = message.journals[message.seat];
+      // Back between two Rounds, or after the last one: the Round that just ended is shown, until
+      // the Countdown of the next one or the end of the Duel.
+      const afterRound =
+        message.rounds.length > 0 &&
+        (message.words === null || message.rounds.length >= message.round);
       set({
-        phase: "waiting",
+        phase: afterRound ? "roundEnd" : "waiting",
         seat: message.seat,
         participants: message.participants,
         round: message.round,
+        rounds: message.rounds,
         words: message.words ?? [],
         // Without the Target words, the Countdown is still to come and brings them.
         opponentGame:
@@ -150,6 +158,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
             : opponentJournal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, message.words)),
       });
       useDuelClockStore.getState().synchronise();
+      if (afterRound && message.startAt !== null) showNextStart(message.startAt);
     } else if (message.type === "presence") {
       set((state) => ({ participants: withParticipant(state.participants, message.participant) }));
     } else if (message.type === "pong") {
@@ -158,23 +167,38 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const { opponentGame } = get();
       if (opponentGame !== null) set({ opponentGame: applyEvent(opponentGame, message.event) });
     } else if (message.type === "countdown") {
+      const seated = get();
+      // A Round already finished has no Start left to wait for.
+      if (message.round <= seated.rounds.length) return;
+      // The journal handed back on joining is the one of the Round joined, not of a later one.
+      if (message.round !== seated.round) resumedJournal = [];
       // A Participant seated before the Countdown learns the Target words of the Round from it.
-      if (get().opponentGame === null) {
+      if (message.round !== seated.round || seated.opponentGame === null) {
         const { round, words } = message;
         set({ round, words, opponentGame: createGame(DUEL_GAME_CONFIG, words) });
       }
       const { phase } = get();
       // A Game already running or over has no Start left to wait for.
-      if (phase !== "waiting" && phase !== "countdown") return;
+      if (phase !== "waiting" && phase !== "countdown" && phase !== "roundEnd") return;
       if (resumedJournal.length > 0) return resume(message.startAt);
       set({ phase: "countdown" });
       useDuelCountdownStore.getState().schedule(message.startAt, start);
+    } else if (message.type === "roundEnd") {
+      const { rounds } = get();
+      // Only the Round that follows the finished ones: the state may already list this one.
+      if (message.round !== rounds.length + 1) return;
+      useDuelCountdownStore.getState().cancel();
+      stopResumingGame();
+      stopForwardingEvents();
+      resumedJournal = [];
+      const { results, outcomes } = message;
+      set({ phase: "roundEnd", rounds: [...rounds, { results, outcomes }], opponentGame: null });
+      if (message.nextStartAt !== null) showNextStart(message.nextStartAt);
     } else if (message.type === "end") {
       useDuelCountdownStore.getState().cancel();
       stopResumingGame();
       stopForwardingEvents();
-      const { results, outcomes } = message;
-      set({ phase: "finished", end: { results, outcomes } });
+      set({ phase: "finished", rounds: message.rounds, end: { outcomes: message.outcomes } });
     }
   };
 

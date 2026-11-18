@@ -6,6 +6,8 @@ import { DuelEnd } from "./DuelEnd.tsx";
 import { DuelInviteLink } from "./DuelInviteLink.tsx";
 import { DuelParticipants } from "./DuelParticipants.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
+import { DuelRoundEnd } from "./DuelRoundEnd.tsx";
+import { DuelRoundScore } from "./DuelRoundScore.tsx";
 import { OpponentLiveStats } from "./OpponentLiveStats.tsx";
 
 export function DuelScreen() {
@@ -25,6 +27,7 @@ export function DuelScreen() {
       {phase === "countdown" && (
         <>
           <DuelParticipants />
+          <DuelRoundScore />
           <DuelCountdown />
         </>
       )}
@@ -32,8 +35,16 @@ export function DuelScreen() {
       {phase === "running" && (
         <>
           <DuelParticipants />
+          <DuelRoundScore />
           <OpponentLiveStats />
           <TypingArea />
+        </>
+      )}
+      {phase === "roundEnd" && (
+        <>
+          <DuelParticipants />
+          <DuelRoundScore />
+          <DuelRoundEnd />
         </>
       )}
       {phase === "finished" && <DuelEnd />}

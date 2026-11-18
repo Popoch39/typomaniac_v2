@@ -12,7 +12,7 @@ A Duel is served by the existing API over a WebSocket route. The server is autho
 ## Consequences
 
 - Redis becomes a required service of the API, in the local and the production stacks; the API refuses to start without its address.
-- Any instance holding a seat can finalise a Duel. The finalisation is claimed atomically, so it happens once even when two instances try.
+- Any instance holding a seat can end a Round and finalise a Duel. A Round ends through one atomic step that also creates the next Round and fixes its Start, and the finalisation is claimed atomically, so each happens once even when two instances try (ADR 0010).
 - A Duel survives the crash of one instance as long as another one holds a seat. When every instance holding a seat is down at the deadline, the Duel is lost.
 - Nothing is written to the database before a Duel ends: a Duel that never finishes leaves only expiring Redis keys.
 - Each Event is bounded by the instant of its receipt before it is applied, journaled and relayed, which is what makes a Duel Result reliable enough for ranked play (ADR 0009).

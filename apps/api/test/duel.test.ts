@@ -1,5 +1,10 @@
 import { afterAll, expect, test } from "bun:test";
-import { DUEL_GAME_CONFIG, DUEL_WORD_COUNT, START_WINDOW_MS } from "@repo/duel-engine";
+import {
+  DUEL_GAME_CONFIG,
+  DUEL_WORD_COUNT,
+  type ServerMessage,
+  START_WINDOW_MS,
+} from "@repo/duel-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { and, count, eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
@@ -56,6 +61,8 @@ test("a Player with a Nickname creates a Duel and takes its first seat, alone an
     type: "state",
     seat: 0,
     round: 1,
+    rounds: [],
+    startAt: null,
     words: null,
     participants: [{ seat: 0, name: nickname, connected: true }],
     journals: [[], []],
@@ -451,13 +458,15 @@ test("the Countdown is announced to both Participants once both are connected, w
   expect(startAt).toBeLessThanOrEqual(after + 3000);
 });
 
-// Seats two Players in a Duel of an app whose Countdown is short enough to wait for, and reads the Start.
+// Seats two Players in a Duel of an app whose Countdown is short enough to wait for, and reads the
+// Start. Its pause between Rounds is skipped unless a test asks for one.
 const startDuel = async (
   countdownMs: number,
   cookies: { creatorCookie?: string; opponentCookie?: string } = {},
   db = testDb.db,
+  roundPauseMs = 0,
 ) => {
-  const quick = createApp(db, auth, testRedis.redis, { countdownMs }).listen(0);
+  const quick = createApp(db, auth, testRedis.redis, { countdownMs, roundPauseMs }).listen(0);
   const socketUrl = (duelId: string) =>
     `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
   const creatorCookie = cookies.creatorCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
@@ -481,6 +490,7 @@ const startDuel = async (
     startAt: countdown.startAt,
     words: countdown.words,
     reopenCreator: () => openSocket(socketUrl(id), creatorCookie),
+    reopenOpponent: () => openSocket(socketUrl(id), opponentCookie),
     stop: async () => {
       creator.close();
       opponent.close();
@@ -723,33 +733,87 @@ test("a Tick reaching 30 seconds ends the Game, and the Events sent after its en
   }
 });
 
-// Skips the Opponent's Events and presence changes, which may come before or after the end.
-const nextEnd = async (socket: Awaited<ReturnType<typeof openSocket>>) => {
+type Socket = Awaited<ReturnType<typeof openSocket>>;
+
+const isOfType = <Type extends ServerMessage["type"]>(
+  message: ServerMessage,
+  type: Type,
+): message is Extract<ServerMessage, { type: Type }> => message.type === type;
+
+// Skips what may come before the awaited message: the Opponent's Events, presence changes.
+const nextOfType = async <Type extends ServerMessage["type"]>(socket: Socket, type: Type) => {
   for (;;) {
     const message = await socket.next();
-    if (message.type === "end") return message;
+    if (isOfType(message, type)) return message;
+  }
+};
+const nextEnd = (socket: Socket) => nextOfType(socket, "end");
+const nextRoundEnd = (socket: Socket) => nextOfType(socket, "roundEnd");
+
+// Everything a socket receives up to the end of the Duel, the end included.
+const messagesUntilEnd = async (socket: Socket) => {
+  const messages: ServerMessage[] = [];
+  for (;;) {
+    const message = await socket.next();
+    messages.push(message);
+    if (message.type === "end") return messages;
   }
 };
 
-test("once both Games are finished, both Participants receive both Results and both Outcomes", async () => {
-  const { creator, opponent, words, stop } = await startDuel(0);
+// The Countdown of `round` as both Participants receive it, waited through to its Start.
+const awaitStart = async (sockets: readonly Socket[], round: number) => {
+  const countdowns = [];
+  for (const socket of sockets) countdowns.push(await nextOfType(socket, "countdown"));
+  const [countdown] = countdowns;
+  if (!countdown || countdowns.some((other) => other.round !== round))
+    throw new Error(`Expected the Countdown of Round ${round}`);
+  await Bun.sleep(Math.max(0, countdown.startAt - Date.now()));
+  return countdown;
+};
+
+// A whole Game in three Events at most: started, `typed` when given, and ended by a Tick stamped
+// 30 seconds ahead, so that no test waits for it.
+const playGame = (socket: Socket, round: number, typed?: string) => {
+  socket.send({ type: "event", round, event: { type: "start", at: 10 } });
+  if (typed !== undefined)
+    socket.send({ type: "event", round, event: { type: "insert", at: 1010, text: typed } });
+  socket.send({ type: "event", round, event: { type: "tick", at: 30_010 } });
+};
+
+// Plays `round` from its Start to its end. A Participant given the Target words types the first
+// one, which wins the Round against one who types nothing.
+const playRound = async (
+  [creator, opponent]: readonly [Socket, Socket],
+  round: number,
+  typing: { readonly creator?: readonly string[]; readonly opponent?: readonly string[] } = {},
+) => {
+  playGame(creator, round, typing.creator && `${typing.creator[0]} `);
+  playGame(opponent, round, typing.opponent && `${typing.opponent[0]} `);
+  const ends = [await nextRoundEnd(creator), await nextRoundEnd(opponent)] as const;
+  return ends;
+};
+
+// Plays the Rounds left after `round`, each won by the creator, until the Duel ends.
+const playOut = async (sockets: readonly [Socket, Socket], round: number) => {
+  for (let next = round + 1; ; next += 1) {
+    const { words } = await awaitStart(sockets, next);
+    const [ended] = await playRound(sockets, next, { creator: words });
+    if (ended.nextStartAt === null) return nextEnd(sockets[0]);
+  }
+};
+
+test("once both Games of a Round are finished, both Participants receive both Results and both Outcomes of the Round, and the Start of the next one", async () => {
+  const { creator, opponent, words, stop } = await startDuel(0, {}, testDb.db, 400);
   try {
     const [firstWord = ""] = words;
-    creator.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
-    creator.send({
-      type: "event",
-      round: 1,
-      event: { type: "insert", at: 1010, text: `${firstWord} ` },
-    });
-    creator.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
-    opponent.send({ type: "event", round: 1, event: { type: "start", at: 11 } });
-    opponent.send({ type: "event", round: 1, event: { type: "tick", at: 30_011 } });
-
-    const ends = [await nextEnd(creator), await nextEnd(opponent)];
+    const before = Date.now();
+    const ends = await playRound([creator, opponent], 1, { creator: words });
+    const after = Date.now();
 
     expect(ends[0]).toEqual(ends[1]);
     expect(ends[0]).toMatchObject({
-      type: "end",
+      type: "roundEnd",
+      round: 1,
       // The first word and its Separator, exactly typed in half a minute, at 5 characters a word.
       results: [
         { duration: 30, wpm: ((firstWord.length + 1) / 5) * 2, accuracy: 100 },
@@ -757,12 +821,154 @@ test("once both Games are finished, both Participants receive both Results and b
       ],
       outcomes: ["win", "loss"],
     });
+    expect(ends[0].nextStartAt).toBeGreaterThanOrEqual(before + 400);
+    expect(ends[0].nextStartAt).toBeLessThanOrEqual(after + 400);
   } finally {
     await stop();
   }
 });
 
-test("a finished Duel is saved as one Duel of the custom kind, one Round, two Games and two participants, a Guest without a Player", async () => {
+test("the pause between two Rounds lasts 5 seconds unless the app is given another", async () => {
+  const cookies = [
+    await signInPlayerWithNickname(uniqueNickname()),
+    await signInPlayerWithNickname(uniqueNickname()),
+  ] as const;
+  const { id } = (await (await createDuel(cookies[0])).json()) as { id: string };
+  const creator = await openSocket(duelSocketUrl(id), cookies[0]);
+  const opponent = await openSocket(duelSocketUrl(id), cookies[1]);
+  try {
+    await awaitStart([creator, opponent], 1);
+    const before = Date.now();
+    const [ended] = await playRound([creator, opponent], 1);
+    const after = Date.now();
+
+    // The pause, then the 3 seconds of the Countdown.
+    expect(ended.nextStartAt).toBeGreaterThanOrEqual(before + 5000 + 3000);
+    expect(ended.nextStartAt).toBeLessThanOrEqual(after + 5000 + 3000);
+  } finally {
+    creator.close();
+    opponent.close();
+  }
+});
+
+test("the Countdown of the next Round follows the pause on its own, on new Target words", async () => {
+  const { creator, opponent, words, stop } = await startDuel(200, {}, testDb.db, 300);
+  try {
+    const [ended] = await playRound([creator, opponent], 1);
+    const silent = await creator.staysSilent(200);
+    const countdowns = [await creator.next(), await opponent.next()];
+    const receivedAt = Date.now();
+
+    const { nextStartAt } = ended;
+    if (nextStartAt === null) throw new Error("Expected a second Round");
+    const [countdown] = countdowns;
+    if (countdown?.type !== "countdown") throw new Error("Expected the Countdown");
+    // Nothing during the pause, then the Countdown, 200 ms before the Start fixed at the end of the Round.
+    expect(silent).toBe(true);
+    expect(countdowns[1]).toEqual(countdown);
+    expect(countdown).toMatchObject({ type: "countdown", round: 2, startAt: nextStartAt });
+    expect(receivedAt).toBeGreaterThanOrEqual(nextStartAt - 200);
+    expect(receivedAt).toBeLessThan(nextStartAt);
+    expect(countdown.words).toHaveLength(DUEL_WORD_COUNT);
+    expect(countdown.words).not.toEqual(words);
+  } finally {
+    await stop();
+  }
+});
+
+test("a Duel ends as soon as a Participant has won two Rounds: a 2-0 Duel plays no third Round", async () => {
+  const { creator, opponent, words, stop } = await startDuel(0);
+  try {
+    const sockets = [creator, opponent] as const;
+    playGame(creator, 1, `${words[0]} `);
+    playGame(opponent, 1);
+    const second = await awaitStart(sockets, 2);
+    playGame(creator, 2, `${second.words[0]} `);
+    playGame(opponent, 2);
+    const received = [await messagesUntilEnd(creator), await messagesUntilEnd(opponent)] as const;
+    const silent = [await creator.staysSilent(300), await opponent.staysSilent(0)];
+
+    for (const messages of received) {
+      const roundEnds = messages.filter((message) => message.type === "roundEnd");
+      expect(roundEnds).toMatchObject([{ round: 2, outcomes: ["win", "loss"], nextStartAt: null }]);
+      expect(messages.filter((message) => message.type === "countdown")).toEqual([]);
+      const [roundEnd] = roundEnds;
+      expect(messages.at(-1)).toMatchObject({
+        type: "end",
+        outcomes: ["win", "loss"],
+        rounds: [
+          { outcomes: ["win", "loss"] },
+          { results: roundEnd?.results, outcomes: ["win", "loss"] },
+        ],
+      });
+    }
+    expect(received[0].at(-1)).toEqual(received[1].at(-1));
+    expect(silent).toEqual([true, true]);
+  } finally {
+    await stop();
+  }
+});
+
+test("a drawn Round counts for neither Participant: after three Rounds, the Duel goes to whoever won more", async () => {
+  const { creator, opponent, stop } = await startDuel(0);
+  try {
+    const sockets = [creator, opponent] as const;
+    const first = await playRound(sockets, 1);
+    const second = await playRound(sockets, 2, { opponent: (await awaitStart(sockets, 2)).words });
+    await awaitStart(sockets, 3);
+    const third = await playRound(sockets, 3);
+    const end = await nextEnd(creator);
+
+    expect(first[0]).toMatchObject({ round: 1, outcomes: ["draw", "draw"] });
+    expect(first[0].nextStartAt).not.toBeNull();
+    expect(second[0]).toMatchObject({ round: 2, outcomes: ["loss", "win"] });
+    // One Round won is not two: the third Round is played.
+    expect(second[0].nextStartAt).not.toBeNull();
+    expect(third[0]).toMatchObject({ round: 3, outcomes: ["draw", "draw"], nextStartAt: null });
+    expect(end).toMatchObject({
+      type: "end",
+      outcomes: ["loss", "win"],
+      rounds: [
+        { outcomes: ["draw", "draw"] },
+        { outcomes: ["loss", "win"] },
+        { outcomes: ["draw", "draw"] },
+      ],
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("after three Rounds won equally, the Duel is a draw", async () => {
+  const { creator, opponent, words, duelId, stop } = await startDuel(0);
+  try {
+    const sockets = [creator, opponent] as const;
+    await playRound(sockets, 1, { creator: words });
+    await playRound(sockets, 2, { opponent: (await awaitStart(sockets, 2)).words });
+    await awaitStart(sockets, 3);
+    const third = await playRound(sockets, 3);
+    const ends = [await nextEnd(creator), await nextEnd(opponent)] as const;
+    const participants = await testDb.db
+      .select()
+      .from(duelParticipant)
+      .where(eq(duelParticipant.duelId, duelId))
+      .orderBy(duelParticipant.seat);
+
+    expect(third[0]).toMatchObject({ round: 3, outcomes: ["draw", "draw"], nextStartAt: null });
+    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["draw", "draw"] });
+    expect(ends[0].rounds.map((round) => round.outcomes)).toEqual([
+      ["win", "loss"],
+      ["loss", "win"],
+      ["draw", "draw"],
+    ]);
+    expect(ends[1]).toEqual(ends[0]);
+    expect(participants.map((participant) => participant.outcome)).toEqual(["draw", "draw"]);
+  } finally {
+    await stop();
+  }
+});
+
+test("a finished Duel is saved once it ends as one Duel of the custom kind, with every Round, its Games and each participant's Outcome of the Duel, a Guest without a Player", async () => {
   const { player, cookie: creatorCookie } = await signInPlayer(auth);
   const nicknamed = await fetch(`${origin}/api/me/nickname`, {
     method: "PUT",
@@ -788,7 +994,23 @@ test("a finished Duel is saved as one Duel of the custom kind, one Round, two Ga
     ];
     for (const event of creatorJournal) creator.send({ type: "event", round: 1, event });
     for (const event of guestJournal) opponent.send({ type: "event", round: 1, event });
-    const { results } = await nextEnd(creator);
+    const { results } = await nextRoundEnd(creator);
+    await nextRoundEnd(opponent);
+    const savedAfterFirstRound = await testDb.db.select().from(duel).where(eq(duel.id, duelId));
+    const second = await awaitStart([creator, opponent], 2);
+    const secondJournals: [GameEvent[], GameEvent[]] = [
+      [
+        { type: "start", at: 10 },
+        { type: "insert", at: 1010, text: `${second.words[0]} ` },
+        { type: "tick", at: 30_010 },
+      ],
+      [
+        { type: "start", at: 10 },
+        { type: "tick", at: 30_010 },
+      ],
+    ];
+    const [secondEnded] = await playRound([creator, opponent], 2, { creator: second.words });
+    await nextEnd(creator);
     await nextEnd(opponent);
 
     const duels = await testDb.db.select().from(duel).where(eq(duel.id, duelId));
@@ -797,7 +1019,7 @@ test("a finished Duel is saved as one Duel of the custom kind, one Round, two Ga
       .select()
       .from(duelGame)
       .where(eq(duelGame.duelId, duelId))
-      .orderBy(duelGame.seat);
+      .orderBy(duelGame.round, duelGame.seat);
     const participants = await testDb.db
       .select()
       .from(duelParticipant)
@@ -815,24 +1037,38 @@ test("a finished Duel is saved as one Duel of the custom kind, one Round, two Ga
         endedAt,
       },
     ]);
+    // Nothing is written before the Duel ends.
+    expect(savedAfterFirstRound).toEqual([]);
+    const firstEndedAt = rounds[0]?.endedAt ?? new Date(Number.NaN);
+    expect(firstEndedAt.getTime()).toBeGreaterThanOrEqual(startAt);
+    expect(firstEndedAt.getTime()).toBeLessThanOrEqual(second.startAt);
     expect(rounds).toEqual([
-      { duelId, round: 1, words: [...words], startedAt: new Date(startAt), endedAt },
-    ]);
-    expect(games).toEqual([
+      { duelId, round: 1, words: [...words], startedAt: new Date(startAt), endedAt: firstEndedAt },
       {
         duelId,
-        round: 1,
+        round: 2,
+        words: [...second.words],
+        startedAt: new Date(second.startAt),
+        endedAt,
+      },
+    ]);
+    expect(games).toEqual([
+      { duelId, round: 1, seat: 0, result: results[0], journal: creatorJournal, outcome: "win" },
+      { duelId, round: 1, seat: 1, result: results[1], journal: guestJournal, outcome: "loss" },
+      {
+        duelId,
+        round: 2,
         seat: 0,
-        result: results[0],
-        journal: creatorJournal,
+        result: secondEnded.results[0],
+        journal: secondJournals[0],
         outcome: "win",
       },
       {
         duelId,
-        round: 1,
+        round: 2,
         seat: 1,
-        result: results[1],
-        journal: guestJournal,
+        result: secondEnded.results[1],
+        journal: secondJournals[1],
         outcome: "loss",
       },
     ]);
@@ -846,20 +1082,21 @@ test("a finished Duel is saved as one Duel of the custom kind, one Round, two Ga
 });
 
 test("a Participant who comes back after the end of the Duel is handed the end again", async () => {
-  const { creator, opponent, reopenCreator, stop } = await startDuel(0);
+  const { creator, opponent, words, reopenCreator, stop } = await startDuel(0);
   try {
-    for (const socket of [creator, opponent]) {
-      socket.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
-      socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
-    }
-    const end = await nextEnd(creator);
+    await playRound([creator, opponent], 1, { creator: words });
+    const end = await playOut([creator, opponent], 1);
 
     creator.close();
     const again = await reopenCreator();
-    const handedAgain = await nextEnd(again);
+    const received = await messagesUntilEnd(again);
     again.close();
 
-    expect(handedAgain).toEqual(end);
+    // The state, with the Round the Duel ended in and every Round finished, then the end again.
+    expect(received).toEqual([
+      expect.objectContaining({ type: "state", round: 2, rounds: end.rounds }),
+      end,
+    ]);
   } finally {
     await stop();
   }
@@ -879,13 +1116,18 @@ test("replaying a saved journal gives the saved Result", async () => {
     creator.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
     opponent.send({ type: "event", round: 1, event: { type: "start", at: 11 } });
     opponent.send({ type: "event", round: 1, event: { type: "tick", at: 30_011 } });
-    await nextEnd(creator);
+    await nextRoundEnd(creator);
+    await nextRoundEnd(opponent);
+    await playOut([creator, opponent], 1);
 
+    const rounds = await testDb.db.select().from(duelRound).where(eq(duelRound.duelId, duelId));
     const games = await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId));
 
-    expect(games).toHaveLength(2);
+    expect(rounds[0]?.words).toEqual([...words]);
+    expect(games).toHaveLength(4);
     for (const game of games) {
-      const replayed = game.journal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
+      const played = rounds.find((round) => round.round === game.round)?.words ?? [];
+      const replayed = game.journal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, played));
       expect(getResult(replayed)).toEqual(game.result);
     }
   } finally {
@@ -924,10 +1166,11 @@ test("a Game whose client goes silent is ended by the server 2 seconds after the
       event: { type: "insert", at: 1500, text: `${firstWord} ` },
     });
 
-    const end = await nextEnd(creator);
+    const end = await nextRoundEnd(creator);
 
     expect(Date.now()).toBeGreaterThanOrEqual(startAt + 32_000);
     expect(end).toMatchObject({
+      round: 1,
       results: [
         { duration: 30, wpm: 0 },
         { duration: 30, wpm: ((firstWord.length + 1) / 5) * 2 },
@@ -965,7 +1208,7 @@ test("the time a Participant spends away counts as Inactivity in their Result", 
     again.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
     opponent.send({ type: "event", round: 1, event: { type: "start", at: 11 } });
     opponent.send({ type: "event", round: 1, event: { type: "tick", at: 30_011 } });
-    const { results } = await nextEnd(again);
+    const { results } = await nextRoundEnd(again);
     again.close();
 
     // Typing in the first and the 25th seconds only: the 28 others, mostly away, are inactive.
@@ -975,7 +1218,7 @@ test("the time a Participant spends away counts as Inactivity in their Result", 
   }
 });
 
-test("a Participant who comes back after the deadline, while the server is still ending their silent Game, finds the Duel over", async () => {
+test("a Participant who comes back after the deadline, while the server is still ending their silent Game, finds the Round over", async () => {
   const { creator, opponent, startAt, reopenCreator, stop } = await startDuel(0);
   try {
     creator.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
@@ -988,10 +1231,11 @@ test("a Participant who comes back after the deadline, while the server is still
     // Past the deadline, but within the grace the server gives a silent client before ending its Game.
     await Bun.sleep(startAt + DUEL_GAME_CONFIG.seconds * 1000 + 500 - Date.now());
     const again = await reopenCreator();
-    const end = await nextEnd(again);
+    const end = await nextRoundEnd(again);
     again.close();
 
     expect(end).toMatchObject({
+      round: 1,
       results: [{ duration: 30 }, { duration: 30 }],
       outcomes: ["draw", "draw"],
     });
@@ -1000,7 +1244,7 @@ test("a Participant who comes back after the deadline, while the server is still
   }
 }, 40_000);
 
-test("a Duel whose save failed is finalised again at the deadline, saved once, and its end announced", async () => {
+test("a Duel whose save failed is finalised again at the deadline of its last Round, saved once, and its end announced", async () => {
   let failuresLeft = 1;
   // The real database, but for its first transaction, refused as by a database out of reach.
   const flakyDb = new Proxy(testDb.db, {
@@ -1013,22 +1257,22 @@ test("a Duel whose save failed is finalised again at the deadline, saved once, a
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
-  const { creator, opponent, duelId, startAt, stop } = await startDuel(0, {}, flakyDb);
+  const { creator, opponent, duelId, words, stop } = await startDuel(0, {}, flakyDb);
   try {
-    for (const socket of [creator, opponent]) {
-      socket.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
-      socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
-    }
+    const sockets = [creator, opponent] as const;
+    await playRound(sockets, 1, { creator: words });
+    const second = await awaitStart(sockets, 2);
+    await playRound(sockets, 2, { creator: second.words });
 
     const ends = [await nextEnd(creator), await nextEnd(opponent)];
 
     expect(failuresLeft).toBe(0);
-    expect(Date.now()).toBeGreaterThanOrEqual(startAt + 32_000);
-    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["draw", "draw"] });
+    expect(Date.now()).toBeGreaterThanOrEqual(second.startAt + 32_000);
+    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["win", "loss"] });
     expect(ends[1]).toEqual(ends[0]);
     expect(await testDb.db.select().from(duel).where(eq(duel.id, duelId))).toHaveLength(1);
     expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId))).toHaveLength(
-      2,
+      4,
     );
   } finally {
     await stop();
@@ -1073,9 +1317,10 @@ test("two Participants on two API instances sharing Redis receive each other's E
   }
 });
 
-test("with two API instances on one Redis, a Duel is finalised and saved exactly once", async () => {
-  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
-  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+test("with two API instances on one Redis, each Round ends exactly once for both Participants, and the Duel is finalised and saved exactly once", async () => {
+  const options = { countdownMs: 0, roundPauseMs: 0 };
+  const first = createApp(testDb.db, auth, testRedis.redis, options).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, options).listen(0);
   const socketUrl = (port: number | undefined, duelId: string) =>
     `ws://localhost:${port}/api/duels/${duelId}/socket`;
   try {
@@ -1087,21 +1332,43 @@ test("with two API instances on one Redis, a Duel is finalised and saved exactly
     const opponent = await openSocket(socketUrl(second.server?.port, id), opponentCookie);
     for (const socket of [opponent, opponent, creator, creator]) await socket.next();
 
-    // Both final Ticks at once, so that both instances see both Games ended.
-    for (const socket of [creator, opponent]) {
-      socket.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
-      socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
+    // Both final Ticks of each Round at once, so that both instances see both Games ended.
+    const received: [ServerMessage[], ServerMessage[]] = [[], []];
+    const sockets = [creator, opponent] as const;
+    for (const round of [1, 2, 3]) {
+      for (const socket of sockets) playGame(socket, round);
+      for (const seat of [0, 1] as const) {
+        // Up to what ends the Round for this Participant: the next Countdown, or the end of the Duel.
+        const last = round === 3 ? "end" : "countdown";
+        for (;;) {
+          const message = await sockets[seat].next();
+          received[seat].push(message);
+          if (message.type === last) break;
+        }
+      }
     }
-    const ends = [await nextEnd(creator), await nextEnd(opponent)];
     const silent = [await creator.staysSilent(300), await opponent.staysSilent(0)];
     creator.close();
     opponent.close();
 
-    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["draw", "draw"] });
-    expect(ends[1]).toEqual(ends[0]);
+    for (const messages of received) {
+      const roundEnds = messages.filter((message) => message.type === "roundEnd");
+      expect(roundEnds.map((roundEnd) => roundEnd.round)).toEqual([1, 2, 3]);
+      const countdowns = messages.filter((message) => message.type === "countdown");
+      expect(countdowns.map((countdown) => countdown.round)).toEqual([2, 3]);
+      expect(messages.filter((message) => message.type === "end")).toMatchObject([
+        { outcomes: ["draw", "draw"], rounds: roundEnds.map(({ results }) => ({ results })) },
+      ]);
+    }
+    expect(received[0].filter((message) => message.type === "roundEnd")).toEqual(
+      received[1].filter((message) => message.type === "roundEnd"),
+    );
     expect(silent).toEqual([true, true]);
     expect(await testDb.db.select().from(duel).where(eq(duel.id, id))).toHaveLength(1);
-    expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, id))).toHaveLength(2);
+    expect(await testDb.db.select().from(duelRound).where(eq(duelRound.duelId, id))).toHaveLength(
+      3,
+    );
+    expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, id))).toHaveLength(6);
   } finally {
     await first.stop(true);
     await second.stop(true);
@@ -1169,12 +1436,14 @@ test("an Event stamped more than 1 second behind its receipt is kept, and relaye
     const state = await again.next();
     again.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
     opponent.send({ type: "event", round: 1, event: { type: "tick", at: 30_011 } });
-    const { results } = await nextEnd(again);
+    const { results } = await nextRoundEnd(again);
+    await nextRoundEnd(opponent);
+    await playOut([again, opponent], 1);
     again.close();
     const [saved] = await testDb.db
       .select()
       .from(duelGame)
-      .where(and(eq(duelGame.duelId, duelId), eq(duelGame.seat, 0)));
+      .where(and(eq(duelGame.duelId, duelId), eq(duelGame.round, 1), eq(duelGame.seat, 0)));
 
     // 1 second behind the receipt, which the test only knows between its sending and its relay.
     expect(movedAt).toBeGreaterThanOrEqual(10 + sentAt - startAt - 1000);
@@ -1296,11 +1565,13 @@ test("the final Tick the server applies to a silent Game is stamped no earlier t
     // Stamped past the 30 seconds of the Game, and never followed by a Tick.
     opponent.send({ type: "event", round: 1, event: { type: "insert", at: 36_500, text: "a" } });
 
-    const { results } = await nextEnd(creator);
+    const { results } = await nextRoundEnd(creator);
+    await nextRoundEnd(opponent);
+    await playOut([creator, opponent], 1);
     const [saved] = await testDb.db
       .select()
       .from(duelGame)
-      .where(and(eq(duelGame.duelId, duelId), eq(duelGame.seat, 1)));
+      .where(and(eq(duelGame.duelId, duelId), eq(duelGame.round, 1), eq(duelGame.seat, 1)));
 
     expect(saved?.journal.at(-1)).toEqual({ type: "tick", at: 36_500 });
     expect(results[1]).toMatchObject({ duration: 36 });
@@ -1308,3 +1579,111 @@ test("the final Tick the server applies to a silent Game is stamped no earlier t
     await stop();
   }
 }, 40_000);
+
+test("a Participant away at the Start of a Round has their Game started at that Start, and their absence counts as Inactivity", async () => {
+  const { creator, opponent, words, reopenCreator, stop } = await startDuel(0);
+  try {
+    await playRound([creator, opponent], 1, { creator: words });
+    creator.close();
+    // Announced to the Opponent alone: the Round does not wait for the Participant who left.
+    const second = await awaitStart([opponent], 2);
+    playGame(opponent, 2);
+    await Bun.sleep(second.startAt + START_WINDOW_MS + 100 - Date.now());
+
+    const again = await reopenCreator();
+    const state = await again.next();
+    // The Game the server started runs on its clock: this Tick ends it 30 seconds after the Start.
+    again.send({ type: "event", round: 2, event: { type: "tick", at: second.startAt + 30_000 } });
+    const ended = await nextRoundEnd(again);
+    again.close();
+
+    expect(state).toMatchObject({
+      type: "state",
+      round: 2,
+      startAt: second.startAt,
+      journals: [[{ type: "start", at: second.startAt }], [{ type: "start", at: 10 }, {}]],
+    });
+    expect(ended).toMatchObject({
+      round: 2,
+      results: [{ duration: 30, wpm: 0, inactiveSeconds: 30 }, { duration: 30 }],
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("a Participant who comes back during a later Round gets the finished Rounds, the current Round and their Game, and types on", async () => {
+  const { creator, opponent, words, reopenCreator, stop } = await startDuel(0);
+  try {
+    const [first] = await playRound([creator, opponent], 1, { creator: words });
+    const second = await awaitStart([creator, opponent], 2);
+    creator.send({ type: "event", round: 2, event: { type: "start", at: 10 } });
+    creator.send({ type: "event", round: 2, event: { type: "insert", at: 20, text: "a" } });
+    await nextOfType(opponent, "opponentEvent");
+    await nextOfType(opponent, "opponentEvent");
+    creator.close();
+
+    const again = await reopenCreator();
+    const state = await again.next();
+    const countdown = await again.next();
+    again.send({ type: "event", round: 2, event: { type: "insert", at: 30, text: "b" } });
+    const relayed = await nextOfType(opponent, "opponentEvent");
+    again.close();
+
+    expect(state).toMatchObject({
+      type: "state",
+      seat: 0,
+      round: 2,
+      rounds: [{ results: first.results, outcomes: ["win", "loss"] }],
+      startAt: second.startAt,
+      words: second.words,
+      journals: [
+        [
+          { type: "start", at: 10 },
+          { type: "insert", at: 20, text: "a" },
+        ],
+        [],
+      ],
+    });
+    expect(countdown).toEqual(second);
+    expect(relayed.event).toEqual({ type: "insert", at: 30, text: "b" });
+  } finally {
+    await stop();
+  }
+});
+
+test("a Participant who comes back between two Rounds gets the Round that just ended and the coming Start, then the Countdown with the Target words, and plays the Round", async () => {
+  const { creator, opponent, words, reopenCreator, stop } = await startDuel(
+    100,
+    {},
+    testDb.db,
+    600,
+  );
+  try {
+    const [first] = await playRound([creator, opponent], 1, { creator: words });
+    creator.close();
+
+    const again = await reopenCreator();
+    const state = await again.next();
+    const second = await awaitStart([again, opponent], 2);
+    const [ended] = await playRound([again, opponent], 2, { creator: second.words });
+    await nextEnd(again);
+    again.close();
+
+    expect(state).toMatchObject({
+      type: "state",
+      seat: 0,
+      round: 2,
+      rounds: [{ results: first.results, outcomes: ["win", "loss"] }],
+      startAt: first.nextStartAt,
+      // Held back until the Countdown of the Round.
+      words: null,
+      journals: [[], []],
+    });
+    expect(second).toMatchObject({ round: 2, startAt: first.nextStartAt });
+    expect(second.words).toHaveLength(DUEL_WORD_COUNT);
+    expect(ended).toMatchObject({ round: 2, outcomes: ["win", "loss"], nextStartAt: null });
+  } finally {
+    await stop();
+  }
+});

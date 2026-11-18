@@ -68,12 +68,17 @@ const isResult: Check = (value) =>
     inactiveAtEnd: isBoolean,
   });
 
+const isFinishedRound: Check = (value) =>
+  hasFields(value, { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) });
+
 // What each type of message must carry, as the server's schemas send it.
 const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
   pong: { clientAt: isNumber, serverAt: isNumber },
   state: {
     seat: isSeat,
     round: isRound,
+    rounds: isListOf(isFinishedRound),
+    startAt: isNullOr(isNumber),
     words: isNullOr(isListOf(isString)),
     participants: isListOf(isParticipant),
     journals: isPairOf(isListOf(isGameEvent)),
@@ -81,7 +86,13 @@ const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
   presence: { participant: isParticipant },
   countdown: { round: isRound, startAt: isNumber, words: isListOf(isString) },
   opponentEvent: { event: isGameEvent },
-  end: { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) },
+  roundEnd: {
+    round: isRound,
+    results: isPairOf(isResult),
+    outcomes: isPairOf(isOutcome),
+    nextStartAt: isNullOr(isNumber),
+  },
+  end: { outcomes: isPairOf(isOutcome), rounds: isListOf(isFinishedRound) },
 };
 
 const isMessageType = (type: unknown): type is ServerMessage["type"] =>

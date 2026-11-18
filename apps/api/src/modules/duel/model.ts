@@ -67,6 +67,8 @@ const result = t.Object({
 
 const outcome = t.Union([t.Literal("win"), t.Literal("loss"), t.Literal("draw")]);
 
+const finishedRound = { results: pair(result), outcomes: pair(outcome) };
+
 export const IdSocket = {
   Params: duelParams,
   Body: t.Union([
@@ -81,6 +83,8 @@ export const IdSocket = {
         type: t.Literal("state"),
         seat,
         round,
+        rounds: list(t.Object(finishedRound)),
+        startAt: t.Union([t.Number(), t.Null()]),
         words: t.Union([list(t.String()), t.Null()]),
         participants: list(participant),
         journals: pair(list(gameEvent)),
@@ -93,7 +97,17 @@ export const IdSocket = {
         words: list(t.String()),
       }),
       t.Object({ type: t.Literal("opponentEvent"), event: gameEvent }),
-      t.Object({ type: t.Literal("end"), results: pair(result), outcomes: pair(outcome) }),
+      t.Object({
+        type: t.Literal("roundEnd"),
+        round,
+        ...finishedRound,
+        nextStartAt: t.Union([t.Number(), t.Null()]),
+      }),
+      t.Object({
+        type: t.Literal("end"),
+        outcomes: pair(outcome),
+        rounds: list(t.Object(finishedRound)),
+      }),
     ]),
     404: notFound,
     409: t.Object({ code: t.Literal("DUEL_FULL") }),

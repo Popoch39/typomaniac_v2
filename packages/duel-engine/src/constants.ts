@@ -12,3 +12,9 @@ export const END_GRACE_MS = 2000;
 export const START_WINDOW_MS = 1000;
 /** How far behind its receipt an Event may be stamped before its timestamp is moved up. */
 export const TIMESTAMP_TOLERANCE_MS = 1000;
+/** How many Rounds a Participant must win to win the Duel. */
+export const ROUNDS_TO_WIN = 2;
+/** How many Rounds a Duel has at most: it ends earlier once a Participant has won enough. */
+export const MAX_ROUNDS = 3;
+/** Between the end of a Round and the Countdown of the next one, while both Results are shown. */
+export const ROUND_PAUSE_MS = 5000;
