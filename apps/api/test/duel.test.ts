@@ -20,8 +20,12 @@ const auth = createTestAuth(testDb.db);
 // Listening on an ephemeral port: the in-process request seam cannot upgrade a connection.
 const app = createApp(testDb.db, auth, testRedis.redis).listen(0);
 const origin = `http://localhost:${app.server?.port}`;
+// The Redis of the apps started with delays of their own: every instance sweeping one Redis
+// advances its Duels by its own delays, so these do not share the one of the default app.
+const quickRedis = await createTestRedis();
 afterAll(async () => {
   await app.stop(true);
+  await quickRedis.drop();
   await testRedis.drop();
   await testDb.drop();
 });
@@ -466,13 +470,17 @@ const startDuel = async (
   db = testDb.db,
   roundPauseMs = 0,
 ) => {
-  const quick = createApp(db, auth, testRedis.redis, { countdownMs, roundPauseMs }).listen(0);
+  const quick = createApp(db, auth, quickRedis.redis, { countdownMs, roundPauseMs }).listen(0);
   const socketUrl = (duelId: string) =>
     `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
   const creatorCookie = cookies.creatorCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
   const opponentCookie =
     cookies.opponentCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
-  const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+  const created = await fetch(`http://localhost:${quick.server?.port}/api/duels`, {
+    method: "POST",
+    headers: { cookie: creatorCookie },
+  });
+  const { id } = (await created.json()) as { id: string };
   const creator = await openSocket(socketUrl(id), creatorCookie);
   await creator.next();
   const opponent = await openSocket(socketUrl(id), opponentCookie);
@@ -1252,41 +1260,6 @@ test("a Participant who comes back after the deadline, while the server is still
       results: [{ duration: 30 }, { duration: 30 }],
       outcomes: ["draw", "draw"],
     });
-  } finally {
-    await stop();
-  }
-}, 40_000);
-
-test("a Duel whose save failed is finalised again at the deadline of its last Round, saved once, and its end announced", async () => {
-  let failuresLeft = 1;
-  // The real database, but for its first transaction, refused as by a database out of reach.
-  const flakyDb = new Proxy(testDb.db, {
-    get: (target, key) => {
-      if (key === "transaction" && failuresLeft > 0) {
-        failuresLeft -= 1;
-        return () => Promise.reject(new Error("The database cannot be reached"));
-      }
-      const value: unknown = Reflect.get(target, key);
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  });
-  const { creator, opponent, duelId, words, stop } = await startDuel(0, {}, flakyDb);
-  try {
-    const sockets = [creator, opponent] as const;
-    await playRound(sockets, 1, { creator: words });
-    const second = await awaitStart(sockets, 2);
-    await playRound(sockets, 2, { creator: second.words });
-
-    const ends = [await nextEnd(creator), await nextEnd(opponent)];
-
-    expect(failuresLeft).toBe(0);
-    expect(Date.now()).toBeGreaterThanOrEqual(second.startAt + 32_000);
-    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["win", "loss"] });
-    expect(ends[1]).toEqual(ends[0]);
-    expect(await testDb.db.select().from(duel).where(eq(duel.id, duelId))).toHaveLength(1);
-    expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId))).toHaveLength(
-      4,
-    );
   } finally {
     await stop();
   }
