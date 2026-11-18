@@ -9,6 +9,7 @@ import {
   getOutcome,
   type Outcome,
   type Participant,
+  type RankedEnd,
   type Seat,
   type ServerMessage,
   START_WINDOW_MS,
@@ -21,9 +22,17 @@ import {
   type GameStatus,
   getResult,
 } from "@repo/typing-engine";
-import type { Db } from "../../db/client.ts";
+import { eq } from "drizzle-orm";
+import type { Db, Transaction } from "../../db/client.ts";
 import { duel, duelGame, duelParticipant, duelRound } from "../../db/schema.ts";
 import type { Redis } from "../../redis/client.ts";
+import {
+  moveStandings,
+  rankFromStored,
+  type StandingMove,
+  storedRank,
+  visibleStanding,
+} from "../standing/service.ts";
 import type { Relay } from "./relay.ts";
 
 /** How long a Duel can be joined after its creation. */
@@ -505,9 +514,49 @@ type PlayedRound = FinishedRound & {
   readonly journals: readonly [GameEvent[], GameEvent[]];
 };
 
+// The ranked columns of a participant: the Standing before and after, and what the Duel changed.
+const savedMove = ({ before, update }: StandingMove) => {
+  const rankBefore = storedRank(before.rank);
+  const rankAfter = storedRank(update.standing.rank);
+  return {
+    mmrBefore: before.mmr,
+    mmrAfter: update.standing.mmr,
+    duelsPlayedBefore: before.duelsPlayed,
+    duelsPlayedAfter: update.standing.duelsPlayed,
+    ladderIndexBefore: rankBefore.ladderIndex,
+    lpBefore: rankBefore.lp,
+    ladderIndexAfter: rankAfter.ladderIndex,
+    lpAfter: rankAfter.lp,
+    lpDelta: update.lpDelta,
+    rankChange: update.rankChange,
+  };
+};
+
+// Read back from what was saved rather than from what was just computed, so that a finalisation
+// retried after its save tells both Players what the first one would have.
+const readRankedEnds = async (tx: Transaction, duelId: string) => {
+  const participants = await tx
+    .select()
+    .from(duelParticipant)
+    .where(eq(duelParticipant.duelId, duelId))
+    .orderBy(duelParticipant.seat);
+  const ends = participants.map((participant): RankedEnd => {
+    const { duelsPlayedAfter, ladderIndexAfter, lpAfter, lpDelta, rankChange } = participant;
+    if (duelsPlayedAfter === null || lpDelta === null || rankChange === null)
+      throw new Error(`Ranked Duel ${duelId} was saved without the Standing of a Player`);
+    const rank = rankFromStored(ladderIndexAfter, lpAfter);
+    return { lpDelta, rankChange, ...visibleStanding({ duelsPlayed: duelsPlayedAfter, rank }) };
+  });
+  const [first, second] = ends;
+  if (!first || !second) throw new Error(`Duel ${duelId} was saved without both participants`);
+  return [first, second] as const;
+};
+
 /**
- * Saves a decided Duel with every Round, their Games and both participants in one transaction.
- * A Duel saved already, by a finalisation that failed after its save, is not saved again.
+ * Saves a decided Duel with every Round, their Games and both participants in one transaction,
+ * which also moves both Standings when the Duel is ranked. A Duel saved already, by a finalisation
+ * that failed after its save, is not saved again, and no Standing moves twice. Gives what a ranked
+ * Duel did to each Player's Standing, indexed by seat, `null` for a Custom Duel.
  */
 export const saveDuel = async (
   db: Db,
@@ -524,7 +573,7 @@ export const saveDuel = async (
   const first = rounds.at(0);
   const last = rounds.at(-1);
   if (!first || !last) throw new Error(`Duel ${duelId} has ended without a Round`);
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const inserted = await tx
       .insert(duel)
       .values({
@@ -536,7 +585,7 @@ export const saveDuel = async (
       })
       .onConflictDoNothing()
       .returning({ id: duel.id });
-    if (inserted.length === 0) return;
+    if (inserted.length === 0) return kind === "ranked" ? readRankedEnds(tx, duelId) : null;
     await tx.insert(duelRound).values(
       rounds.map((round) => ({
         duelId,
@@ -558,14 +607,26 @@ export const saveDuel = async (
         })),
       ),
     );
+    const [firstPlayerId, secondPlayerId] = playerIds;
+    if (kind === "ranked" && (!firstPlayerId || !secondPlayerId))
+      throw new Error(`Ranked Duel ${duelId} has a seat without a Player`);
+    const moves =
+      kind === "ranked" && firstPlayerId && secondPlayerId
+        ? await moveStandings(tx, [firstPlayerId, secondPlayerId], outcomes)
+        : null;
     await tx.insert(duelParticipant).values(
-      SEATS.map((seat) => ({
-        duelId,
-        seat,
-        playerId: playerIds[seat] ?? null,
-        outcome: outcomes[seat],
-      })),
+      SEATS.map((seat) => {
+        const move = moves?.[seat];
+        return {
+          duelId,
+          seat,
+          playerId: playerIds[seat] ?? null,
+          outcome: outcomes[seat],
+          ...(move && savedMove(move)),
+        };
+      }),
     );
+    return moves && readRankedEnds(tx, duelId);
   });
 };
 
@@ -623,10 +684,12 @@ export const finaliseDuel = async (
     }
     const outcomes = getDuelOutcomes(rounds.map((round) => round.outcomes));
     if (outcomes === null) throw new Error(`Duel ${duelId} is not decided`);
-    await saveDuel(db, duelId, { kind: duel.kind, playerIds: duel.playerIds, outcomes, rounds });
+    const { kind, playerIds } = duel;
+    const ranked = await saveDuel(db, duelId, { kind, playerIds, outcomes, rounds });
     const end = {
       type: "end",
       outcomes,
+      ranked,
       rounds: rounds.map(({ results, outcomes: roundOutcomes }) => ({
         results,
         outcomes: roundOutcomes,

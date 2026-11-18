@@ -1072,9 +1072,22 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         outcome: "loss",
       },
     ]);
+    // A Custom Duel keeps no Standing: the ranked columns stay empty.
+    const noStanding = {
+      mmrBefore: null,
+      mmrAfter: null,
+      duelsPlayedBefore: null,
+      duelsPlayedAfter: null,
+      ladderIndexBefore: null,
+      lpBefore: null,
+      ladderIndexAfter: null,
+      lpAfter: null,
+      lpDelta: null,
+      rankChange: null,
+    };
     expect(participants).toEqual([
-      { duelId, seat: 0, playerId: player.id, outcome: "win" },
-      { duelId, seat: 1, playerId: null, outcome: "loss" },
+      { duelId, seat: 0, playerId: player.id, outcome: "win", ...noStanding },
+      { duelId, seat: 1, playerId: null, outcome: "loss", ...noStanding },
     ]);
   } finally {
     await stop();

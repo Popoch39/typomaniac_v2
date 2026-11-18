@@ -71,6 +71,24 @@ const isResult: Check = (value) =>
 const isFinishedRound: Check = (value) =>
   hasFields(value, { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) });
 
+const isRank: Check = (value) => {
+  if (!isRecord(value) || !Number.isInteger(value.lp)) return false;
+  if (value.tier === "master") return true;
+  return (
+    ["bronze", "silver", "gold", "platinum", "diamond"].includes(String(value.tier)) &&
+    [1, 2, 3, 4].includes(Number(value.division))
+  );
+};
+
+const isRankedEnd: Check = (value) =>
+  hasFields(value, {
+    lpDelta: (lpDelta) => Number.isInteger(lpDelta),
+    rankChange: (change) =>
+      change === "placed" || change === "promoted" || change === "demoted" || change === "none",
+    rank: isNullOr(isRank),
+    placement: (placement) => hasFields(placement, { played: isNumber, total: isNumber }),
+  });
+
 // What each type of message must carry, as the server's schemas send it.
 const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
   pong: { clientAt: isNumber, serverAt: isNumber },
@@ -92,7 +110,12 @@ const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
     outcomes: isPairOf(isOutcome),
     nextStartAt: isNullOr(isNumber),
   },
-  end: { outcomes: isPairOf(isOutcome), rounds: isListOf(isFinishedRound) },
+  end: {
+    outcomes: isPairOf(isOutcome),
+    rounds: isListOf(isFinishedRound),
+    // `null` for a Custom Duel, but never left out.
+    ranked: (ranked) => ranked !== undefined && isNullOr(isPairOf(isRankedEnd))(ranked),
+  },
 };
 
 const isMessageType = (type: unknown): type is ServerMessage["type"] =>

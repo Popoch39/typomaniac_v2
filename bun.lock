@@ -95,6 +95,7 @@
       "name": "@repo/duel-engine",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/ranked-engine": "*",
         "@repo/typing-engine": "*",
       },
       "devDependencies": {

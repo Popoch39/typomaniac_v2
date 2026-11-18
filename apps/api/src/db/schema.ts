@@ -1,5 +1,6 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
 import type { Outcome, Seat } from "@repo/duel-engine";
+import type { RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -189,7 +190,9 @@ export const duelGame = pgTable(
   ],
 );
 
-// One row per seat of a Duel: who sat there and what the Duel meant for them.
+// One row per seat of a Duel: who sat there and what the Duel meant for them. The columns after the
+// Outcome are those of a ranked Duel, all null for a Custom Duel: the Player's Standing before and
+// after it, stored as in `standing`, so that a change of Rank can be explained and audited.
 export const duelParticipant = pgTable(
   "duel_participant",
   {
@@ -203,6 +206,19 @@ export const duelParticipant = pgTable(
     outcome: text("outcome", { enum: ["win", "loss", "draw"] })
       .$type<Outcome>()
       .notNull(),
+    mmrBefore: integer("mmr_before"),
+    mmrAfter: integer("mmr_after"),
+    duelsPlayedBefore: integer("duels_played_before"),
+    duelsPlayedAfter: integer("duels_played_after"),
+    ladderIndexBefore: smallint("ladder_index_before"),
+    lpBefore: integer("lp_before"),
+    ladderIndexAfter: smallint("ladder_index_after"),
+    lpAfter: integer("lp_after"),
+    // The LP won or lost, signed.
+    lpDelta: integer("lp_delta"),
+    rankChange: text("rank_change", {
+      enum: ["placed", "promoted", "demoted", "none"],
+    }).$type<RankChange>(),
   },
   (table) => [primaryKey({ columns: [table.duelId, table.seat] })],
 );

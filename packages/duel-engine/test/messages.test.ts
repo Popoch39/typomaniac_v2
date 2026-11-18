@@ -44,6 +44,21 @@ const serverMessages: ServerMessage[] = [
     type: "end",
     outcomes: ["draw", "draw"],
     rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["draw", "draw"] }],
+    ranked: null,
+  },
+  {
+    type: "end",
+    outcomes: ["win", "loss"],
+    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] }],
+    ranked: [
+      {
+        lpDelta: 23,
+        rankChange: "promoted",
+        rank: { tier: "gold", division: 1, lp: 13 },
+        placement: { played: 5, total: 5 },
+      },
+      { lpDelta: 0, rankChange: "none", rank: null, placement: { played: 2, total: 5 } },
+    ],
   },
 ];
 

@@ -1,3 +1,4 @@
+import type { Rank, RankChange } from "@repo/ranked-engine";
 import type { GameEvent, Result } from "@repo/typing-engine";
 import type { RoundOutcomes } from "./rounds.ts";
 
@@ -15,6 +16,20 @@ export type Participant = {
 export type FinishedRound = {
   readonly results: readonly [Result, Result];
   readonly outcomes: RoundOutcomes;
+};
+
+/**
+ * What a ranked Duel did to a Player's Standing, as far as a Player may see it: the MMR is hidden
+ * (ADR 0006).
+ */
+export type RankedEnd = {
+  /** The LP won or lost, signed. */
+  readonly lpDelta: number;
+  readonly rankChange: RankChange;
+  /** The Rank after the Duel, `null` while the Player is Unranked. */
+  readonly rank: Rank | null;
+  /** The Placement Duels played, this one included, out of those a Placement has. */
+  readonly placement: { readonly played: number; readonly total: number };
 };
 
 /** Timestamps are milliseconds since the epoch, each on the clock of the side that sets it. */
@@ -65,9 +80,13 @@ export type ServerMessage =
       readonly round: number;
       readonly nextStartAt: number | null;
     } & FinishedRound)
-  /** Ends the Duel with its Outcomes, indexed by seat, and every Round played. */
+  /**
+   * Ends the Duel with its Outcomes, indexed by seat, and every Round played. `ranked` is what a
+   * ranked Duel did to each Player's Standing, indexed by seat; `null` for a Custom Duel.
+   */
   | {
       readonly type: "end";
       readonly outcomes: RoundOutcomes;
       readonly rounds: readonly FinishedRound[];
+      readonly ranked: readonly [RankedEnd, RankedEnd] | null;
     };
