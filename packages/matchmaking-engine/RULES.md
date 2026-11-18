@@ -42,7 +42,7 @@ A pair names the Player considered first, then the Player found inside their win
 
 ## Messages
 
-The messages of the Queue socket are typed here, in `QueueServerMessage`, so that the server and the front share one definition.
+The messages of the Queue socket are typed here, in `QueueServerMessage` and `QueueClientMessage`, so that the server and the front share one definition.
 
 | Id        | Rule                                                                                        |
 | --------- | ------------------------------------------------------------------------------------------- |

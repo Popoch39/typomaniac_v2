@@ -1,4 +1,4 @@
-import type { QueueServerMessage } from "@repo/matchmaking-engine";
+import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { queueQueryOptions } from "../api/queueQueryOptions.ts";
@@ -53,6 +53,10 @@ export function openQueueSocket({ receive, refuse, disconnect }: QueueSocketHand
     const refusal = await findRefusal();
     if (socket === opened) refuse(refusal);
   });
+}
+
+export function sendToQueue(message: QueueClientMessage) {
+  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 
 export function closeQueueSocket() {

@@ -1,5 +1,5 @@
 import { SQL } from "bun";
-import { DrizzleQueryError, eq } from "drizzle-orm";
+import { DrizzleQueryError, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../db/client.ts";
 import { nicknameUniqueIndex, user } from "../../db/schema.ts";
 import { nicknameFormat } from "./model.ts";
@@ -46,6 +46,17 @@ export const saveNickname = async (
     if (isNicknameTaken(error)) return "taken";
     throw error;
   }
+};
+
+/** The Nickname of each of the Players who chose one, by Player id. */
+export const readNicknames = async (db: Db, playerIds: readonly string[]) => {
+  const players = await db
+    .select({ id: user.id, nickname: user.nickname })
+    .from(user)
+    .where(inArray(user.id, [...playerIds]));
+  return new Map(
+    players.flatMap(({ id, nickname }) => (nickname === null ? [] : [[id, nickname] as const])),
+  );
 };
 
 const nicknamePattern = new RegExp(nicknameFormat.pattern);

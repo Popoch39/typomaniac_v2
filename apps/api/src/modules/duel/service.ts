@@ -37,6 +37,9 @@ export type Identity = {
 
 export type DuelKind = "custom" | "ranked";
 
+/** A Player a seat of a ranked Duel is held for, shown by their Nickname. */
+export type RankedSeat = { readonly playerId: string; readonly nickname: string };
+
 /** What a Duel holds per Round: what both Games of the Round are played on. */
 export type Round = {
   /** Rounds are numbered from 1. */
@@ -92,6 +95,34 @@ export const createDuel = async (redis: Redis, kind: DuelKind, expiryMs: number)
     expiryMs,
   );
   return duelId;
+};
+
+/**
+ * A ranked Duel as the second acceptance of a Pairing creates it, in that acceptance's own step
+ * rather than here: both seats are already held by the two Players, in the order given, so the
+ * seat claim gives each of them theirs and refuses anyone else.
+ */
+export const draftRankedDuel = (
+  redis: Redis,
+  players: readonly [RankedSeat, RankedSeat],
+  expiryMs: number,
+) => {
+  const duelId = crypto.randomUUID();
+  const seats: Record<string, string> = Object.fromEntries(
+    players.flatMap(({ playerId, nickname }, seat) => [
+      [`holder${seat}`, playerId],
+      [`name${seat}`, nickname],
+      [`player${seat}`, playerId],
+    ]),
+  );
+  const hashes: { key: string; fields: Record<string, string> }[] = [
+    { key: duelKey(redis, duelId), fields: { kind: "ranked", round: "1", ...seats } },
+    {
+      key: roundKey(redis, duelId, 1),
+      fields: { words: JSON.stringify(drawWords(DUEL_WORD_COUNT, Math.random)) },
+    },
+  ];
+  return { duelId, hashes, expiryMs };
 };
 
 // Atomic, so two identities opening the same Duel at once never get the same seat. An identity
