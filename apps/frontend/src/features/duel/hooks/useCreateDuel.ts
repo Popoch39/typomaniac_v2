@@ -2,7 +2,6 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
 const FAILURES: Record<number, string> = {
-  401: "Sign in to create a Duel.",
   403: "Choose a Nickname to create a Duel.",
 };
 

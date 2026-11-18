@@ -1,6 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
 import { DUEL_WORD_COUNT, START_WINDOW_MS } from "@repo/duel-engine";
+import { count } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
+import { user } from "../src/db/schema.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
@@ -129,14 +131,126 @@ test("a Player already seated in a Duel is refused its other seat", async () => 
   expect(await response.json()).toEqual({ code: "ALREADY_SEATED" });
 });
 
-test("a visitor without a session can neither create nor join a Duel", async () => {
-  const cookie = await signInPlayerWithNickname(uniqueNickname());
-  const { id } = (await (await createDuel(cookie)).json()) as { id: string };
+// The name/value pair a browser would send back from the Guest cookie the API set.
+const guestCookieOf = (response: Response) => {
+  const cookie = response.headers.getSetCookie().find((header) => header.startsWith("guest="));
+  if (!cookie) throw new Error("No Guest cookie was set");
+  return cookie.split(";")[0] ?? "";
+};
 
-  for (const response of [await createDuel(), await requestUpgrade(duelSocketUrl(id))]) {
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ code: "UNAUTHORIZED" });
-  }
+test("a Guest creates a Duel under a generated display name, which the Player who joins sees", async () => {
+  const created = await createDuel();
+  expect(created.status).toBe(201);
+  const guestCookie = guestCookieOf(created);
+  const { id } = (await created.json()) as { id: string };
+  const playerName = uniqueNickname();
+  const playerCookie = await signInPlayerWithNickname(playerName);
+
+  const guest = await openSocket(duelSocketUrl(id), guestCookie);
+  const guestState = await guest.next();
+  const player = await openSocket(duelSocketUrl(id), playerCookie);
+  const playerState = await player.next();
+  guest.close();
+  player.close();
+
+  const guestName = guestState.type === "state" ? guestState.participants[0]?.name : undefined;
+  expect(guestName).toMatch(/^Guest \d{4}$/);
+  expect(playerState).toMatchObject({
+    type: "state",
+    seat: 1,
+    participants: [
+      { seat: 0, name: guestName, connected: true },
+      { seat: 1, name: playerName, connected: true },
+    ],
+  });
+});
+
+test("a Guest without a cookie joins by the link and is handed their cookie with the handshake", async () => {
+  const creatorName = uniqueNickname();
+  const creatorCookie = await signInPlayerWithNickname(creatorName);
+  const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+  const creator = await openSocket(duelSocketUrl(id), creatorCookie);
+  await creator.next();
+
+  const handshake = await requestUpgrade(duelSocketUrl(id));
+  const guestCookie = guestCookieOf(handshake);
+  const arrived = await creator.next();
+  creator.close();
+
+  expect(handshake.status).toBe(101);
+  expect(arrived).toMatchObject({
+    type: "presence",
+    participant: { seat: 1, name: expect.stringMatching(/^Guest \d{4}$/), connected: true },
+  });
+  expect(guestCookie).toStartWith("guest=");
+});
+
+test("the same Guest opening a Duel twice is refused its other seat, and gets their own back", async () => {
+  const created = await createDuel();
+  const guestCookie = guestCookieOf(created);
+  const { id } = (await created.json()) as { id: string };
+  const seated = await openSocket(duelSocketUrl(id), guestCookie);
+  await seated.next();
+  const opponent = await openSocket(
+    duelSocketUrl(id),
+    await signInPlayerWithNickname(uniqueNickname()),
+  );
+  await opponent.next();
+
+  const twice = await requestUpgrade(duelSocketUrl(id), guestCookie);
+  seated.close();
+  await opponent.next();
+  const again = await openSocket(duelSocketUrl(id), guestCookie);
+  const state = await again.next();
+  again.close();
+  opponent.close();
+
+  expect(twice.status).toBe(409);
+  expect(await twice.json()).toEqual({ code: "ALREADY_SEATED" });
+  expect(state).toMatchObject({ type: "state", seat: 0 });
+});
+
+const forgedGuestCookies = {
+  tampered: (cookie: string) => {
+    const [payload = "", signature] = cookie.slice("guest=".length).split(".");
+    const guest = JSON.parse(Buffer.from(payload, "base64url").toString()) as { id: string };
+    const renamed = Buffer.from(JSON.stringify({ ...guest, name: "Guest 0000" })).toString(
+      "base64url",
+    );
+    return `guest=${renamed}.${signature}`;
+  },
+  unsigned: (cookie: string) => cookie.split(".")[0] ?? "",
+};
+
+for (const [forgery, forge] of Object.entries(forgedGuestCookies)) {
+  test(`a ${forgery} Guest cookie is not accepted as the Guest it names`, async () => {
+    const created = await createDuel();
+    const guestCookie = guestCookieOf(created);
+    const { id } = (await created.json()) as { id: string };
+    const guest = await openSocket(duelSocketUrl(id), guestCookie);
+    await guest.next();
+    guest.close();
+
+    const impostor = await openSocket(duelSocketUrl(id), forge(guestCookie));
+    const state = await impostor.next();
+    impostor.close();
+
+    expect(state).toMatchObject({ type: "state", seat: 1 });
+  });
+}
+
+test("no row is written to the database for a Guest who creates and joins a Duel", async () => {
+  const countPlayers = async () =>
+    (await testDb.db.select({ count: count() }).from(user))[0]?.count;
+  const before = await countPlayers();
+
+  const created = await createDuel();
+  const { id } = (await created.json()) as { id: string };
+  const guest = await openSocket(duelSocketUrl(id), guestCookieOf(created));
+  await guest.next();
+  guest.close();
+
+  expect(await countPlayers()).toBe(before);
 });
 
 test("a Player without a Nickname can neither create nor join a Duel", async () => {
@@ -150,6 +264,7 @@ test("a Player without a Nickname can neither create nor join a Duel", async () 
   ]) {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ code: "NICKNAME_REQUIRED" });
+    expect(response.headers.getSetCookie()).toEqual([]);
   }
 });
 

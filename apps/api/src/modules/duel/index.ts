@@ -40,14 +40,14 @@ export const createDuelRoutes = (
       .use(websocket())
       .post(
         "/",
-        { nicknameChosen: true, response: { 201: DuelModel.RootPost.Response } },
+        { participant: true, response: { 201: DuelModel.RootPost.Response } },
         async ({ status }) => status(201, { id: await createDuel(redis, expiryMs) }),
       )
       // Lets a client tell why its upgrade was refused, which a browser WebSocket never shows.
       .get(
         "/:id",
         {
-          nicknameChosen: true,
+          participant: true,
           params: DuelModel.IdGet.Params,
           response: { 200: DuelModel.IdGet.Response, 404: DuelModel.IdGet.NotFound },
         },
@@ -58,26 +58,25 @@ export const createDuelRoutes = (
         },
       )
       .ws("/:id/socket", {
-        nicknameChosen: true,
+        participant: true,
         params: DuelModel.IdSocket.Params,
         body: DuelModel.IdSocket.Body,
-        async beforeHandle({ body, params, player, request, status }) {
+        async beforeHandle({ body, params, identity, request, status }) {
           // Also runs before each message, which carries a body: the seat is claimed on the upgrade only.
           if (body !== undefined) return;
           // A plain request must not claim a seat it could never use.
           if (request.headers.get("upgrade")?.toLowerCase() !== "websocket")
             return status(426, { code: "UPGRADE_REQUIRED" });
-          const claimed = await claimSeat(redis, params.id, {
-            id: player.id,
-            name: player.nickname,
-          });
+          const claimed = await claimSeat(redis, params.id, identity);
           if (claimed === "unknown") return status(404, { code: "DUEL_NOT_FOUND" });
           if (claimed === "full") return status(409, { code: "DUEL_FULL" });
           if (claimed === "seated") return status(409, { code: "ALREADY_SEATED" });
         },
+        // Hands a new Guest their cookie with the handshake, the only response a socket gets.
+        upgrade: ({ set }) => set.headers,
         async open(ws) {
           const duel = await readDuel(redis, ws.params.id);
-          const seat = duel?.holderIds.indexOf(ws.player.id);
+          const seat = duel?.holderIds.indexOf(ws.identity.id);
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
