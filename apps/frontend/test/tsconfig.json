@@ -10,6 +10,11 @@
     "emitDeclarationOnly": true,
     "verbatimModuleSyntax": true
   },
-  "include": [".", "../src/features/game/input", "../src/features/game/words/judgeLetter.ts"],
+  "include": [
+    ".",
+    "../src/features/game/input",
+    "../src/features/game/words/judgeLetter.ts",
+    "../src/features/duel/clock"
+  ],
   "references": [{ "path": "../../../packages/typing-engine" }]
 }
