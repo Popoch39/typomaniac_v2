@@ -1,4 +1,4 @@
-import type { Outcome } from "@repo/duel-engine";
+import { type Outcome, opponentSeat } from "@repo/duel-engine";
 import { useDuelStore } from "../store/useDuelStore.ts";
 
 const OUTCOME_LABELS: Record<Outcome, string> = {
@@ -13,8 +13,7 @@ export function useDuelEnd() {
   const seat = useDuelStore((state) => state.seat);
   const participants = useDuelStore((state) => state.participants);
   if (end === null || seat === null) return null;
-  const opponentSeat = seat === 0 ? 1 : 0;
-  const sides = [seat, opponentSeat].map((side) => ({
+  const sides = [seat, opponentSeat(seat)].map((side) => ({
     seat: side,
     name: participants.find((participant) => participant.seat === side)?.name ?? "",
     result: end.results[side],

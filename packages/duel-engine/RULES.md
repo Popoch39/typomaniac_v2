@@ -29,6 +29,12 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 | WORDS-3 | The draw never gives the same word twice in a row, nor a first word equal to the word the drawn words follow, when given one. |
 | WORDS-4 | The common words are distinct lowercase words, without any space.                                                             |
 
+## Seats
+
+| Id     | Rule                                                                                 |
+| ------ | ------------------------------------------------------------------------------------ |
+| SEAT-1 | The Opponent of a Participant sits on the other seat: seat 0 faces seat 1, and back. |
+
 ## Messages
 
 | Id        | Rule                                                                                                              |

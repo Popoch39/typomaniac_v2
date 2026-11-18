@@ -120,16 +120,23 @@ test("the upgrade is refused for a full Duel", async () => {
   expect(await response.json()).toEqual({ code: "DUEL_FULL" });
 });
 
-test("a Player already seated in a Duel is refused its other seat", async () => {
-  const cookie = await signInPlayerWithNickname(uniqueNickname());
+test("a Player opening a Duel twice gets their own seat back, never its other seat", async () => {
+  const nickname = uniqueNickname();
+  const cookie = await signInPlayerWithNickname(nickname);
   const { id } = (await (await createDuel(cookie)).json()) as { id: string };
   const seated = await openSocket(duelSocketUrl(id), cookie);
+  await seated.next();
 
-  const response = await requestUpgrade(duelSocketUrl(id), cookie);
-  seated.close();
+  const twice = await openSocket(duelSocketUrl(id), cookie);
+  const state = await twice.next();
+  await seated.closed;
+  twice.close();
 
-  expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({ code: "ALREADY_SEATED" });
+  expect(state).toMatchObject({
+    type: "state",
+    seat: 0,
+    participants: [{ seat: 0, name: nickname, connected: true }],
+  });
 });
 
 // The name/value pair a browser would send back from the Guest cookie the API set.
@@ -186,7 +193,7 @@ test("a Guest without a cookie joins by the link and is handed their cookie with
   expect(guestCookie).toStartWith("guest=");
 });
 
-test("the same Guest opening a Duel twice is refused its other seat, and gets their own back", async () => {
+test("the same Guest opening a full Duel again gets their own seat back", async () => {
   const created = await createDuel();
   const guestCookie = guestCookieOf(created);
   const { id } = (await created.json()) as { id: string };
@@ -198,17 +205,50 @@ test("the same Guest opening a Duel twice is refused its other seat, and gets th
   );
   await opponent.next();
 
-  const twice = await requestUpgrade(duelSocketUrl(id), guestCookie);
-  seated.close();
-  await opponent.next();
   const again = await openSocket(duelSocketUrl(id), guestCookie);
   const state = await again.next();
+  await seated.closed;
   again.close();
   opponent.close();
 
-  expect(twice.status).toBe(409);
-  expect(await twice.json()).toEqual({ code: "ALREADY_SEATED" });
   expect(state).toMatchObject({ type: "state", seat: 0 });
+});
+
+test("a Participant whose old socket still holds their seat takes it back from another instance, and the old socket is closed", async () => {
+  const other = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  try {
+    const creatorName = uniqueNickname();
+    const creatorCookie = await signInPlayerWithNickname(creatorName);
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const stale = await openSocket(
+      `ws://localhost:${other.server?.port}/api/duels/${id}/socket`,
+      creatorCookie,
+    );
+    await stale.next();
+    const opponent = await openSocket(duelSocketUrl(id), opponentCookie);
+    // State and Countdown.
+    await opponent.next();
+    await opponent.next();
+
+    const again = await openSocket(duelSocketUrl(id), creatorCookie);
+    const state = await again.next();
+    await stale.closed;
+    const back = await opponent.next();
+    // The old socket closing does not show the Participant away: their seat is held by the new one.
+    const silent = await opponent.staysSilent(300);
+    again.close();
+    opponent.close();
+
+    expect(state).toMatchObject({ type: "state", seat: 0 });
+    expect(back).toEqual({
+      type: "presence",
+      participant: { seat: 0, name: creatorName, connected: true },
+    });
+    expect(silent).toBe(true);
+  } finally {
+    await other.stop(true);
+  }
 });
 
 const forgedGuestCookies = {
@@ -410,8 +450,9 @@ test("the Countdown is announced to both Participants once both are connected, w
 const startDuel = async (
   countdownMs: number,
   cookies: { creatorCookie?: string; opponentCookie?: string } = {},
+  db = testDb.db,
 ) => {
-  const quick = createApp(testDb.db, auth, testRedis.redis, { countdownMs }).listen(0);
+  const quick = createApp(db, auth, testRedis.redis, { countdownMs }).listen(0);
   const socketUrl = (duelId: string) =>
     `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
   const creatorCookie = cookies.creatorCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
@@ -572,6 +613,33 @@ test("a Participant who comes back on another API instance resumes the same Game
   } finally {
     await first.stop(true);
     await second.stop(true);
+  }
+});
+
+test("a Participant who comes back after the Start without having started has their Game started at the Start, and types on", async () => {
+  const { creator, opponent, startAt, reopenCreator, stop } = await startDuel(0);
+  try {
+    creator.close();
+    await opponent.next();
+    await Bun.sleep(startAt + START_WINDOW_MS + 100 - Date.now());
+
+    const again = await reopenCreator();
+    const state = await again.next();
+    again.send({ type: "event", event: { type: "insert", at: startAt + 2000, text: "a" } });
+    const toOpponent = [await opponent.next(), await opponent.next(), await opponent.next()];
+    again.close();
+
+    expect(state).toMatchObject({
+      type: "state",
+      journals: [[{ type: "start", at: startAt }], []],
+    });
+    expect(toOpponent).toEqual([
+      { type: "presence", participant: expect.objectContaining({ seat: 0, connected: true }) },
+      { type: "opponentEvent", event: { type: "start", at: startAt } },
+      { type: "opponentEvent", event: { type: "insert", at: startAt + 2000, text: "a" } },
+    ]);
+  } finally {
+    await stop();
   }
 });
 
@@ -794,6 +862,94 @@ test("a Game whose client goes silent is ended by the server 2 seconds after the
       ],
       outcomes: ["loss", "win"],
     });
+  } finally {
+    await stop();
+  }
+}, 40_000);
+
+test("the time a Participant spends away counts as Inactivity in their Result", async () => {
+  const { creator, opponent, reopenCreator, words, stop } = await startDuel(0);
+  try {
+    const [firstWord = "", secondWord = ""] = words;
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "insert", at: 1010, text: `${firstWord} ` } });
+    await opponent.next();
+    await opponent.next();
+    creator.close();
+    await opponent.next();
+
+    // Back 24 seconds later on the Participant's clock, which ran on meanwhile.
+    const again = await reopenCreator();
+    await again.next();
+    again.send({ type: "event", event: { type: "insert", at: 25_010, text: `${secondWord} ` } });
+    again.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+    const { results } = await nextEnd(again);
+    again.close();
+
+    // Typing in the first and the 25th seconds only: the 28 others, mostly away, are inactive.
+    expect(results[0]).toMatchObject({ duration: 30, inactiveSeconds: 28 });
+  } finally {
+    await stop();
+  }
+});
+
+test("a Participant who comes back after the deadline, while the server is still ending their silent Game, finds the Duel over", async () => {
+  const { creator, opponent, startAt, reopenCreator, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    await opponent.next();
+    creator.close();
+    await opponent.next();
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+
+    // Past the deadline, but within the grace the server gives a silent client before ending its Game.
+    await Bun.sleep(startAt + DUEL_GAME_CONFIG.seconds * 1000 + 500 - Date.now());
+    const again = await reopenCreator();
+    const end = await nextEnd(again);
+    again.close();
+
+    expect(end).toMatchObject({
+      results: [{ duration: 30 }, { duration: 30 }],
+      outcomes: ["draw", "draw"],
+    });
+  } finally {
+    await stop();
+  }
+}, 40_000);
+
+test("a Duel whose save failed is finalised again at the deadline, saved once, and its end announced", async () => {
+  let failuresLeft = 1;
+  // The real database, but for its first transaction, refused as by a database out of reach.
+  const flakyDb = new Proxy(testDb.db, {
+    get: (target, key) => {
+      if (key === "transaction" && failuresLeft > 0) {
+        failuresLeft -= 1;
+        return () => Promise.reject(new Error("The database cannot be reached"));
+      }
+      const value: unknown = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const { creator, opponent, duelId, startAt, stop } = await startDuel(0, {}, flakyDb);
+  try {
+    for (const socket of [creator, opponent]) {
+      socket.send({ type: "event", event: { type: "start", at: 10 } });
+      socket.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    }
+
+    const ends = [await nextEnd(creator), await nextEnd(opponent)];
+
+    expect(failuresLeft).toBe(0);
+    expect(Date.now()).toBeGreaterThanOrEqual(startAt + 32_000);
+    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["draw", "draw"] });
+    expect(ends[1]).toEqual(ends[0]);
+    expect(await testDb.db.select().from(duel).where(eq(duel.id, duelId))).toHaveLength(1);
+    expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId))).toHaveLength(
+      2,
+    );
   } finally {
     await stop();
   }

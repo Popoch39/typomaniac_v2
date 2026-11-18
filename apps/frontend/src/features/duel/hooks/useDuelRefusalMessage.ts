@@ -1,9 +1,9 @@
-import { type DuelRefusal, useDuelStore } from "../store/useDuelStore.ts";
+import type { DuelRefusal } from "../socket/duelSocket.ts";
+import { useDuelStore } from "../store/useDuelStore.ts";
 
 const MESSAGES: Record<DuelRefusal, string> = {
   notFound: "This Duel does not exist or has expired. Ask for a new link.",
   full: "This Duel is full: two Participants are already in it.",
-  alreadySeated: "You are already in this Duel, in another tab or window.",
   nicknameRequired: "Choose a Nickname to join this Duel.",
   unreachable: "The Duel could not be reached. Try again in a moment.",
 };

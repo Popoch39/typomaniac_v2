@@ -3,6 +3,7 @@ import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   drawWords,
+  END_GRACE_MS,
   getOutcome,
   type Participant,
   type Seat,
@@ -20,6 +21,7 @@ import {
 import type { Db } from "../../db/client.ts";
 import { duel, duelGame } from "../../db/schema.ts";
 import type { Redis } from "../../redis/client.ts";
+import type { Relay } from "./relay.ts";
 
 /** How long a Duel can be joined after its creation. */
 export const DUEL_EXPIRY_MS = 10 * 60 * 1000;
@@ -66,12 +68,12 @@ export const createDuel = async (redis: Redis, expiryMs: number) => {
 };
 
 // Atomic, so two identities opening the same Duel at once never get the same seat. An identity
-// that holds a seat gets it back rather than the other one, unless it is connected there already.
+// that holds a seat gets it back rather than the other one, even while it still looks connected
+// there: its old socket may sit on a crashed instance, or be half-open, and never be closed.
 const CLAIM = `
 if redis.call('EXISTS', KEYS[1]) == 0 then return 'unknown' end
 for seat = 0, 1 do
   if redis.call('HGET', KEYS[1], 'holder' .. seat) == ARGV[1] then
-    if redis.call('HGET', KEYS[1], 'connected' .. seat) == '1' then return 'seated' end
     redis.call('HSET', KEYS[1], 'connected' .. seat, '1')
     return tostring(seat)
   end
@@ -90,7 +92,7 @@ export const claimSeat = async (
   redis: Redis,
   duelId: string,
   identity: Identity,
-): Promise<Seat | "unknown" | "full" | "seated"> => {
+): Promise<Seat | "unknown" | "full"> => {
   const claimed: string = await redis.client.eval(
     CLAIM,
     1,
@@ -101,18 +103,45 @@ export const claimSeat = async (
   );
   if (claimed === "0") return 0;
   if (claimed === "1") return 1;
-  if (claimed === "unknown" || claimed === "full" || claimed === "seated") return claimed;
+  if (claimed === "unknown" || claimed === "full") return claimed;
   throw new Error(`Unexpected seat claim answer: ${claimed}`);
 };
 
 // Does not recreate a Duel that expired meanwhile.
-const RELEASE = `
-if redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'connected' .. ARGV[1], '0') end
+const HOLD = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  redis.call('HSET', KEYS[1], 'connection' .. ARGV[1], ARGV[2], 'connected' .. ARGV[1], '1')
+end
 `;
 
-/** The seat stays held by its identity: only its connection is let go. */
-export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat) => {
-  await redis.client.eval(RELEASE, 1, duelKey(redis, duelId), seat);
+/**
+ * Makes `connection` the one socket that acts for `seat`: a socket that held it before, on
+ * whichever instance, no longer does.
+ */
+export const holdSeat = async (redis: Redis, duelId: string, seat: Seat, connection: string) => {
+  await redis.client.eval(HOLD, 1, duelKey(redis, duelId), seat, connection);
+};
+
+// Only the socket that holds the seat lets it go: one replaced by a reconnection closes later.
+const RELEASE = `
+if redis.call('HGET', KEYS[1], 'connection' .. ARGV[1]) ~= ARGV[2] then return 0 end
+redis.call('HSET', KEYS[1], 'connected' .. ARGV[1], '0')
+return 1
+`;
+
+/**
+ * The seat stays held by its identity: only its connection is let go. Gives whether `connection`
+ * was still the one holding the seat.
+ */
+export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat, connection: string) => {
+  const released: number = await redis.client.eval(
+    RELEASE,
+    1,
+    duelKey(redis, duelId),
+    seat,
+    connection,
+  );
+  return released === 1;
 };
 
 export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | null> => {
@@ -224,6 +253,29 @@ export const appendEvents = async (
   return appended === 1;
 };
 
+/**
+ * Starts at the announced Start the Game of a Participant who comes back past the start window
+ * without having started it: their own start would be refused, and their clock ran on meanwhile.
+ * Gives the Events appended, `null` when the Game needs none.
+ */
+export const startLateGame = async (
+  redis: Redis,
+  duelId: string,
+  seat: Seat,
+  game: {
+    readonly journal: readonly GameEvent[];
+    readonly startAt: number | null;
+    readonly now: number;
+    readonly expiryMs: number;
+  },
+): Promise<GameEvent[] | null> => {
+  const { journal, startAt, now, expiryMs } = game;
+  if (journal.length > 0 || startAt === null || now - startAt <= START_WINDOW_MS) return null;
+  const events: GameEvent[] = [{ type: "start", at: startAt }];
+  const appended = await appendEvents(redis, duelId, seat, events, { ends: false, expiryMs });
+  return appended ? events : null;
+};
+
 /** The Game played on journal `events`, as the server rebuilds it. */
 export const replayGame = (words: readonly string[], events: readonly GameEvent[]): Game =>
   events.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
@@ -242,10 +294,19 @@ export const closingEvents = (game: Game, startAt: number): GameEvent[] => {
   return [{ type: "tick", at: game.startedAt + durationMs }];
 };
 
-// Atomic, so that of every instance that sees both Games ended, a single one finalises the Duel.
+/** How long a claim to finalise a Duel lasts, should its instance stop before releasing it. */
+const FINALISATION_CLAIM_MS = 10_000;
+
+const finalisationKey = (redis: Redis, duelId: string) =>
+  redis.name("duel", duelId, "finalisation");
+
+// Atomic, so that of every instance that sees both Games ended, a single one finalises the Duel at
+// a time, and none once its end is recorded. The claim expires, so that a crash cannot hold it.
 const CLAIM_FINALISATION = `
 if redis.call('HGET', KEYS[1], 'ended0') ~= '1' or redis.call('HGET', KEYS[1], 'ended1') ~= '1' then return 0 end
-return redis.call('HSETNX', KEYS[1], 'finalised', '1')
+if redis.call('HEXISTS', KEYS[1], 'end') == 1 then return 0 end
+if redis.call('SET', KEYS[2], '1', 'NX', 'PX', ARGV[1]) then return 1 end
+return 0
 `;
 
 // Does not recreate a Duel that expired meanwhile.
@@ -260,13 +321,25 @@ export const recordEnd = async (redis: Redis, duelId: string, end: DuelEnd) => {
 
 /** Whether this call claimed the finalisation of a Duel whose Games have both ended. */
 export const claimFinalisation = async (redis: Redis, duelId: string) => {
-  const claimed: number = await redis.client.eval(CLAIM_FINALISATION, 1, duelKey(redis, duelId));
+  const claimed: number = await redis.client.eval(
+    CLAIM_FINALISATION,
+    2,
+    duelKey(redis, duelId),
+    finalisationKey(redis, duelId),
+    FINALISATION_CLAIM_MS,
+  );
   return claimed === 1;
+};
+
+/** Lets a finalisation that failed be tried again, by this instance or another one. */
+export const releaseFinalisation = async (redis: Redis, duelId: string) => {
+  await redis.client.del(finalisationKey(redis, duelId));
 };
 
 /**
  * Judges a Duel whose two Games are finished from their journals, and saves it with both Games in
- * one transaction. Gives both Results and both Outcomes, indexed by seat.
+ * one transaction. Gives both Results and both Outcomes, indexed by seat. A Duel saved already, by
+ * a finalisation that failed after its save, is not saved again.
  */
 export const saveDuel = async (
   db: Db,
@@ -288,13 +361,18 @@ export const saveDuel = async (
     getOutcome(results[1], results[0]),
   ] as const;
   await db.transaction(async (tx) => {
-    await tx.insert(duel).values({
-      id: duelId,
-      config: DUEL_GAME_CONFIG,
-      words: [...words],
-      startedAt: new Date(startAt),
-      endedAt: new Date(),
-    });
+    const inserted = await tx
+      .insert(duel)
+      .values({
+        id: duelId,
+        config: DUEL_GAME_CONFIG,
+        words: [...words],
+        startedAt: new Date(startAt),
+        endedAt: new Date(),
+      })
+      .onConflictDoNothing()
+      .returning({ id: duel.id });
+    if (inserted.length === 0) return;
     await tx.insert(duelGame).values(
       SEATS.map((seat) => ({
         duelId,
@@ -319,4 +397,88 @@ export const readJournals = async (
     return events.map((event) => JSON.parse(event) as GameEvent);
   };
   return [await read(0), await read(1)];
+};
+
+/**
+ * Saves a Duel whose two Games have ended, keeps its end and announces it to both Participants.
+ * Run by whichever instance sees both Games ended: the claim lets only one of them through, and is
+ * let go when the finalisation fails, so that it can be tried again.
+ */
+export const finaliseDuel = async (
+  db: Db,
+  redis: Redis,
+  relay: Pick<Relay, "publish">,
+  duelId: string,
+) => {
+  if (!(await claimFinalisation(redis, duelId))) return;
+  try {
+    const duel = await readDuel(redis, duelId);
+    // Expired meanwhile: nothing is left to save.
+    if (!duel) return;
+    if (duel.startAt === null) throw new Error(`Duel ${duelId} has ended without a Start`);
+    const { results, outcomes } = await saveDuel(db, duelId, {
+      words: duel.words,
+      playerIds: duel.playerIds,
+      startAt: duel.startAt,
+      journals: await readJournals(redis, duelId),
+    });
+    const end = { type: "end", results, outcomes } as const;
+    await recordEnd(redis, duelId, end);
+    await relay.publish(duelId, null, end);
+  } catch (error) {
+    await releaseFinalisation(redis, duelId);
+    throw error;
+  }
+};
+
+/** Ends the Games whose clients went silent, at their start plus 30 seconds, then finalises the Duel. */
+export const closeOverdueGames = async (
+  db: Db,
+  redis: Redis,
+  relay: Pick<Relay, "publish">,
+  duelId: string,
+  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
+) => {
+  const duel = await readDuel(redis, duelId);
+  if (!duel) return;
+  const journals = await readJournals(redis, duelId);
+  for (const seat of SEATS) {
+    const game = replayGame(duel.words, journals[seat]);
+    if (game.status === "finished") continue;
+    const events = closingEvents(game, startAt);
+    await appendEvents(redis, duelId, seat, events, { ends: true, expiryMs });
+  }
+  await finaliseDuel(db, redis, relay, duelId);
+};
+
+/**
+ * Runs `close` on each Duel once its deadline has passed, then again until it succeeds: a failed
+ * finalisation is tried again here, until the Duel is finalised or expires. Each instance that
+ * holds one of a Duel's sockets watches its deadline, so that any of them can close it.
+ */
+export const createDeadlineWatch = (close: (duelId: string, startAt: number) => Promise<void>) => {
+  const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
+  const watch = (
+    duelId: string,
+    startAt: number,
+    delayMs = startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS - Date.now(),
+  ) => {
+    if (deadlines.has(duelId)) return;
+    const timer = setTimeout(() => {
+      close(duelId, startAt).then(
+        () => deadlines.delete(duelId),
+        (error: unknown) => {
+          console.error(`Could not close the overdue Games of Duel ${duelId}`, error);
+          deadlines.delete(duelId);
+          watch(duelId, startAt, END_GRACE_MS);
+        },
+      );
+    }, delayMs);
+    deadlines.set(duelId, timer);
+  };
+  const stop = () => {
+    for (const timer of deadlines.values()) clearTimeout(timer);
+    deadlines.clear();
+  };
+  return { watch: (duelId: string, startAt: number) => watch(duelId, startAt), stop };
 };

@@ -1,10 +1,22 @@
 import type { Seat, ServerMessage } from "@repo/duel-engine";
 import type { Redis } from "../../redis/client.ts";
 
-type Delivery = { readonly seat: Seat; readonly send: (message: ServerMessage) => void };
+type Delivery = {
+  readonly seat: Seat;
+  /** The socket this delivery reaches, as held in the Duel by `holdSeat`. */
+  readonly connection: string;
+  readonly send: (message: ServerMessage) => void;
+  /** Closes the socket, once another one has taken its seat back. */
+  readonly evict: () => void;
+};
 
-/** What travels on a Duel's channel: a message for the Participants other than `from`, or for all when `null`. */
-type Published = { readonly from: Seat | null; readonly message: ServerMessage };
+/**
+ * What travels on a Duel's channel: a message for the Participants other than `from`, or for all
+ * when `null`; or a seat taken back by `connection`, whose other sockets must stop acting for it.
+ */
+type Published =
+  | { readonly kind: "message"; readonly from: Seat | null; readonly message: ServerMessage }
+  | { readonly kind: "takeover"; readonly seat: Seat; readonly connection: string };
 
 /**
  * Carries messages between the Participants of a Duel through its Redis channel, so that two
@@ -17,10 +29,18 @@ export const createRelay = (redis: Redis) => {
   const channel = (duelId: string) => redis.name("duel", duelId, "channel");
 
   const deliver = (duelId: string) => (raw: string) => {
-    const { from, message } = JSON.parse(raw) as Published;
+    const published = JSON.parse(raw) as Published;
     for (const delivery of deliveries.get(duelId) ?? []) {
-      if (delivery.seat !== from) delivery.send(message);
+      if (published.kind === "message") {
+        if (delivery.seat !== published.from) delivery.send(published.message);
+      } else if (delivery.seat === published.seat && delivery.connection !== published.connection) {
+        delivery.evict();
+      }
     }
+  };
+
+  const publish = async (duelId: string, published: Published) => {
+    await redis.client.publish(channel(duelId), JSON.stringify(published));
   };
 
   return {
@@ -44,9 +64,12 @@ export const createRelay = (redis: Redis) => {
       // Only this relay's listener: another relay on the same connection may still follow the Duel.
       if (listener) await redis.subscriber.unsubscribe(channel(duelId), listener);
     },
-    publish: async (duelId: string, from: Seat | null, message: ServerMessage) => {
-      const published: Published = { from, message };
-      await redis.client.publish(channel(duelId), JSON.stringify(published));
-    },
+    publish: (duelId: string, from: Seat | null, message: ServerMessage) =>
+      publish(duelId, { kind: "message", from, message }),
+    /** Evicts every socket of `seat` but `connection`, on whichever instance it is held. */
+    takeOver: (duelId: string, seat: Seat, connection: string) =>
+      publish(duelId, { kind: "takeover", seat, connection }),
   };
 };
+
+export type Relay = ReturnType<typeof createRelay>;
