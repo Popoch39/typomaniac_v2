@@ -16,6 +16,8 @@ export const TIMESTAMP_TOLERANCE_MS = 1000;
 export const ROUNDS_TO_WIN = 2;
 /** How many Rounds a Duel has at most: it ends earlier once a Participant has won enough. */
 export const MAX_ROUNDS = 3;
+/** What WPM × (Accuracy / 100)² is multiplied by to give Points, so they read as whole numbers. */
+export const POINTS_FACTOR = 10;
 /** Between the end of a Round and the Countdown of the next one, while both Results are shown. */
 export const ROUND_PAUSE_MS = 5000;
 /**

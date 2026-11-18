@@ -889,6 +889,26 @@ test("once both Games of a Round are finished, both Participants receive both Re
   }
 });
 
+test("a slower but cleaner Participant has more Points and both Participants receive their win of the Round", async () => {
+  const { creator, opponent, words, stop } = await startDuel(0);
+  try {
+    const [first = "", second = "", third = ""] = words;
+    const exact = `${first} ${second} ${third} `;
+    // Twice as many wrong keystrokes as right ones: a third of the creator's Accuracy, squared.
+    playGame(creator, 1, `${exact}${"#".repeat(exact.length * 2)}`);
+    playGame(opponent, 1, `${first} ${second} `);
+    const ends = [await nextRoundEnd(creator), await nextRoundEnd(opponent)] as const;
+
+    expect(ends[0]).toEqual(ends[1]);
+    const [sloppy, clean] = ends[0].results;
+    expect(sloppy.wpm).toBeGreaterThan(clean.wpm);
+    expect(sloppy.accuracy).toBeLessThan(clean.accuracy);
+    expect(ends[0].outcomes).toEqual(["loss", "win"]);
+  } finally {
+    await stop();
+  }
+});
+
 test("the pause between two Rounds lasts 5 seconds unless the app is given another", async () => {
   const cookies = [
     await signInPlayerWithNickname(uniqueNickname()),
