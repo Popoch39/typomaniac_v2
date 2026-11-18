@@ -12,7 +12,8 @@ A Duel is served by the existing API over a WebSocket route. The server is autho
 ## Consequences
 
 - Redis becomes a required service of the API, in the local and the production stacks; the API refuses to start without its address.
-- Any instance holding a seat can end a Round and finalise a Duel. A Round ends through one atomic step that also creates the next Round and fixes its Start, and the finalisation is claimed atomically, so each happens once even when two instances try (ADR 0010).
-- A Duel survives the crash of one instance as long as another one holds a seat. When every instance holding a seat is down at the deadline, the Duel is lost.
+- Any instance can end a Round and finalise a Duel, whether or not it holds one of its sockets. A Round ends through one atomic step that also creates the next Round and fixes its Start, and the finalisation is claimed atomically, so each happens once even when two instances try (ADR 0010).
+- A Duel needs nobody connected to move forward. Redis keeps the Duels that are not finalised in a sorted set, each scored by the instant its next step is due at: a Countdown to announce, overdue Games to close, which ends the Round, or the Duel to finalise. Every instance sweeps that set periodically and takes each due Duel one idempotent step forward; the steps that move a Duel move its score in the same script. A step that fails leaves the Duel due, so it is tried again at the next sweep until it succeeds or the Duel expires.
+- A Duel survives the crash of any instance as long as one is running: it is played to its end and saved even when both Participants have left.
 - Nothing is written to the database before a Duel ends: a Duel that never finishes leaves only expiring Redis keys.
 - Each Event is bounded by the instant of its receipt before it is applied, journaled and relayed, which is what makes a Duel Result reliable enough for ranked play (ADR 0009).
