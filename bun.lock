@@ -16,6 +16,8 @@
       "name": "api",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/duel-engine": "*",
+        "@repo/typing-engine": "*",
         "better-auth": "1.7.25",
         "drizzle-orm": "0.45.4",
         "elysia": "2.0.0-rc.3",
@@ -33,6 +35,8 @@
       "name": "frontend",
       "version": "0.0.0",
       "dependencies": {
+        "@elysia/eden": "2.0.0-rc.1",
+        "@repo/duel-engine": "*",
         "@repo/typing-engine": "*",
         "@tanstack/react-query": "^5.108.0",
         "@tanstack/react-router": "^1.170.46",
@@ -54,9 +58,22 @@
         "@types/react-dom": "^19.3.0",
         "@vitejs/plugin-react": "^6.1.2",
         "babel-plugin-react-compiler": "^1.0.0",
+        "elysia": "2.0.0-rc.3",
         "oxc-transform-react": "^0.158.0",
         "typescript": "~7.0.2",
         "vite": "^8.3.6",
+      },
+    },
+    "packages/duel-engine": {
+      "name": "@repo/duel-engine",
+      "version": "0.0.0",
+      "dependencies": {
+        "@repo/typing-engine": "*",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "*",
+        "@types/bun": "^1.4.4",
+        "typescript": "7.0.2",
       },
     },
     "packages/ranked-engine": {
@@ -151,6 +168,8 @@
     "@corvu/utils": ["@corvu/utils@0.4.2", "", { "dependencies": { "@floating-ui/dom": "^1.6.11" }, "peerDependencies": { "solid-js": "^1.8" } }, "sha512-Ox2kYyxy7NoXdKWdHeDEjZxClwzO4SKM8plAaVwmAJPxHMqA0rLOoAsa+hBDwRLpctf+ZRnAd/ykguuJidnaTA=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
+
+    "@elysia/eden": ["@elysia/eden@2.0.0-rc.1", "", { "peerDependencies": { "elysia": ">= 2.0.0-rc.0" } }, "sha512-5W2/OaTOYlF3XU/nQDQ4HeL8SfWHD8YV+YE7YlbZdvK3hDjCcwqc2C7/CvjmE8QZ8XbYDLzk5rj0rY+xBVH6dw=="],
 
     "@emnapi/core": ["@emnapi/core@2.0.0-beta.2", "", { "dependencies": { "@emnapi/wasi-threads": "2.2.0", "tslib": "^2.4.0" } }, "sha512-MzCVoWtcg4Pm2B3je5mMvYMvj3MmBKw+fU7vbsJc9/iT8ip6/eYIHo/Dsm/mr+wsHB6SEyJDuxB09Yy6r/8+4A=="],
 
@@ -357,6 +376,8 @@
     "@oxlint/binding-win32-ia32-msvc": ["@oxlint/binding-win32-ia32-msvc@1.94.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-1l1FDlzbPmAeDoZ8UGspOE2dOmz1ZL6SlDsvOmRCmWSQjCdTy5LzUepS8mO/SGpAoz4D6WAt/yNZAUyHqbkmkQ=="],
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.94.0", "", { "os": "win32", "cpu": "x64" }, "sha512-I3eZdd4bemIJQDNv9XDV/FEofDxIoN32tzCv98wIgLdW05EqxZb5hF4AwPrRzHD/dQhl0n7KgPy5AQPfM0HWrA=="],
+
+    "@repo/duel-engine": ["@repo/duel-engine@workspace:packages/duel-engine"],
 
     "@repo/ranked-engine": ["@repo/ranked-engine@workspace:packages/ranked-engine"],
 

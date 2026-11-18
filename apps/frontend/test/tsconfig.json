@@ -10,6 +10,18 @@
     "emitDeclarationOnly": true,
     "verbatimModuleSyntax": true
   },
-  "include": [".", "../src/features/game/input", "../src/features/game/words/judgeLetter.ts"],
-  "references": [{ "path": "../../../packages/typing-engine" }]
+  "include": [
+    ".",
+    "../src/features/game/input",
+    "../src/features/game/words/judgeLetter.ts",
+    "../src/features/game/words/withoutSeparator.ts",
+    "../src/features/duel/clock",
+    "../src/features/duel/caret",
+    "../src/features/duel/message",
+    "../src/shared/api/describeApiError.ts"
+  ],
+  "references": [
+    { "path": "../../../packages/typing-engine" },
+    { "path": "../../../packages/duel-engine" }
+  ]
 }

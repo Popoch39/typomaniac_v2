@@ -1,4 +1,4 @@
-# Local Postgres for `bun run dev` and `bun test` (the API itself runs on the host).
+# Local Postgres and Redis for `bun run dev` and `bun test` (the API itself runs on the host).
 services:
   postgres:
     image: postgres:18.7-alpine
@@ -13,6 +13,17 @@ services:
       - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  # No volume: a Duel only lives in Redis until it is saved, so nothing there is worth keeping.
+  redis:
+    image: redis:8.4-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 2s
       timeout: 5s
       retries: 15

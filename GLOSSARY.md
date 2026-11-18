@@ -18,6 +18,28 @@ _Avoid_: Username, user name, handle, identifier
 A person who plays without having signed in; nothing is kept for them.
 _Avoid_: Anonymous, visitor, signed-out user
 
+### Duel
+
+**Duel**:
+Any 1v1 between two **Participants**, each playing their own Game on the same Target words and the same Start. A _ranked Duel_ is the rated case, between two Players.
+_Avoid_: match, game (reserved for one player's Game), versus, battle, race
+
+**Participant** (`Participant`):
+A Player or a Guest taking part in a Duel.
+_Avoid_: player (reserved for a signed-in person), contestant, competitor
+
+**Opponent**:
+The other Participant of a Duel, seen from one Participant.
+_Avoid_: enemy, rival, adversary
+
+**Outcome** (`Outcome`):
+What a Duel means for one Participant: `win`, `loss` or `draw`. The higher WPM wins, then the higher Accuracy; otherwise it is a draw. It is decided from the Results, outside the ranked engine.
+_Avoid_: result (reserved for a Game's Result), score, verdict, issue
+
+**Countdown**:
+The delay between both Participants being connected and the Start of a Duel.
+_Avoid_: timer, delay
+
 ### Game
 
 **Game** (`Game`):
@@ -92,14 +114,6 @@ The WPM, Raw WPM and Accuracy read while a Game is being played, as opposed to i
 _Avoid_: live result, current stats
 
 ### Ranked
-
-**Duel**:
-A ranked 1v1 between two Players, each playing their own Game on the same words; it ends with an Outcome for each of them.
-_Avoid_: match, game (reserved for one player's Game), versus
-
-**Outcome** (`Outcome`):
-What a Duel means for one Player: `win`, `loss` or `draw`. It is decided from the Results, outside the ranked engine.
-_Avoid_: score, result (reserved for a Game's Result), issue
 
 **MMR**:
 A Player's hidden level estimate, an integer moved by Elo after each Duel, which matchmaking reads.

@@ -17,6 +17,8 @@ src/
   db/
     client.ts       Ouverture et migration de la base
     schema.ts       Toutes les tables Drizzle
+  redis/
+    client.ts       Ouverture de Redis (client de commandes + connexion d'abonnement), sous un namespace
   modules/
     <module>/
       index.ts      Routes et comportement HTTP du module (instance ou plugin Elysia)
@@ -27,7 +29,7 @@ test/
   helpers/          Base et auth de test
 ```
 
-- Tout code métier vit dans un module de `src/modules/`, un dossier par domaine (`auth`, `player`), nommé au singulier avec le terme du glossaire. Rien d'autre à la racine de `src/` que `index.ts`, `app.ts` et `db/`.
+- Tout code métier vit dans un module de `src/modules/`, un dossier par domaine (`auth`, `player`), nommé au singulier avec le terme du glossaire. Rien d'autre à la racine de `src/` que `index.ts`, `app.ts`, `db/` et `redis/`.
 - Un module a les trois mêmes fichiers, `index.ts`, `model.ts`, `service.ts`. Un fichier qui serait vide n'est pas créé (`auth` n'a pas de `model.ts`). Un quatrième fichier n'est ajouté que pour une responsabilité distincte, nommée par ce qu'il contient (`auth/config.ts` : variables d'environnement).
 - `index.ts` exporte une fabrique `create<Module>Routes(db, auth)` qui rend une instance Elysia préfixée. Les handlers y restent en ligne : ils possèdent validation, statuts et cookies, et passent des valeurs simples au service, jamais le contexte.
 - `model.ts` décrit le contrat d'API, pas les tables. Un groupe par route, nommé `[Chemin][Méthode]` relatif au préfixe (`PUT /nickname` donne `NicknamePut`), avec ses schémas sous `Body`, `Params`, `Query`, `Response`. Il s'importe en `import * as PlayerModel from "./model.ts"`. Un type n'est dérivé (`UnwrapModels`) que lorsqu'un service en a besoin.
@@ -37,7 +39,7 @@ test/
 - `src/app.ts` compose l'app et exporte `App` (type partagé avec le client Eden) sans écouter de port. Il ne déclare aucune route métier : une nouvelle route va dans son module.
 - `src/index.ts` est le seul endroit qui appelle `.listen()`.
 - `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse.
-- Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet.
+- Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet. Exception : une route WebSocket ne s'upgrade pas par `app.handle()`, ses tests font `.listen(0)` et passent par de vrais clients HTTP et WebSocket (`test/helpers/socket.ts`).
 
 ## Base de données
 
@@ -46,8 +48,17 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
 - Le schéma vit dans `src/db/schema.ts` (`drizzle-orm/pg-core`). Après chaque changement : `bun run db:generate`, puis commit du dossier `drizzle/` généré.
 - Schémas d'API : TypeBox 1.x (`t` d'Elysia) écrits à la main. `drizzle-orm/typebox`, cité par `.agents/skills/elysiajs/references/drizzle.md`, n'existe qu'en Drizzle 1.0 ; ne pas installer `drizzle-typebox` (TypeBox 0.x, incompatible avec Elysia 2).
-- `src/app.ts` exporte `createApp(db, auth)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
-- Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db))`.
+- `src/app.ts` exporte `createApp(db, auth, redis)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
+- Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis)`.
+
+## Redis
+
+Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en cours (`src/modules/duel/`), voir `docs/adr/0007-live-duel-in-memory-engine-redis-journal.md`.
+
+- Redis local : lancé par le même `docker compose up -d` que Postgres ; `REDIS_URL` dans `apps/api/.env`. `src/index.ts` refuse de démarrer sans lui, avant d'ouvrir Postgres.
+- `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.
+- Redis est injecté comme la base : `createApp(db, auth, redis)`.
+- Dans les tests : `const testRedis = await createTestRedis()` (`test/helpers/redis.ts`) ouvre Redis sous un namespace propre au fichier ; `afterAll` appelle `testRedis.drop()`, qui efface ses clés et ferme les connexions.
 
 ## Auth
 
@@ -60,6 +71,7 @@ Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-
 - Deux niveaux de protection, en option de route (`createProtection(auth)`, `src/modules/auth/index.ts`), qui donnent `player` et `session` au handler. En mettre une seule par route.
   - `signedIn: true`, « connecté » : 401 `{ code: "UNAUTHORIZED" }` sans session valide. `player.nickname` peut être `null`.
   - `nicknameChosen: true`, « Nickname choisi » : même 401 pour un Guest, 403 `{ code: "NICKNAME_REQUIRED" }` pour un Player sans Nickname. `player.nickname` est une chaîne. C'est le niveau des routes qui enregistrent ou affichent publiquement quelque chose.
+  - `participant: true`, « Participant » : un Player avec Nickname ou un Guest, donnés en `identity` (`{ id, name, playerId }`, `playerId` à `null` pour un Guest). Même 403 pour un Player sans Nickname. Sans session, c'est un Guest, reconnu par le cookie `guest` signé avec le secret d'auth (`src/modules/auth/guest.ts`, aucune ligne en base) ; à défaut d'un cookie valide, un nouveau Guest est émis et son cookie posé dans `set.headers`. Une route WebSocket doit le recopier dans la réponse d'upgrade (`upgrade: ({ set }) => set.headers`), sinon il est perdu.
   - Chaque module de routes doit `.use(createProtection(auth))` pour avoir les options et leurs types.
 - Le Nickname est une colonne maison de la table `user` (`nickname`, `null` tant qu'il n'est pas choisi), déclarée à Better Auth comme champ supplémentaire avec `input: false` : il sort dans la session, mais seule `PUT /api/me/nickname` l'écrit. Ses règles vivent dans `src/modules/player/` (format dans `model.ts`, réservés et enregistrement dans `service.ts`). Un Nickname mal formé reçoit 422 `{ code: "NICKNAME_INVALID" }`, posé par l'option `error` du schéma `nickname` : sans elle, Elysia répond par son document par défaut (`code: "validation"`), vidé de son détail en production. L'unicité à la casse près est tenue par l'index unique sur `lower(nickname)` : le 409 vient de sa violation, ne pas ajouter de lecture préalable.
 - Dans les tests : `signInPlayer(auth)` (`test/helpers/auth.ts`) crée un Player sans Nickname et rend `{ player, cookie }`, le cookie étant à passer dans l'en-tête `cookie` de la requête. Pour lui donner un Nickname, passer par `PUT /api/me/nickname`.
