@@ -10,9 +10,12 @@ const finished = applyEvent(
 
 const messages: ServerMessage[] = [
   { type: "pong", clientAt: 1000, serverAt: 1500 },
+  // Before the Countdown is announced, the Target words of the Round are held back.
+  { type: "state", seat: 0, round: 1, words: null, participants: [], journals: [[], []] },
   {
     type: "state",
     seat: 1,
+    round: 1,
     words: ["cat", "dog"],
     participants: [
       { seat: 0, name: "ada", connected: true },
@@ -31,7 +34,7 @@ const messages: ServerMessage[] = [
     ],
   },
   { type: "presence", participant: { seat: 0, name: "ada", connected: false } },
-  { type: "countdown", startAt: 4000 },
+  { type: "countdown", round: 1, startAt: 4000, words: ["cat", "dog"] },
   { type: "opponentEvent", event: { type: "insert", at: 4200, text: "c" } },
   {
     type: "end",
@@ -56,12 +59,29 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     [],
     { type: "surrender" },
     { type: "pong", clientAt: 1000 },
-    { type: "countdown", startAt: "soon" },
+    { type: "countdown", round: 1, startAt: "soon", words: ["cat"] },
+    { type: "countdown", startAt: 4000, words: ["cat"] },
+    { type: "countdown", round: 0, startAt: 4000, words: ["cat"] },
+    { type: "countdown", round: 1.5, startAt: 4000, words: ["cat"] },
+    { type: "countdown", round: 1, startAt: 4000 },
+    { type: "countdown", round: 1, startAt: 4000, words: null },
+    { type: "countdown", round: 1, startAt: 4000, words: ["cat", 3] },
     { type: "presence", participant: { seat: 2, name: "ada", connected: true } },
     { type: "opponentEvent", event: { type: "insert", at: 10 } },
     { type: "opponentEvent", event: { type: "delete", at: 10, unit: "line" } },
     { type: "opponentEvent", event: { type: "jump", at: 10 } },
-    { type: "state", seat: 0, words: ["cat"], participants: [], journals: [[]] },
+    { type: "state", seat: 0, round: 1, words: ["cat"], participants: [], journals: [[]] },
+    { type: "state", seat: 0, words: ["cat"], participants: [], journals: [[], []] },
+    {
+      type: "state",
+      seat: 0,
+      round: "first",
+      words: ["cat"],
+      participants: [],
+      journals: [[], []],
+    },
+    { type: "state", seat: 0, round: 1, participants: [], journals: [[], []] },
+    { type: "state", seat: 0, round: 1, words: "cat", participants: [], journals: [[], []] },
     { type: "end", results: [getResult(finished)], outcomes: ["win", "loss"] },
     {
       type: "end",

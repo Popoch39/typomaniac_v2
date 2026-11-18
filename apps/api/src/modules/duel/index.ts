@@ -43,6 +43,8 @@ export const createDuelRoutes = (
   const relay = createRelay(redis);
   type Seating = {
     participant: Participant;
+    /** The Round this socket was seated in: the only one whose Events it takes. */
+    round: number;
     /** Tells this socket from an older or newer one of the same seat. */
     connection: string;
     delivery: Parameters<typeof relay.join>[1];
@@ -69,7 +71,7 @@ export const createDuelRoutes = (
       .post(
         "/",
         { participant: true, response: { 201: DuelModel.RootPost.Response } },
-        async ({ status }) => status(201, { id: await createDuel(redis, expiryMs) }),
+        async ({ status }) => status(201, { id: await createDuel(redis, "custom", expiryMs) }),
       )
       // Lets a client tell why its upgrade was refused, which a browser WebSocket never shows.
       .get(
@@ -108,15 +110,17 @@ export const createDuelRoutes = (
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
-          const journals = await readJournals(redis, ws.params.id);
-          const lateStart = await startLateGame(redis, ws.params.id, self.seat, {
+          const round = duel.round.number;
+          const { words, startAt, anchorAts } = duel.round;
+          const journals = await readJournals(redis, ws.params.id, round);
+          const lateStart = await startLateGame(redis, ws.params.id, round, self.seat, {
             journal: journals[self.seat],
-            startAt: duel.startAt,
+            startAt,
             now: Date.now(),
             expiryMs,
           });
           if (lateStart) journals[self.seat] = lateStart;
-          const game = replayGame(duel.words, journals[self.seat]);
+          const game = replayGame(words, journals[self.seat]);
           const send = (message: ServerMessage) => {
             // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
             if (message.type === "countdown") {
@@ -128,9 +132,10 @@ export const createDuelRoutes = (
           const connection = crypto.randomUUID();
           const delivery = { seat: self.seat, connection, send, evict: () => ws.close() };
           // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
-          const anchorAt = lateStart ? duel.startAt : (duel.anchorAts[self.seat] ?? null);
+          const anchorAt = lateStart ? startAt : (anchorAts[self.seat] ?? null);
           const entry: Seating = {
             participant: self,
+            round,
             connection,
             delivery,
             startAt: null,
@@ -145,19 +150,21 @@ export const createDuelRoutes = (
           send({
             type: "state",
             seat: self.seat,
-            words: duel.words,
+            round,
+            // Held back until the Countdown, which brings them to both Participants at once.
+            words: startAt === null ? null : words,
             participants: duel.participants,
             journals,
           });
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
           for (const event of lateStart ?? [])
             await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });
-          const start = await announceStart(redis, ws.params.id, {
+          const start = await announceStart(redis, ws.params.id, round, {
             startAt: Date.now() + countdownMs,
             expiryMs,
           });
           if (!start) return;
-          const countdown = { type: "countdown", startAt: start.startAt } as const;
+          const countdown = { type: "countdown", round, startAt: start.startAt, words } as const;
           send(countdown);
           if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
           if (duel.end) send(duel.end);
@@ -170,7 +177,7 @@ export const createDuelRoutes = (
           }
           const seating = seated.get(ws.id);
           const { event } = message;
-          if (!seating) return;
+          if (!seating || message.round !== seating.round) return;
           const { status, startedAt } = seating.game;
           const { startAt } = seating;
           if (!isEventAccepted(event, { status, startAt, now })) return;
@@ -186,7 +193,8 @@ export const createDuelRoutes = (
           seating.game = applyEvent(seating.game, taken);
           const ends = seating.game.status === "finished";
           const { seat } = seating.participant;
-          const appended = await appendEvents(redis, ws.params.id, seat, [taken], {
+          const { round } = seating;
+          const appended = await appendEvents(redis, ws.params.id, round, seat, [taken], {
             ends,
             expiryMs,
             anchorAt: startedAt === null ? anchorAt : null,
@@ -196,7 +204,7 @@ export const createDuelRoutes = (
           await relay.publish(ws.params.id, seat, { type: "opponentEvent", event: taken });
           // Tried again at the deadline when it fails.
           if (ends)
-            await finaliseDuel(db, redis, relay, ws.params.id).catch((error: unknown) =>
+            await finaliseDuel(db, redis, relay, ws.params.id, round).catch((error: unknown) =>
               console.error(`Could not finalise Duel ${ws.params.id}`, error),
             );
         },

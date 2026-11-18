@@ -7,7 +7,7 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 | Id       | Rule                                                                                                                     |
 | -------- | ------------------------------------------------------------------------------------------------------------------------ |
 | CONFIG-1 | A Duel Game is a `time` Game of 30 seconds: it ends at the first Tick that reaches 30 seconds after its Start.           |
-| CONFIG-2 | A Duel draws 250 Target words once, at its creation; no word is added during the Duel.                                   |
+| CONFIG-2 | A Round has 250 Target words, drawn once; no word is added during the Round.                                             |
 | CONFIG-3 | The Countdown lasts 3 seconds. The server waits 2 seconds after a Game's deadline before applying its final Tick itself. |
 | CONFIG-4 | The server accepts a Participant's `start` up to 1 second before or after the announced Start, on its own clock.         |
 | CONFIG-5 | An Event may be stamped up to 1 second behind its receipt before its timestamp is moved up.                              |

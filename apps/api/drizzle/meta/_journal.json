@@ -43,6 +43,13 @@
       "when": 1795019951866,
       "tag": "0005_standing",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795021643306,
+      "tag": "0006_duel_rounds",
+      "breakpoints": true
     }
   ]
 }

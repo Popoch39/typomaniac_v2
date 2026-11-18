@@ -9,6 +9,8 @@ const isNumber: Check = (value) => typeof value === "number" && Number.isFinite(
 const isString: Check = (value) => typeof value === "string";
 const isBoolean: Check = (value) => typeof value === "boolean";
 const isSeat: Check = (value) => value === 0 || value === 1;
+// Rounds are numbered from 1.
+const isRound: Check = (value) => Number.isInteger(value) && Number(value) >= 1;
 const isOutcome: Check = (value) => value === "win" || value === "loss" || value === "draw";
 
 const isListOf =
@@ -19,6 +21,10 @@ const isPairOf =
   (isItem: Check): Check =>
   (value) =>
     isListOf(isItem)(value) && Array.isArray(value) && value.length === 2;
+const isNullOr =
+  (isValue: Check): Check =>
+  (value) =>
+    value === null || isValue(value);
 const hasFields = (value: unknown, checks: Record<string, Check>) =>
   isRecord(value) && Object.entries(checks).every(([key, check]) => check(value[key]));
 
@@ -67,12 +73,13 @@ const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
   pong: { clientAt: isNumber, serverAt: isNumber },
   state: {
     seat: isSeat,
-    words: isListOf(isString),
+    round: isRound,
+    words: isNullOr(isListOf(isString)),
     participants: isListOf(isParticipant),
     journals: isPairOf(isListOf(isGameEvent)),
   },
   presence: { participant: isParticipant },
-  countdown: { startAt: isNumber },
+  countdown: { round: isRound, startAt: isNumber, words: isListOf(isString) },
   opponentEvent: { event: isGameEvent },
   end: { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) },
 };
