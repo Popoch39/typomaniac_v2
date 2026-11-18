@@ -5,6 +5,8 @@ import { DuelCountdown } from "./DuelCountdown.tsx";
 import { DuelInviteLink } from "./DuelInviteLink.tsx";
 import { DuelParticipants } from "./DuelParticipants.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
+import "./DuelScreen.css";
+import { OpponentLiveStats } from "./OpponentLiveStats.tsx";
 
 export function DuelScreen() {
   const phase = useDuelPhase();
@@ -29,6 +31,7 @@ export function DuelScreen() {
       {phase === "running" && (
         <>
           <DuelParticipants />
+          <OpponentLiveStats />
           <TypingArea />
         </>
       )}

@@ -5,6 +5,7 @@ import {
   type Seat,
   type ServerMessage,
 } from "@repo/duel-engine";
+import { applyEvent, createGame, type Game } from "@repo/typing-engine";
 import { create } from "zustand";
 import { eventTime } from "../../game/clock/eventTime.ts";
 import { useGameStore } from "../../game/store/useGameStore.ts";
@@ -23,6 +24,8 @@ type DuelState = {
   readonly seat: Seat | null;
   readonly participants: readonly Participant[];
   readonly words: readonly string[];
+  /** The Opponent's Game, replayed from their Events to place their caret and read their WPM. */
+  readonly opponentGame: Game | null;
   /** How far the server's clock is ahead of this client's, `null` until the ping/pong exchanges end. */
   readonly clockOffset: number | null;
   /** Whole seconds left before the Start, shown during the Countdown. */
@@ -63,6 +66,7 @@ let clockSamples: ClockSample[] = [];
 let startAt: number | null = null;
 let startTimer: ReturnType<typeof setTimeout> | null = null;
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
+let stopForwarding: (() => void) | null = null;
 
 function send(message: ClientMessage) {
   socket?.send(JSON.stringify(message));
@@ -70,6 +74,16 @@ function send(message: ClientMessage) {
 
 function ping() {
   send({ type: "ping", clientAt: eventTime() });
+}
+
+// The server applies the Participant's Events to its own copy of the Game, from the Start on.
+function forwardEvents() {
+  stopForwarding?.();
+  stopForwarding = useGameStore.subscribe(({ lastEvent }, previous) => {
+    if (lastEvent !== null && lastEvent !== previous.lastEvent) {
+      send({ type: "event", event: lastEvent });
+    }
+  });
 }
 
 function stopTimers() {
@@ -84,6 +98,7 @@ const initialState = {
   seat: null,
   participants: [],
   words: [],
+  opponentGame: null,
   clockOffset: null,
   secondsLeft: null,
   refusal: null,
@@ -95,8 +110,8 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     const at = eventTime();
     const gameStore = useGameStore.getState();
     gameStore.loadGame(DUEL_GAME_CONFIG, get().words);
+    forwardEvents();
     gameStore.applyEvent({ type: "start", at });
-    send({ type: "event", event: { type: "start", at } });
     set({ phase: "running", secondsLeft: null });
   };
 
@@ -116,11 +131,16 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   const receive = (message: ServerMessage) => {
     if (message.type === "state") {
+      const opponentJournal = message.journals[message.seat === 0 ? 1 : 0];
       set({
         phase: "waiting",
         seat: message.seat,
         participants: message.participants,
         words: message.words,
+        opponentGame: opponentJournal.reduce(
+          applyEvent,
+          createGame(DUEL_GAME_CONFIG, message.words),
+        ),
       });
       clockSamples = [];
       ping();
@@ -132,6 +152,9 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       if (clockSamples.length < CLOCK_SAMPLE_COUNT) return ping();
       set({ clockOffset: estimateClockOffset(clockSamples) });
       scheduleStart();
+    } else if (message.type === "opponentEvent") {
+      const { opponentGame } = get();
+      if (opponentGame !== null) set({ opponentGame: applyEvent(opponentGame, message.event) });
     } else if (message.type === "countdown") {
       startAt = message.startAt;
       if (get().phase === "waiting") set({ phase: "countdown" });
@@ -145,6 +168,8 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     clockSamples = [];
     startAt = null;
     stopTimers();
+    stopForwarding?.();
+    stopForwarding = null;
     set(initialState);
   };
 

@@ -1,4 +1,10 @@
-import { COUNTDOWN_MS, type Participant, type ServerMessage } from "@repo/duel-engine";
+import {
+  COUNTDOWN_MS,
+  DUEL_GAME_CONFIG,
+  type Participant,
+  type ServerMessage,
+} from "@repo/duel-engine";
+import { applyEvent, createGame, type Game } from "@repo/typing-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Redis } from "../../redis/client.ts";
@@ -8,11 +14,13 @@ import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
   announceStart,
+  appendEvent,
   claimSeat,
   createDuel,
   DUEL_EXPIRY_MS,
   isEventAccepted,
   readDuel,
+  readJournals,
   releaseSeat,
 } from "./service.ts";
 
@@ -29,7 +37,8 @@ export const createDuelRoutes = (
     delivery: Parameters<typeof relay.join>[1];
     /** The Start this socket was told of, in server time, whichever instance announced it. */
     startAt: number | null;
-    started: boolean;
+    /** This instance's copy of the Participant's Game, rebuilt from its journal on opening. */
+    game: Game;
   };
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
@@ -80,13 +89,18 @@ export const createDuelRoutes = (
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
+          const journals = await readJournals(redis, ws.params.id);
+          const game = journals[self.seat].reduce(
+            applyEvent,
+            createGame(DUEL_GAME_CONFIG, duel.words),
+          );
           const send = (message: ServerMessage) => {
             // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
             if (message.type === "countdown") entry.startAt = message.startAt;
             ws.send(JSON.stringify(message));
           };
           const delivery = { seat: self.seat, send };
-          const entry: Seating = { participant: self, delivery, startAt: null, started: false };
+          const entry: Seating = { participant: self, delivery, startAt: null, game };
           seated.set(ws.id, entry);
           await relay.join(ws.params.id, delivery);
           send({
@@ -94,7 +108,7 @@ export const createDuelRoutes = (
             seat: self.seat,
             words: duel.words,
             participants: duel.participants,
-            journals: [[], []],
+            journals,
           });
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
           const start = await announceStart(redis, ws.params.id, Date.now() + countdownMs);
@@ -111,8 +125,10 @@ export const createDuelRoutes = (
           }
           const seat = seated.get(ws.id);
           const { event } = message;
-          if (!seat || !isEventAccepted(event, { ...seat, now })) return;
-          if (event.type === "start") seat.started = true;
+          const started = seat?.game.status !== "ready";
+          if (!seat || !isEventAccepted(event, { started, startAt: seat.startAt, now })) return;
+          seat.game = applyEvent(seat.game, event);
+          await appendEvent(redis, ws.params.id, seat.participant.seat, event, expiryMs);
           await relay.publish(ws.params.id, seat.participant.seat, {
             type: "opponentEvent",
             event,

@@ -1,0 +1,30 @@
+.duel-screen {
+  --opponent: #4f9dde;
+}
+
+/* Positioned so that the Opponent's name can sit above their caret. */
+.caret-opponent {
+  position: relative;
+  background: var(--opponent);
+}
+
+.caret-opponent-name {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--opponent);
+}
+
+.opponent-live-stats {
+  display: flex;
+  gap: 24px;
+  margin: 0 0 8px;
+  font-family: var(--mono);
+}
+
+.opponent-name {
+  color: var(--opponent);
+}

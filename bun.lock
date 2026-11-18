@@ -17,6 +17,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/duel-engine": "*",
+        "@repo/typing-engine": "*",
         "better-auth": "1.7.25",
         "drizzle-orm": "0.45.4",
         "elysia": "2.0.0-rc.3",
