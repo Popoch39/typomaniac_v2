@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@repo/duel-engine": "*",
+    "@repo/ranked-engine": "*",
     "@repo/redis": "*",
     "@repo/typing-engine": "*",
     "better-auth": "1.7.25",

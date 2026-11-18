@@ -20,6 +20,7 @@ RUN bun install --frozen-lockfile --filter api
 # The workspace packages the API imports are compiled from their sources: each one must be copied whole.
 COPY packages/typing-engine ./packages/typing-engine
 COPY packages/duel-engine ./packages/duel-engine
+COPY packages/ranked-engine ./packages/ranked-engine
 COPY packages/redis ./packages/redis
 COPY apps/api ./apps/api
 ENV NODE_ENV=production

@@ -17,6 +17,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/duel-engine": "*",
+        "@repo/ranked-engine": "*",
         "@repo/redis": "*",
         "@repo/typing-engine": "*",
         "better-auth": "1.7.25",
@@ -38,6 +39,7 @@
       "dependencies": {
         "@elysia/eden": "2.0.0-rc.1",
         "@repo/duel-engine": "*",
+        "@repo/ranked-engine": "*",
         "@repo/typing-engine": "*",
         "@tanstack/react-query": "^5.108.0",
         "@tanstack/react-router": "^1.170.46",

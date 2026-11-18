@@ -3,6 +3,7 @@ import type { Db } from "./db/client.ts";
 import type { Auth } from "./modules/auth/service.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
+import { createStandingRoutes } from "./modules/standing/index.ts";
 import type { Redis } from "./redis/client.ts";
 
 // The database, the auth instance and Redis are injected so tests can run each app against its own
@@ -14,6 +15,7 @@ export const createApp = (db: Db, auth: Auth, redis: Redis, duelOptions?: DuelOp
     .mount(auth.handler)
     .get("/health", () => "ok")
     .use(createPlayerRoutes(db, auth))
+    .use(createStandingRoutes(db, auth))
     .use(createDuelRoutes(db, auth, redis, duelOptions));
 
 export type App = ReturnType<typeof createApp>;
