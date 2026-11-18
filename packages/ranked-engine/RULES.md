@@ -33,11 +33,18 @@ Each update increments the number of Duels played by one. The update of a Player
 
 ## Placement
 
-| Id      | Rule                                                                                     |
-| ------- | ---------------------------------------------------------------------------------------- |
-| PLACE-1 | During Placement the Rank stays `null`, the LP delta is 0 and the rank change is `none`. |
+| Id      | Rule                                                                                                                                                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PLACE-1 | During Placement the Rank stays `null`, the LP delta is 0 and the rank change is `none`.                                                                                                                                             |
+| PLACE-2 | On the last Placement Duel, the Rank is the highest Division whose reference MMR (LP-1) is at or below the new MMR, at 0 LP, bounded between Bronze IV and the Placement ceiling. The LP delta is 0 and the rank change is `placed`. |
 
-Until the Placement gives a Rank, a Player who has finished Placement stays Unranked: only their MMR keeps moving, with the regular K-factor.
+## LP
+
+The ladder runs from Bronze IV up to Diamond I: each Tier from Bronze to Diamond holds Divisions IV, III, II and I, in that order.
+
+| Id   | Rule                                                                                                                                                                                                                        |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LP-1 | A Division's reference MMR is the Bronze IV reference plus its index times the MMR per Division, where the index counts the Divisions below it: 900 for Bronze IV, 950 for Bronze III, up to 1850 for Diamond I by default. |
 
 ## Purity
 

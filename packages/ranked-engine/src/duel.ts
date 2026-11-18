@@ -1,4 +1,5 @@
 import { DEFAULT_RANKED_CONFIG, type RankedConfig } from "./config.ts";
+import { placedRank } from "./ladder.ts";
 import { nextMmr } from "./mmr.ts";
 import type { Standing } from "./standing.ts";
 
@@ -25,11 +26,13 @@ export function applyDuel(
   const inPlacement = standing.duelsPlayed < config.placementDuels;
   const kFactor = inPlacement ? config.placementKFactor : config.kFactor;
   const mmr = nextMmr(standing.mmr, opponentMmr, SCORE[outcome], kFactor);
+  const duelsPlayed = standing.duelsPlayed + 1;
+  const placed = inPlacement && duelsPlayed === config.placementDuels;
   return {
-    standing: { mmr, duelsPlayed: standing.duelsPlayed + 1, rank: null },
+    standing: { mmr, duelsPlayed, rank: placed ? placedRank(mmr, config) : null },
     // Read from the floored MMR, so it is the change applied and never −0.
     mmrDelta: mmr - standing.mmr,
     lpDelta: 0,
-    rankChange: "none",
+    rankChange: placed ? "placed" : "none",
   };
 }
