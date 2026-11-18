@@ -2,6 +2,7 @@ import { useState } from "react";
 import heroImg from "./assets/hero.png";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";
+import { SignInStatus } from "./features/auth/components/SignInStatus.tsx";
 import { CreateDuelButton } from "./features/duel/components/CreateDuelButton.tsx";
 import "./App.css";
 
@@ -26,6 +27,7 @@ function App() {
           Count is {count}
         </button>
         <CreateDuelButton />
+        <SignInStatus />
       </section>
 
       <div className="ticks"></div>

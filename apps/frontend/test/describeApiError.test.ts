@@ -34,6 +34,11 @@ test("an unknown server code falls back to its status", () => {
   );
 });
 
+test("a Better Auth error is told by its status", () => {
+  const authError = { status: 429, statusText: "Too Many Requests", code: "RATE_LIMITED" };
+  expect(describeApiError(authError)).toBe("Too many attempts. Wait a moment and try again.");
+});
+
 test("anything else thrown gets a generic message", () => {
   expect(describeApiError(new SyntaxError("Unexpected token < in JSON"))).toBe(
     "Something went wrong. Try again.",
