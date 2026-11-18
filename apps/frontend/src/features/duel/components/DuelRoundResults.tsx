@@ -1,9 +1,9 @@
-import type { Result } from "@repo/typing-engine";
+import type { RoundSummarySide } from "../round/summariseRound.ts";
 import { DuelResult } from "./DuelResult.tsx";
 
 type DuelRoundResultsProps = {
   title: string;
-  sides: readonly { seat: number; name: string; result: Result; points: number }[];
+  sides: readonly RoundSummarySide[];
 };
 
 export function DuelRoundResults({ title, sides }: DuelRoundResultsProps) {
