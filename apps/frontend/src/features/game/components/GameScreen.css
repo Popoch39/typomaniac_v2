@@ -1,0 +1,73 @@
+.game-screen {
+  --letter-incorrect: #ca4754;
+  --letter-extra: #7e2a33;
+
+  padding: 32px;
+  text-align: left;
+}
+
+.typing-area {
+  position: relative;
+}
+
+/* Kept focusable but invisible: the engine, not the input, holds the typed text. */
+.typing-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+
+.word-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em 0.6em;
+  font-family: var(--mono);
+  font-size: 24px;
+  line-height: 1.4;
+}
+
+.letter-untyped {
+  color: var(--text);
+}
+
+.letter-correct {
+  color: var(--text-h);
+}
+
+.letter-incorrect {
+  color: var(--letter-incorrect);
+}
+
+.letter-extra {
+  color: var(--letter-extra);
+}
+
+/* Zero-width so the letters never move when the caret does. */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  margin-right: -2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+}
+
+.result-panel {
+  display: flex;
+  gap: 48px;
+  margin: 0;
+}
+
+.result-panel dt {
+  color: var(--text);
+}
+
+.result-panel dd {
+  margin: 0;
+  font-size: 48px;
+  color: var(--text-h);
+}
