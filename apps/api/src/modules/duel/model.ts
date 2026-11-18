@@ -24,6 +24,8 @@ const list = <Item extends TSchema>(item: Item) => t.Immutable(t.Array(item));
 const pair = <Item extends TSchema>(item: Item) => t.Immutable(t.Tuple([item, item]));
 
 const at = t.Number();
+// Rounds are numbered from 1.
+const round = t.Integer({ minimum: 1 });
 
 const gameEvent = t.Union([
   t.Object({ type: t.Literal("start"), at }),
@@ -69,7 +71,7 @@ export const IdSocket = {
   Params: duelParams,
   Body: t.Union([
     t.Object({ type: t.Literal("ping"), clientAt: t.Number() }),
-    t.Object({ type: t.Literal("event"), event: gameEvent }),
+    t.Object({ type: t.Literal("event"), round, event: gameEvent }),
   ]),
   Response: {
     // What the socket sends once open; the other statuses refuse the upgrade.
@@ -78,12 +80,18 @@ export const IdSocket = {
       t.Object({
         type: t.Literal("state"),
         seat,
-        words: list(t.String()),
+        round,
+        words: t.Union([list(t.String()), t.Null()]),
         participants: list(participant),
         journals: pair(list(gameEvent)),
       }),
       t.Object({ type: t.Literal("presence"), participant }),
-      t.Object({ type: t.Literal("countdown"), startAt: t.Number() }),
+      t.Object({
+        type: t.Literal("countdown"),
+        round,
+        startAt: t.Number(),
+        words: list(t.String()),
+      }),
       t.Object({ type: t.Literal("opponentEvent"), event: gameEvent }),
       t.Object({ type: t.Literal("end"), results: pair(result), outcomes: pair(outcome) }),
     ]),

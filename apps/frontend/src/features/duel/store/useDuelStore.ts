@@ -34,8 +34,14 @@ type DuelState = {
     | "disconnected";
   readonly seat: Seat | null;
   readonly participants: readonly Participant[];
+  /** The current Round, which every Event sent to the server names. */
+  readonly round: number | null;
+  /** The Target words of the current Round, empty until its Countdown is announced. */
   readonly words: readonly string[];
-  /** The Opponent's Game, replayed from their Events to place their caret and read their WPM. */
+  /**
+   * The Opponent's Game, replayed from their Events to place their caret and read their WPM;
+   * `null` until the Target words are known.
+   */
   readonly opponentGame: Game | null;
   /** Why the Participant could not take a seat, in words for the user. */
   readonly refusal: string | null;
@@ -55,12 +61,12 @@ const withParticipant = (participants: readonly Participant[], participant: Part
 
 let stopForwarding: (() => void) | null = null;
 
-// The server applies the Participant's Events to its own copy of the Game, from the Start on.
-function forwardEvents() {
+// The server applies the Participant's Events to its own copy of the Game of `round`, from the Start on.
+function forwardEvents(round: number) {
   stopForwarding?.();
   stopForwarding = useGameStore.subscribe(({ lastEvent }, previous) => {
     if (lastEvent !== null && lastEvent !== previous.lastEvent) {
-      sendToDuel({ type: "event", event: lastEvent });
+      sendToDuel({ type: "event", round, event: lastEvent });
     }
   });
 }
@@ -83,6 +89,7 @@ const initialState = {
   phase: "connecting",
   seat: null,
   participants: [],
+  round: null,
   words: [],
   opponentGame: null,
   refusal: null,
@@ -91,12 +98,14 @@ const initialState = {
 
 export const useDuelStore = create<DuelState>()((set, get) => {
   const start = () => {
+    const { round, words } = get();
+    if (round === null) return;
     // A Game the Participant starts runs on their own clock.
     shiftEventTime(0);
     const at = eventTime();
     const gameStore = useGameStore.getState();
-    gameStore.loadGame(DUEL_GAME_CONFIG, get().words);
-    forwardEvents();
+    gameStore.loadGame(DUEL_GAME_CONFIG, words);
+    forwardEvents(round);
     gameStore.applyEvent({ type: "start", at });
     set({ phase: "running" });
   };
@@ -105,14 +114,15 @@ export const useDuelStore = create<DuelState>()((set, get) => {
   const resume = (startAt: number) => {
     const journal = resumedJournal;
     const [started] = journal;
-    if (started?.type !== "start") return;
+    const { round, words } = get();
+    if (started?.type !== "start" || round === null) return;
     const load = (clockOffset: number | null) => {
       const shift = eventClockShift({ gameStartedAt: started.at, startAt, clockOffset });
       if (shift === null) return;
       stopResumingGame();
       shiftEventTime(shift);
-      forwardEvents();
-      useGameStore.getState().loadGame(DUEL_GAME_CONFIG, get().words, journal);
+      forwardEvents(round);
+      useGameStore.getState().loadGame(DUEL_GAME_CONFIG, words, journal);
       set({ phase: "running" });
     };
     stopResumingGame();
@@ -131,11 +141,13 @@ export const useDuelStore = create<DuelState>()((set, get) => {
         phase: "waiting",
         seat: message.seat,
         participants: message.participants,
-        words: message.words,
-        opponentGame: opponentJournal.reduce(
-          applyEvent,
-          createGame(DUEL_GAME_CONFIG, message.words),
-        ),
+        round: message.round,
+        words: message.words ?? [],
+        // Without the Target words, the Countdown is still to come and brings them.
+        opponentGame:
+          message.words === null
+            ? null
+            : opponentJournal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, message.words)),
       });
       useDuelClockStore.getState().synchronise();
     } else if (message.type === "presence") {
@@ -146,6 +158,11 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const { opponentGame } = get();
       if (opponentGame !== null) set({ opponentGame: applyEvent(opponentGame, message.event) });
     } else if (message.type === "countdown") {
+      // A Participant seated before the Countdown learns the Target words of the Round from it.
+      if (get().opponentGame === null) {
+        const { round, words } = message;
+        set({ round, words, opponentGame: createGame(DUEL_GAME_CONFIG, words) });
+      }
       const { phase } = get();
       // A Game already running or over has no Start left to wait for.
       if (phase !== "waiting" && phase !== "countdown") return;

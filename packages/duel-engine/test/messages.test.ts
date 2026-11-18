@@ -12,7 +12,7 @@ const finished = applyEvent(
 
 const clientMessages: ClientMessage[] = [
   { type: "ping", clientAt: 1000 },
-  { type: "event", event: { type: "keyDown", at: 1200, code: "KeyC" } },
+  { type: "event", round: 1, event: { type: "keyDown", at: 1200, code: "KeyC" } },
 ];
 
 const serverMessages: ServerMessage[] = [
@@ -20,6 +20,7 @@ const serverMessages: ServerMessage[] = [
   {
     type: "state",
     seat: 1,
+    round: 1,
     words: ["cat", "dog"],
     participants: [
       { seat: 0, name: "ada", connected: true },
@@ -28,7 +29,7 @@ const serverMessages: ServerMessage[] = [
     journals: [[{ type: "start", at: 0 }], []],
   },
   { type: "presence", participant: { seat: 0, name: "ada", connected: false } },
-  { type: "countdown", startAt: 4000 },
+  { type: "countdown", round: 1, startAt: 4000, words: ["cat", "dog"] },
   { type: "opponentEvent", event: { type: "insert", at: 4200, text: "c" } },
   {
     type: "end",

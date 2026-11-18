@@ -17,7 +17,7 @@ test("CONFIG-1: a Duel Game is a time Game that ends at the first Tick 30 second
   expect(applyEvent(started, { type: "tick", at: 40_000 }).status).toBe("finished");
 });
 
-test("CONFIG-2: a Duel draws 250 Target words", () => {
+test("CONFIG-2: a Round has 250 Target words", () => {
   const game = createGame(DUEL_GAME_CONFIG, drawWords(DUEL_WORD_COUNT, Math.random));
 
   expect(game.targetWords).toHaveLength(250);

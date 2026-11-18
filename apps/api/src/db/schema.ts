@@ -15,6 +15,7 @@ import {
   jsonb,
   smallint,
   primaryKey,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // Named so the route can tell a Nickname already taken from any other unique violation.
@@ -141,27 +142,64 @@ export const standing = pgTable(
   ],
 );
 
-// A finished Duel, written once in the transaction that saves its two Games.
+// A finished Duel, written once in the transaction that saves its Rounds, Games and participants.
 export const duel = pgTable("duel", {
   id: uuid("id").primaryKey(),
+  kind: text("kind", { enum: ["custom", "ranked"] }).notNull(),
   config: jsonb("config").$type<GameConfig>().notNull(),
-  words: jsonb("words").$type<string[]>().notNull(),
   startedAt: timestamp("started_at").notNull(),
   endedAt: timestamp("ended_at").notNull(),
 });
 
-// One row per seat of a Duel, with the full journal so that the Game can be replayed and audited.
+// One row per Round of a Duel, numbered from 1: the Target words both Games were played on, and its instants.
+export const duelRound = pgTable(
+  "duel_round",
+  {
+    duelId: uuid("duel_id")
+      .notNull()
+      .references(() => duel.id, { onDelete: "cascade" }),
+    round: smallint("round").notNull(),
+    words: jsonb("words").$type<string[]>().notNull(),
+    startedAt: timestamp("started_at").notNull(),
+    endedAt: timestamp("ended_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.duelId, table.round] })],
+);
+
+// One row per seat of a Round, with the full journal so that the Game can be replayed and audited.
 export const duelGame = pgTable(
   "duel_game",
+  {
+    duelId: uuid("duel_id").notNull(),
+    round: smallint("round").notNull(),
+    seat: smallint("seat").$type<Seat>().notNull(),
+    result: jsonb("result").$type<Result>().notNull(),
+    journal: jsonb("journal").$type<GameEvent[]>().notNull(),
+    // The Outcome of the Round for this seat.
+    outcome: text("outcome", { enum: ["win", "loss", "draw"] })
+      .$type<Outcome>()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.duelId, table.round, table.seat] }),
+    foreignKey({
+      columns: [table.duelId, table.round],
+      foreignColumns: [duelRound.duelId, duelRound.round],
+    }).onDelete("cascade"),
+  ],
+);
+
+// One row per seat of a Duel: who sat there and what the Duel meant for them.
+export const duelParticipant = pgTable(
+  "duel_participant",
   {
     duelId: uuid("duel_id")
       .notNull()
       .references(() => duel.id, { onDelete: "cascade" }),
     seat: smallint("seat").$type<Seat>().notNull(),
-    // Null for a Guest, who leaves no trace: the Game stays as the one of an unnamed Opponent.
+    // Null for a Guest, who leaves no trace: the seat stays as the one of an unnamed Opponent.
     playerId: text("player_id").references(() => user.id, { onDelete: "set null" }),
-    result: jsonb("result").$type<Result>().notNull(),
-    journal: jsonb("journal").$type<GameEvent[]>().notNull(),
+    // The Outcome of the Duel for this seat.
     outcome: text("outcome", { enum: ["win", "loss", "draw"] })
       .$type<Outcome>()
       .notNull(),
