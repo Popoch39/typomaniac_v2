@@ -1,5 +1,6 @@
 import { useSignedInPlayer } from "../hooks/useSignedInPlayer.ts";
 import { SignInWithDiscordButton } from "./SignInWithDiscordButton.tsx";
+import { SignOutButton } from "./SignOutButton.tsx";
 
 export function SignInStatus() {
   const { player, isPending, failure } = useSignedInPlayer();
@@ -8,10 +9,13 @@ export function SignInStatus() {
   if (failure) return <p role="alert">{failure}</p>;
   if (player === null) return <SignInWithDiscordButton />;
   return (
-    <p className="sign-in-status">
-      {player.nickname === null
-        ? "Signed in. You have not chosen a Nickname yet."
-        : `Signed in as ${player.nickname}`}
-    </p>
+    <>
+      <p className="sign-in-status">
+        {player.nickname === null
+          ? "Signed in. You have not chosen a Nickname yet."
+          : `Signed in as ${player.nickname}`}
+      </p>
+      <SignOutButton />
+    </>
   );
 }
