@@ -28,3 +28,7 @@
 .opponent-name {
   color: var(--opponent);
 }
+
+.opponent-away {
+  opacity: 0.6;
+}

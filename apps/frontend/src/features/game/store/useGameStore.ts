@@ -28,8 +28,15 @@ type GameState = {
   /** Whether words are added as the end of a time Game nears: a loaded Game keeps its given words. */
   readonly topsUpWords: boolean;
   readonly applyEvent: (event: GameEvent) => void;
-  /** Replaces the Game with one on given words, such as the Target words of a Duel; none is added. */
-  readonly loadGame: (config: GameConfig, words: readonly string[]) => void;
+  /**
+   * Replaces the Game with one on given words, such as the Target words of a Duel; none is added.
+   * A journal replays the Events already applied, to resume a Game whose clock kept running.
+   */
+  readonly loadGame: (
+    config: GameConfig,
+    words: readonly string[],
+    journal?: readonly GameEvent[],
+  ) => void;
   readonly restart: () => void;
   readonly setConfig: (config: GameConfig) => void;
 };
@@ -97,7 +104,13 @@ export const useGameStore = create<GameState>()((set, get) => {
       }
       if (game.status === "finished") stopTicking();
     },
-    loadGame: (config, words) => replaceGame(createGame(config, words), false),
+    loadGame: (config, words, journal = []) => {
+      replaceGame(journal.reduce(applyEngineEvent, createGame(config, words)), false);
+      if (get().game.status !== "running") return;
+      tickTimer = setInterval(tick, TICK_INTERVAL_MS);
+      // The clock ran on while the Game was away: one already past its end ends at once.
+      tick();
+    },
     restart: () => startNewGame(get().game.config),
     setConfig: startNewGame,
   };

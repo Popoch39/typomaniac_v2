@@ -502,6 +502,71 @@ test("the Events a Participant sends are kept in their Game's journal, handed ba
   }
 });
 
+test("a Participant who comes back on another API instance resumes the same Game, and the Opponent sees them leave and return", async () => {
+  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const socketUrl = (port: number | undefined, duelId: string) =>
+    `ws://localhost:${port}/api/duels/${duelId}/socket`;
+  try {
+    const creatorName = uniqueNickname();
+    const creatorCookie = await signInPlayerWithNickname(creatorName);
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const creator = await openSocket(socketUrl(first.server?.port, id), creatorCookie);
+    await creator.next();
+    const opponent = await openSocket(socketUrl(second.server?.port, id), opponentCookie);
+    // State and Countdown for the opponent; presence and Countdown for the creator.
+    for (const socket of [opponent, opponent, creator, creator]) await socket.next();
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+    opponent.send({ type: "event", event: { type: "insert", at: 21, text: "b" } });
+    for (const socket of [opponent, opponent, creator, creator]) await socket.next();
+
+    creator.close();
+    const away = await opponent.next();
+    const again = await openSocket(socketUrl(second.server?.port, id), creatorCookie);
+    const state = await again.next();
+    const back = await opponent.next();
+    // Already started before the disconnection: a second start is refused, typing goes on.
+    again.send({ type: "event", event: { type: "start", at: 30 } });
+    again.send({ type: "event", event: { type: "insert", at: 40, text: "c" } });
+    const relayed = await opponent.next();
+    again.close();
+    opponent.close();
+
+    expect(away).toEqual({
+      type: "presence",
+      participant: { seat: 0, name: creatorName, connected: false },
+    });
+    expect(state).toMatchObject({
+      type: "state",
+      seat: 0,
+      journals: [
+        [
+          { type: "start", at: 10 },
+          { type: "insert", at: 20, text: "a" },
+        ],
+        [
+          { type: "start", at: 11 },
+          { type: "insert", at: 21, text: "b" },
+        ],
+      ],
+    });
+    expect(back).toEqual({
+      type: "presence",
+      participant: { seat: 0, name: creatorName, connected: true },
+    });
+    expect(relayed).toEqual({
+      type: "opponentEvent",
+      event: { type: "insert", at: 40, text: "c" },
+    });
+  } finally {
+    await first.stop(true);
+    await second.stop(true);
+  }
+});
+
 test("the server refuses addWords from a client: no word is added during a Duel", async () => {
   const { creator, opponent, stop } = await startDuel(0);
   try {
