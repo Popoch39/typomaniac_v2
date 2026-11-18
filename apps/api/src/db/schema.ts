@@ -7,7 +7,9 @@ import {
   text,
   timestamp,
   boolean,
+  check,
   index,
+  integer,
   uniqueIndex,
   uuid,
   jsonb,
@@ -119,6 +121,25 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// A Player's Standing: one row per Player and no Season. A Player without a row has the Standing of a new Player.
+export const standing = pgTable(
+  "standing",
+  {
+    playerId: text("player_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mmr: integer("mmr").notNull(),
+    duelsPlayed: integer("duels_played").notNull(),
+    // The Rank, as the ranked engine's ladder index of its Division (Master past the last one) and
+    // its LP, so that Ranks order without knowing the Tier names. Both null while Unranked.
+    ladderIndex: smallint("ladder_index"),
+    lp: integer("lp"),
+  },
+  (table) => [
+    check("standing_rank_whole", sql`(${table.ladderIndex} is null) = (${table.lp} is null)`),
+  ],
+);
 
 // A finished Duel, written once in the transaction that saves its two Games.
 export const duel = pgTable("duel", {

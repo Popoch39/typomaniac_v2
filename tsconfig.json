@@ -8,8 +8,12 @@
     { "path": "packages/duel-engine/test" },
     { "path": "packages/ranked-engine" },
     { "path": "packages/ranked-engine/test" },
+    { "path": "packages/matchmaking-engine" },
+    { "path": "packages/matchmaking-engine/test" },
     { "path": "apps/frontend" },
     { "path": "apps/frontend/test" },
-    { "path": "apps/api" }
+    { "path": "packages/redis" },
+    { "path": "apps/api" },
+    { "path": "apps/matchmaker" }
   ]
 }
