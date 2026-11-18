@@ -18,11 +18,19 @@ _Avoid_: Username, user name, handle, identifier
 A person who plays without having signed in; nothing is kept for them.
 _Avoid_: Anonymous, visitor, signed-out user
 
+**Avatar**:
+A **Player**'s picture, taken from their GitHub or Discord account when they sign up.
+_Avoid_: profile picture, pfp, image
+
 ### Duel
 
 **Duel**:
-Any 1v1 between two **Participants**, each playing their own Game on the same Target words and the same Start. A _ranked Duel_ is the rated case, between two Players.
+Any 1v1 between two **Participants**, each playing their own Game on the same Target words and the same Start. A _ranked Duel_ is the rated case, between two Players; a **Custom Duel** is the unrated one.
 _Avoid_: match, game (reserved for one player's Game), versus, battle, race
+
+**Custom Duel**:
+An unrated Duel, created by a Participant and joined through its invite link; Guests may take part.
+_Avoid_: private duel, friendly, lobby, unranked duel
 
 **Participant** (`Participant`):
 A Player or a Guest taking part in a Duel.
