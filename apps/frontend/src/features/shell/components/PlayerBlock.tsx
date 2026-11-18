@@ -21,7 +21,11 @@ export function PlayerBlock() {
   }
   return (
     <div className="player-block">
-      {player === null ? <GuestIdentity /> : <PlayerIdentity nickname={player.nickname} />}
+      {player === null ? (
+        <GuestIdentity />
+      ) : (
+        <PlayerIdentity nickname={player.nickname} avatarUrl={player.avatarUrl} />
+      )}
     </div>
   );
 }
