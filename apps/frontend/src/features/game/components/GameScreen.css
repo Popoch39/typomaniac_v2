@@ -60,7 +60,7 @@
 }
 
 .config-option[aria-pressed="true"] {
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .live-stats-bar {
@@ -72,7 +72,7 @@
 }
 
 .live-stats-progress {
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .word-wrong {
@@ -103,7 +103,7 @@
   height: 1.2em;
   margin-right: -2px;
   vertical-align: text-bottom;
-  background: var(--accent);
+  background: var(--primary);
 }
 
 .focus-veil {
@@ -117,8 +117,14 @@
   backdrop-filter: blur(4px);
 }
 
+/* Tailwind's preflight strips the browser's button look, which this plain button relied on. */
 .restart-button {
   margin-top: 24px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-h);
+  cursor: pointer;
 }
 
 .result-panel {

@@ -22,4 +22,11 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 32px;
+
+  /* Tailwind's preflight resets headings to body text; this one names a Participant's Result. */
+  h3 {
+    font-size: 1.17em;
+    font-weight: bold;
+    color: var(--text-h);
+  }
 }

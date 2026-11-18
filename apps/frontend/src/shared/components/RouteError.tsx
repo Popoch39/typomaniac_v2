@@ -5,7 +5,9 @@ export function RouteError() {
   return (
     <main>
       <p role="alert">Something went wrong on this page.</p>
-      <Link to="/">Back to the home page</Link>
+      <Link to="/" className="text-primary underline underline-offset-4">
+        Back to the home page
+      </Link>
     </main>
   );
 }
