@@ -9,9 +9,9 @@ import {
   rankAtLadderIndex,
   type Standing,
 } from "@repo/ranked-engine";
-import { eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { Db, Transaction } from "../../db/client.ts";
-import { standing as standingTable } from "../../db/schema.ts";
+import { standing as standingTable, user } from "../../db/schema.ts";
 
 /** A Rank as it is stored: the ladder index of its Division and its LP, both `null` while Unranked. */
 export const storedRank = (rank: Rank | null) => ({
@@ -104,4 +104,91 @@ export const moveStandings = async (
 export const visibleStanding = ({ duelsPlayed, rank }: Pick<Standing, "duelsPlayed" | "rank">) => {
   const total = DEFAULT_RANKED_CONFIG.placementDuels;
   return { rank, placement: { played: Math.min(duelsPlayed, total), total } };
+};
+
+/** How many ranked Players the Leaderboard lists. */
+export const LEADERBOARD_SIZE = 100;
+
+const isRanked = isNotNull(standingTable.ladderIndex);
+
+// Rank first (its ladder index, then its LP), the MMR at equal Rank, and the Player's id last so that
+// equal Standings keep one order. The index `standing_leaderboard_idx` follows it column for column.
+const leaderboardOrder = [
+  desc(standingTable.ladderIndex),
+  desc(standingTable.lp),
+  desc(standingTable.mmr),
+  asc(standingTable.playerId),
+];
+
+const leaderboardColumns = {
+  playerId: standingTable.playerId,
+  nickname: user.nickname,
+  avatarUrl: user.image,
+  ladderIndex: standingTable.ladderIndex,
+  lp: standingTable.lp,
+  mmr: standingTable.mmr,
+};
+
+type LeaderboardRow = {
+  playerId: string;
+  nickname: string | null;
+  avatarUrl: string | null;
+  ladderIndex: number | null;
+  lp: number | null;
+  mmr: number;
+};
+
+/** The top of the Leaderboard, in its order. Exported so that a test can read the plan of this very query. */
+export const leaderboardTop = (db: Db) =>
+  db
+    .select(leaderboardColumns)
+    .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
+    .where(isRanked)
+    .orderBy(...leaderboardOrder)
+    .limit(LEADERBOARD_SIZE);
+
+// The ranked Players ahead of this one in the Leaderboard's order.
+const countAhead = async (db: Db, { playerId, ladderIndex, lp, mmr }: LeaderboardRow) => {
+  const own = sql`(${ladderIndex}::smallint, ${lp}::integer, ${mmr}::integer)`;
+  const columns = sql`(${standingTable.ladderIndex}, ${standingTable.lp}, ${standingTable.mmr})`;
+  const [row] = await db
+    .select({ ahead: count() })
+    .from(standingTable)
+    .where(
+      and(
+        isRanked,
+        sql`(${columns} > ${own} or (${columns} = ${own} and ${standingTable.playerId} < ${playerId}))`,
+      ),
+    );
+  return row?.ahead ?? 0;
+};
+
+const leaderboardPlayer = (
+  position: number,
+  { nickname, avatarUrl, ladderIndex, lp }: LeaderboardRow,
+) => {
+  const rank = rankFromStored(ladderIndex, lp);
+  if (rank === null) throw new Error("An Unranked Player has no place on the Leaderboard");
+  return { position, nickname, avatarUrl, rank };
+};
+
+/**
+ * The ranked Players at the top of the Leaderboard and, for a signed-in ranked Player, their own
+ * place, inside the top or below it. A Guest (`playerId` null) and an Unranked Player have none.
+ */
+export const readLeaderboard = async (db: Db, playerId: string | null) => {
+  const top = await leaderboardTop(db);
+  const players = top.map((row, index) => leaderboardPlayer(index + 1, row));
+  if (playerId === null) return { players, own: null };
+
+  const inTop = top.findIndex((row) => row.playerId === playerId);
+  if (inTop !== -1) return { players, own: players[inTop] ?? null };
+  const [row] = await db
+    .select(leaderboardColumns)
+    .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
+    .where(and(isRanked, eq(standingTable.playerId, playerId)));
+  if (!row) return { players, own: null };
+  return { players, own: leaderboardPlayer((await countAhead(db, row)) + 1, row) };
 };

@@ -140,6 +140,16 @@ export const standing = pgTable(
   },
   (table) => [
     check("standing_rank_whole", sql`(${table.ladderIndex} is null) = (${table.lp} is null)`),
+    // The Leaderboard's order, so that its top is read from the index rather than sorted; only
+    // ranked Players are listed.
+    index("standing_leaderboard_idx")
+      .on(
+        table.ladderIndex.desc().nullsFirst(),
+        table.lp.desc().nullsFirst(),
+        table.mmr.desc().nullsFirst(),
+        table.playerId.asc(),
+      )
+      .where(sql`${table.ladderIndex} is not null`),
   ],
 );
 

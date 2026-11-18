@@ -1,0 +1,1 @@
+CREATE INDEX "standing_leaderboard_idx" ON "standing" USING btree ("ladder_index" DESC NULLS FIRST,"lp" DESC NULLS FIRST,"mmr" DESC NULLS FIRST,"player_id") WHERE "standing"."ladder_index" is not null;
