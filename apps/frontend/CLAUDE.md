@@ -54,6 +54,8 @@ src/
   shared/         # composants et hooks réutilisés par plusieurs features
 ```
 
+La logique pure d'une feature (fonctions sans React ni store, testées directement) vit dans un dossier nommé par son domaine, à côté de `components/` (`duel/round/`, `duel/clock/`, `duel/points/`, `queue/clock/`…), listé dans `test/tsconfig.json` pour que ses tests compilent.
+
 Un fichier ne contient qu'un composant, un hook ou un store, et porte son nom.
 
 ## React Compiler
