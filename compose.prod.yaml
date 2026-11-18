@@ -48,5 +48,17 @@ services:
       redis:
         condition: service_healthy
 
+  # One is enough: a second one started by a deployment overlap waits for the leader lock.
+  matchmaker:
+    build:
+      context: .
+      dockerfile: apps/matchmaker/Dockerfile
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres-data:
