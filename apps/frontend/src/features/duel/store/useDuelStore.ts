@@ -6,7 +6,6 @@ export type DuelRefusal =
   | "notFound"
   | "full"
   | "alreadySeated"
-  | "signInRequired"
   | "nicknameRequired"
   | "unreachable";
 
@@ -27,7 +26,6 @@ const socketUrl = (duelId: string) => {
 // A browser never shows why an upgrade was refused: the Duel is read over HTTP to tell the reason.
 async function findRefusal(duelId: string): Promise<DuelRefusal> {
   const response = await fetch(`/api/duels/${duelId}`);
-  if (response.status === 401) return "signInRequired";
   if (response.status === 403) return "nicknameRequired";
   if (response.status === 404) return "notFound";
   if (!response.ok) return "unreachable";
