@@ -14,6 +14,15 @@ function referenceMmr(index: number, config: RankedConfig): number {
   return config.bronzeIvMmr + index * config.mmrPerDivision;
 }
 
+/** LP-1 reference of the Rank; Master starts one step above Diamond I. */
+export function rankReferenceMmr(rank: Rank, config: RankedConfig): number {
+  const index =
+    rank.tier === "master"
+      ? LADDER.length
+      : LADDER.findIndex((step) => step.tier === rank.tier && step.division === rank.division);
+  return referenceMmr(index, config);
+}
+
 /** The highest Division whose reference MMR is at or below the MMR, at 0 LP, between Bronze IV and the Placement ceiling. */
 export function placedRank(mmr: number, config: RankedConfig): DivisionRank {
   const ceiling = config.placementCeiling;

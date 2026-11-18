@@ -12,12 +12,14 @@ test("MMR-3: K is the Placement K-factor up to the last Placement Duel", () => {
 });
 
 test("MMR-3: K is the regular K-factor once the Placement Duels have been played", () => {
-  // Without a Rank, no LP rule applies, so only the K-factor is observed.
-  expect(applyDuel({ mmr: 1200, duelsPlayed: 5, rank: null }, 1200, "win")).toEqual({
-    // 5 Duels played, not fewer than 5: 32 × (1 − 0.5) = 16
-    standing: { mmr: 1216, duelsPlayed: 6, rank: null },
+  const rank = { tier: "silver", division: 2, lp: 50 } as const;
+
+  expect(applyDuel({ mmr: 1200, duelsPlayed: 5, rank }, 1200, "win")).toEqual({
+    // 5 Duels played, not fewer than 5: 32 × (1 − 0.5) = 16 → 1216;
+    // Silver II reference 900 + 6 × 50 = 1200: gap (1216 − 1200) / 5 = 3.2 → 3 → +23
+    standing: { mmr: 1216, duelsPlayed: 6, rank: { ...rank, lp: 73 } },
     mmrDelta: 16,
-    lpDelta: 0,
+    lpDelta: 23,
     rankChange: "none",
   });
 });

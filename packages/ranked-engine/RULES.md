@@ -42,9 +42,19 @@ Each update increments the number of Duels played by one. The update of a Player
 
 The ladder runs from Bronze IV up to Diamond I: each Tier from Bronze to Diamond holds Divisions IV, III, II and I, in that order.
 
-| Id   | Rule                                                                                                                                                                                                                        |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| LP-1 | A Division's reference MMR is the Bronze IV reference plus its index times the MMR per Division, where the index counts the Divisions below it: 900 for Bronze IV, 950 for Bronze III, up to 1850 for Diamond I by default. |
+| Id   | Rule                                                                                                                                                                                                                                                                                                        |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LP-1 | A Division's reference MMR is the Bronze IV reference plus its index times the MMR per Division, where the index counts the Divisions below it: 900 for Bronze IV, 950 for Bronze III, up to 1850 for Diamond I by default. Master sits one step above Diamond I: its reference at 0 LP is 1900 by default. |
+| LP-2 | The gap is the new MMR minus the reference, divided by the MMR per LP and truncated toward 0. A win gives the base LP plus the gap, a loss takes the base LP minus the gap, each bounded between the LP bounds. The LP delta is signed.                                                                     |
+| LP-3 | A draw moves the MMR and leaves the LP unchanged: the LP delta is 0.                                                                                                                                                                                                                                        |
+
+Each of these rules leaves the rank change at `none`. Until promotion exists, a win stops at 99 LP, one short of the next Division.
+
+## Promotion and demotion
+
+| Id      | Rule                                                                                                                             |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| PROMO-2 | A loss larger than the LP held leaves the Player at 0 LP in the same Division. The LP delta still reports the full loss of LP-2. |
 
 ## Purity
 
