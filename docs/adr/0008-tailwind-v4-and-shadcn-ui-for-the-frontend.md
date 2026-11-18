@@ -1,6 +1,6 @@
 # Tailwind CSS v4 and shadcn/ui for the frontend
 
-The frontend is styled with Tailwind CSS v4, through the `@tailwindcss/vite` plugin, and builds its UI from shadcn/ui components on the Radix base. The components are copied into the repo by the shadcn CLI (`bunx shadcn@latest add …`), into `apps/frontend/src/shared/components/ui/`, and are treated as vendored code: our components dress them through props and classes, and never edit them. The app's colour palette is mapped onto the shadcn theme tokens in `src/index.css`, with the brand purple as the primary colour, and the light/dark theme follows the system through `prefers-color-scheme` rather than a `.dark` class. The app shell (sidebar, Player block, Ranked, Custom and Profile pages) is the first part built this way; the Duel and Game screens keep their hand-written stylesheets until they are migrated.
+The frontend is styled with Tailwind CSS v4, through the `@tailwindcss/vite` plugin, and builds its UI from shadcn/ui components on the Radix base. The components are copied into the repo by the shadcn CLI (`bunx shadcn@latest add …`), into `apps/frontend/src/shared/components/ui/`, and are treated as vendored code: our components dress them through props and classes, and never edit them. The app's colour palette is mapped onto the shadcn theme tokens in `src/index.css`, with the brand purple as the primary colour, and the light/dark theme follows the system through `prefers-color-scheme` rather than a `.dark` class. The whole app is styled this way, the app shell and the Duel and Game screens alike: `src/index.css` is the only CSS file, and holds the theme and what Tailwind cannot express as a class.
 
 ## Considered Options
 
@@ -10,7 +10,8 @@ The frontend is styled with Tailwind CSS v4, through the `@tailwindcss/vite` plu
 
 ## Consequences
 
-- Five new runtime dependencies come with shadcn/ui: `radix-ui`, `class-variance-authority`, `cn` (class merging), `tw-animate-css` and `shadcn` (its Tailwind stylesheet), next to `tailwindcss` and `@tailwindcss/vite`.
-- Tailwind's preflight resets the browser's element styles (headings, buttons, links) for the whole app, including the screens not migrated yet: the few places that relied on them restore what they need.
+- New runtime dependencies come with shadcn/ui: `radix-ui`, `class-variance-authority`, `cn` (class merging, a drop-in for `clsx` + `tailwind-merge`) and `tw-animate-css`. `tailwindcss`, `@tailwindcss/vite` and `shadcn` (pulled in only for its Tailwind stylesheet) are only needed at build time, so they are dev dependencies.
+- Tailwind's preflight resets the browser's element styles (headings, buttons, links) for the whole app: the few places that relied on them restore what they need.
+- The shadcn `Sidebar` is state-driven (open or collapsed), not driven by a media query. The icon rail on tablets (768–1024px) comes from `useSidebarOpen`, which reads `matchMedia` through `useSyncExternalStore` and feeds `SidebarProvider`'s `open` prop: the layout follows the viewport width alone, with no user-agent detection and no toggle to expand the rail.
 - Generated files keep shadcn's own patterns, `useEffect` included, which our own code forbids. `apps/frontend/.oxlintrc.json` turns off `react/set-state-in-effect` and `react/only-export-components` for those files only. Running `shadcn add` again over an existing component overwrites it, so nothing of ours may live in those files.
 - The `@/` import alias (to `apps/frontend/src`) exists for the generated files, which import each other through it.
