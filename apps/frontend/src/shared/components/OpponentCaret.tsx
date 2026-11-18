@@ -1,4 +1,5 @@
 import { useOpponentCaret } from "../hooks/useOpponentCaret.ts";
+import "./OpponentCaret.css";
 
 type OpponentCaretProps = {
   wordIndex: number;

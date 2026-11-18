@@ -1,4 +1,4 @@
-import { OpponentCaret } from "../../duel/components/OpponentCaret.tsx";
+import { OpponentCaret } from "../../../shared/components/OpponentCaret.tsx";
 import { useLetter } from "../hooks/useLetter.ts";
 import { Caret } from "./Caret.tsx";
 

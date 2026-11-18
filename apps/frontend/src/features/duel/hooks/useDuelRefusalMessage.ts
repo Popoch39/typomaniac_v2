@@ -1,4 +1,5 @@
-import { type DuelRefusal, useDuelStore } from "../store/useDuelStore.ts";
+import type { DuelRefusal } from "../socket/duelSocket.ts";
+import { useDuelStore } from "../store/useDuelStore.ts";
 
 const MESSAGES: Record<DuelRefusal, string> = {
   notFound: "This Duel does not exist or has expired. Ask for a new link.",

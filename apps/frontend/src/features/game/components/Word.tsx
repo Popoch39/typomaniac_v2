@@ -1,4 +1,4 @@
-import { OpponentCaret } from "../../duel/components/OpponentCaret.tsx";
+import { OpponentCaret } from "../../../shared/components/OpponentCaret.tsx";
 import { useActiveWordScroll } from "../hooks/useActiveWordScroll.ts";
 import { useWord } from "../hooks/useWord.ts";
 import { Caret } from "./Caret.tsx";
