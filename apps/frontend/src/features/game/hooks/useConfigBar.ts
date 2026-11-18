@@ -9,6 +9,7 @@ const MODE_VALUES: Record<Mode, readonly number[]> = {
   time: [15, 30, 60, 120],
   words: [10, 25, 50, 100],
 };
+// The value a Mode starts at when picked: 30 s matches the default Game, 25 words is a chosen middle option.
 const DEFAULT_VALUES: Record<Mode, number> = { time: 30, words: 25 };
 
 function configFor(mode: Mode, value: number): GameConfig {
@@ -16,7 +17,7 @@ function configFor(mode: Mode, value: number): GameConfig {
 }
 
 export function useConfigBar() {
-  const config = useGameStore((state) => state.config);
+  const config = useGameStore((state) => state.game.config);
   const setConfig = useGameStore((state) => state.setConfig);
 
   return {
