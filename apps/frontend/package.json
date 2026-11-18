@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "bun test"
   },
   "dependencies": {
+    "@repo/typing-engine": "*",
     "@tanstack/react-query": "^5.108.0",
     "@tanstack/react-router": "^1.170.46",
     "react": "^19.3.1",
@@ -18,11 +20,13 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
+    "@repo/typescript-config": "*",
     "@rolldown/plugin-babel": "^0.3.0",
     "@tanstack/react-query-devtools": "^5.108.0",
     "@tanstack/react-router-devtools": "^1.167.3",
     "@tanstack/router-plugin": "^1.169.0",
     "@types/babel__core": "^7.20.5",
+    "@types/bun": "^1.4.4",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
