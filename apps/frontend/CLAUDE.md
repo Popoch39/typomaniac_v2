@@ -23,6 +23,13 @@
 - réaction à une action utilisateur → la gérer dans le handler de l'événement ;
 - synchronisation entre stores ou avec l'extérieur → l'action du store ou `subscribe` de Zustand.
 
+## Appels API
+
+- Tout appel HTTP passe par TanStack Query (`useQuery`, `useMutation`, ou `queryClient.fetchQuery` avec des `queryOptions` partagées hors React) et par le client Eden typé `apiClient` (`src/shared/api/apiClient.ts`, `treaty<App>` sur le type de `apps/api/src/app.ts`, importé en `import type`). Jamais de `fetch` brut ni de cast `as` sur une réponse. Le `queryClient` partagé vit dans `src/shared/api/queryClient.ts`. Le WebSocket reste un WebSocket.
+- Un état en cours se voit : bouton désactivé avec un libellé d'attente (« Creating… »), écran de chargement.
+- Une erreur s'affiche toujours (`role="alert"`) et toujours en phrase lisible : jamais « Failed to fetch », un statut HTTP ou un `code` serveur. Passer par `describeApiError` (`src/shared/api/describeApiError.ts`), qui traduit statut, `code` et coupure réseau, et accepte des libellés propres à l'action.
+- L'app ne plante jamais : le routeur a un `defaultErrorComponent` et un `defaultNotFoundComponent` qui renvoient vers l'accueil.
+
 ## Organisation des fichiers
 
 Ranger par feature, chaque feature dans son sous-dossier, pour que l'app reste maintenable :
