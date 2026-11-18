@@ -12,21 +12,27 @@ export function lpChange(rank: Rank, mmr: number, outcome: Outcome, config: Rank
   return outcome === "win" ? bounded : -bounded;
 }
 
-/** The Rank after the LP delta: a promotion at the LP per Division, a demotion on a loss at 0 LP. */
+/**
+ * The Rank after the LP-2 delta: a promotion at the LP per Division, a demotion on a loss at 0 LP.
+ * The LP delta returned is the one applied: the full LP-2 delta across a promotion or demotion,
+ * only the LP held when the floor at 0 LP cuts a loss.
+ */
 export function rankAfter(
   rank: Rank,
-  lpDelta: number,
+  delta: number,
   config: RankedConfig,
-): { rank: Rank; rankChange: RankChange } {
-  const lp = rank.lp + lpDelta;
+): { rank: Rank; lpDelta: number; rankChange: RankChange } {
+  const lp = rank.lp + delta;
   const above = lp >= config.lpPerDivision ? adjacentDivision(rank, 1) : undefined;
   if (above !== undefined) {
-    return { rank: { ...above, lp: lp - config.lpPerDivision }, rankChange: "promoted" };
+    const promoted = { ...above, lp: lp - config.lpPerDivision };
+    return { rank: promoted, lpDelta: delta, rankChange: "promoted" };
   }
-  const below = rank.lp === 0 && lpDelta < 0 ? adjacentDivision(rank, -1) : undefined;
+  const below = rank.lp === 0 && delta < 0 ? adjacentDivision(rank, -1) : undefined;
   if (below !== undefined) {
-    return { rank: { ...below, lp: config.demotionLp }, rankChange: "demoted" };
+    return { rank: { ...below, lp: config.demotionLp }, lpDelta: delta, rankChange: "demoted" };
   }
   // Bronze IV at 0 LP is the floor, and Master, with nothing above it, keeps every LP won.
-  return { rank: { ...rank, lp: Math.max(0, lp) }, rankChange: "none" };
+  const floored = Math.max(0, lp);
+  return { rank: { ...rank, lp: floored }, lpDelta: floored - rank.lp, rankChange: "none" };
 }

@@ -13,7 +13,7 @@ export type RankChange = "placed" | "promoted" | "demoted" | "none";
 export type DuelUpdate = {
   standing: Standing;
   mmrDelta: number;
-  /** LP gained or lost (LP-2), before the floor at 0 LP or any promotion or demotion applies. */
+  /** LP gained or lost (LP-2): the full amount across a promotion or demotion, only the LP held when the floor at 0 LP cuts a loss. */
   lpDelta: number;
   rankChange: RankChange;
 };
@@ -38,7 +38,10 @@ export function applyDuel(
   if (standing.rank === null) {
     return { standing: { mmr, duelsPlayed, rank: null }, mmrDelta, lpDelta: 0, rankChange: "none" };
   }
-  const lpDelta = lpChange(standing.rank, mmr, outcome, config);
-  const { rank, rankChange } = rankAfter(standing.rank, lpDelta, config);
+  const { rank, lpDelta, rankChange } = rankAfter(
+    standing.rank,
+    lpChange(standing.rank, mmr, outcome, config),
+    config,
+  );
   return { standing: { mmr, duelsPlayed, rank }, mmrDelta, lpDelta, rankChange };
 }

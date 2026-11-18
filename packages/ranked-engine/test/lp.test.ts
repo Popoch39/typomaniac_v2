@@ -114,12 +114,12 @@ test("LP-3: a draw moves the MMR and leaves the LP unchanged", () => {
   });
 });
 
-test("PROMO-2: a loss larger than the current LP leaves the Player at 0 LP in the same Division", () => {
+test("PROMO-2: a loss larger than the current LP leaves the Player at 0 LP in the same Division, the LP delta the LP lost", () => {
   expect(applyDuel(silverII(1216, 5), 1216, "loss")).toEqual({
-    // 1216 − 16 = 1200; gap 0 → −20, from 5 LP floored at 0; the LP delta is the loss of LP-2
+    // 1216 − 16 = 1200; gap 0 → −20, from 5 LP floored at 0: the LP delta is the 5 LP lost
     standing: { mmr: 1200, duelsPlayed: 21, rank: { tier: "silver", division: 2, lp: 0 } },
     mmrDelta: -16,
-    lpDelta: -20,
+    lpDelta: -5,
     rankChange: "none",
   });
 });

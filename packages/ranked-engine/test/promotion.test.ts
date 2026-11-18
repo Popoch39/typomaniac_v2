@@ -85,13 +85,13 @@ test("PROMO-3: a draw at 0 LP does not demote", () => {
   });
 });
 
-test("PROMO-4: a loss at 0 LP in Bronze IV leaves the Rank unchanged", () => {
+test("PROMO-4: a loss at 0 LP in Bronze IV leaves the Rank unchanged and loses no LP", () => {
   // Bronze IV reference: 900
   expect(applyDuel(ranked(916, { tier: "bronze", division: 4, lp: 0 }), 916, "loss")).toEqual({
-    // 916 − 16 = 900; gap 0 → −20; Bronze IV at 0 LP is the floor
+    // 916 − 16 = 900; gap 0 → −20; Bronze IV at 0 LP is the floor: no LP lost
     standing: { mmr: 900, duelsPlayed: 21, rank: { tier: "bronze", division: 4, lp: 0 } },
     mmrDelta: -16,
-    lpDelta: -20,
+    lpDelta: 0,
     rankChange: "none",
   });
 });

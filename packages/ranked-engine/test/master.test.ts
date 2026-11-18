@@ -51,10 +51,10 @@ test("LP-2: at a given MMR, a Master Player with more LP loses more LP per loss,
 
 test("PROMO-2: a Master loss larger than the LP held floors at 0 LP and stays in Master", () => {
   expect(applyDuel(master(1918, 5), 1918, "loss")).toEqual({
-    // 1918 − 16 = 1902; reference 1900 + ⌊5 × 50 / 100⌋ = 1902: gap 0 → −20; 5 − 20 floored at 0
+    // 1918 − 16 = 1902; reference 1900 + ⌊5 × 50 / 100⌋ = 1902: gap 0 → −20; 5 − 20 floored at 0, 5 LP lost
     standing: { mmr: 1902, duelsPlayed: 21, rank: { tier: "master", lp: 0 } },
     mmrDelta: -16,
-    lpDelta: -20,
+    lpDelta: -5,
     rankChange: "none",
   });
 });
