@@ -867,6 +867,59 @@ test("a Game whose client goes silent is ended by the server 2 seconds after the
   }
 }, 40_000);
 
+test("the time a Participant spends away counts as Inactivity in their Result", async () => {
+  const { creator, opponent, reopenCreator, words, stop } = await startDuel(0);
+  try {
+    const [firstWord = "", secondWord = ""] = words;
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "insert", at: 1010, text: `${firstWord} ` } });
+    await opponent.next();
+    await opponent.next();
+    creator.close();
+    await opponent.next();
+
+    // Back 24 seconds later on the Participant's clock, which ran on meanwhile.
+    const again = await reopenCreator();
+    await again.next();
+    again.send({ type: "event", event: { type: "insert", at: 25_010, text: `${secondWord} ` } });
+    again.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+    const { results } = await nextEnd(again);
+    again.close();
+
+    // Typing in the first and the 25th seconds only: the 28 others, mostly away, are inactive.
+    expect(results[0]).toMatchObject({ duration: 30, inactiveSeconds: 28 });
+  } finally {
+    await stop();
+  }
+});
+
+test("a Participant who comes back after the deadline, while the server is still ending their silent Game, finds the Duel over", async () => {
+  const { creator, opponent, startAt, reopenCreator, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    await opponent.next();
+    creator.close();
+    await opponent.next();
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+
+    // Past the deadline, but within the grace the server gives a silent client before ending its Game.
+    await Bun.sleep(startAt + DUEL_GAME_CONFIG.seconds * 1000 + 500 - Date.now());
+    const again = await reopenCreator();
+    const end = await nextEnd(again);
+    again.close();
+
+    expect(end).toMatchObject({
+      results: [{ duration: 30 }, { duration: 30 }],
+      outcomes: ["draw", "draw"],
+    });
+  } finally {
+    await stop();
+  }
+}, 40_000);
+
 test("a Duel whose save failed is finalised again at the deadline, saved once, and its end announced", async () => {
   let failuresLeft = 1;
   // The real database, but for its first transaction, refused as by a database out of reach.
