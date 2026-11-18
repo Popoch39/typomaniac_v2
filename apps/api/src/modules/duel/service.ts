@@ -292,10 +292,19 @@ export const closingEvents = (game: Game, startAt: number): GameEvent[] => {
   return [{ type: "tick", at: game.startedAt + durationMs }];
 };
 
-// Atomic, so that of every instance that sees both Games ended, a single one finalises the Duel.
+/** How long a claim to finalise a Duel lasts, should its instance stop before releasing it. */
+const FINALISATION_CLAIM_MS = 10_000;
+
+const finalisationKey = (redis: Redis, duelId: string) =>
+  redis.name("duel", duelId, "finalisation");
+
+// Atomic, so that of every instance that sees both Games ended, a single one finalises the Duel at
+// a time, and none once its end is recorded. The claim expires, so that a crash cannot hold it.
 const CLAIM_FINALISATION = `
 if redis.call('HGET', KEYS[1], 'ended0') ~= '1' or redis.call('HGET', KEYS[1], 'ended1') ~= '1' then return 0 end
-return redis.call('HSETNX', KEYS[1], 'finalised', '1')
+if redis.call('HEXISTS', KEYS[1], 'end') == 1 then return 0 end
+if redis.call('SET', KEYS[2], '1', 'NX', 'PX', ARGV[1]) then return 1 end
+return 0
 `;
 
 // Does not recreate a Duel that expired meanwhile.
@@ -310,13 +319,25 @@ export const recordEnd = async (redis: Redis, duelId: string, end: DuelEnd) => {
 
 /** Whether this call claimed the finalisation of a Duel whose Games have both ended. */
 export const claimFinalisation = async (redis: Redis, duelId: string) => {
-  const claimed: number = await redis.client.eval(CLAIM_FINALISATION, 1, duelKey(redis, duelId));
+  const claimed: number = await redis.client.eval(
+    CLAIM_FINALISATION,
+    2,
+    duelKey(redis, duelId),
+    finalisationKey(redis, duelId),
+    FINALISATION_CLAIM_MS,
+  );
   return claimed === 1;
+};
+
+/** Lets a finalisation that failed be tried again, by this instance or another one. */
+export const releaseFinalisation = async (redis: Redis, duelId: string) => {
+  await redis.client.del(finalisationKey(redis, duelId));
 };
 
 /**
  * Judges a Duel whose two Games are finished from their journals, and saves it with both Games in
- * one transaction. Gives both Results and both Outcomes, indexed by seat.
+ * one transaction. Gives both Results and both Outcomes, indexed by seat. A Duel saved already, by
+ * a finalisation that failed after its save, is not saved again.
  */
 export const saveDuel = async (
   db: Db,
@@ -338,13 +359,18 @@ export const saveDuel = async (
     getOutcome(results[1], results[0]),
   ] as const;
   await db.transaction(async (tx) => {
-    await tx.insert(duel).values({
-      id: duelId,
-      config: DUEL_GAME_CONFIG,
-      words: [...words],
-      startedAt: new Date(startAt),
-      endedAt: new Date(),
-    });
+    const inserted = await tx
+      .insert(duel)
+      .values({
+        id: duelId,
+        config: DUEL_GAME_CONFIG,
+        words: [...words],
+        startedAt: new Date(startAt),
+        endedAt: new Date(),
+      })
+      .onConflictDoNothing()
+      .returning({ id: duel.id });
+    if (inserted.length === 0) return;
     await tx.insert(duelGame).values(
       SEATS.map((seat) => ({
         duelId,

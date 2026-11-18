@@ -450,8 +450,9 @@ test("the Countdown is announced to both Participants once both are connected, w
 const startDuel = async (
   countdownMs: number,
   cookies: { creatorCookie?: string; opponentCookie?: string } = {},
+  db = testDb.db,
 ) => {
-  const quick = createApp(testDb.db, auth, testRedis.redis, { countdownMs }).listen(0);
+  const quick = createApp(db, auth, testRedis.redis, { countdownMs }).listen(0);
   const socketUrl = (duelId: string) =>
     `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
   const creatorCookie = cookies.creatorCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
@@ -861,6 +862,41 @@ test("a Game whose client goes silent is ended by the server 2 seconds after the
       ],
       outcomes: ["loss", "win"],
     });
+  } finally {
+    await stop();
+  }
+}, 40_000);
+
+test("a Duel whose save failed is finalised again at the deadline, saved once, and its end announced", async () => {
+  let failuresLeft = 1;
+  // The real database, but for its first transaction, refused as by a database out of reach.
+  const flakyDb = new Proxy(testDb.db, {
+    get: (target, key) => {
+      if (key === "transaction" && failuresLeft > 0) {
+        failuresLeft -= 1;
+        return () => Promise.reject(new Error("The database cannot be reached"));
+      }
+      const value: unknown = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const { creator, opponent, duelId, startAt, stop } = await startDuel(0, {}, flakyDb);
+  try {
+    for (const socket of [creator, opponent]) {
+      socket.send({ type: "event", event: { type: "start", at: 10 } });
+      socket.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    }
+
+    const ends = [await nextEnd(creator), await nextEnd(opponent)];
+
+    expect(failuresLeft).toBe(0);
+    expect(Date.now()).toBeGreaterThanOrEqual(startAt + 32_000);
+    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["draw", "draw"] });
+    expect(ends[1]).toEqual(ends[0]);
+    expect(await testDb.db.select().from(duel).where(eq(duel.id, duelId))).toHaveLength(1);
+    expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId))).toHaveLength(
+      2,
+    );
   } finally {
     await stop();
   }

@@ -28,6 +28,7 @@ import {
   readDuel,
   readJournals,
   recordEnd,
+  releaseFinalisation,
   releaseSeat,
   replayGame,
   saveDuel,
@@ -59,17 +60,24 @@ export const createDuelRoutes = (
   // Run by whichever instance sees both Games ended: the claim lets only one of them through.
   const finalise = async (duelId: string) => {
     if (!(await claimFinalisation(redis, duelId))) return;
-    const duel = await readDuel(redis, duelId);
-    if (duel?.startAt == null) return;
-    const { results, outcomes } = await saveDuel(db, duelId, {
-      words: duel.words,
-      playerIds: duel.playerIds,
-      startAt: duel.startAt,
-      journals: await readJournals(redis, duelId),
-    });
-    const end = { type: "end", results, outcomes } as const;
-    await recordEnd(redis, duelId, end);
-    await relay.publish(duelId, null, end);
+    try {
+      const duel = await readDuel(redis, duelId);
+      // Expired meanwhile: nothing is left to save.
+      if (!duel) return;
+      if (duel.startAt === null) throw new Error(`Duel ${duelId} has ended without a Start`);
+      const { results, outcomes } = await saveDuel(db, duelId, {
+        words: duel.words,
+        playerIds: duel.playerIds,
+        startAt: duel.startAt,
+        journals: await readJournals(redis, duelId),
+      });
+      const end = { type: "end", results, outcomes } as const;
+      await recordEnd(redis, duelId, end);
+      await relay.publish(duelId, null, end);
+    } catch (error) {
+      await releaseFinalisation(redis, duelId);
+      throw error;
+    }
   };
 
   // Ends the Games whose clients went silent, at their start plus 30 seconds.
@@ -88,15 +96,23 @@ export const createDuelRoutes = (
 
   // One per Duel on each instance that holds one of its sockets; any of them can close it.
   const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
-  const watchDeadline = (duelId: string, startAt: number) => {
+  const watchDeadline = (
+    duelId: string,
+    startAt: number,
+    delayMs = startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS - Date.now(),
+  ) => {
     if (deadlines.has(duelId)) return;
-    const deadline = startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS;
     const timer = setTimeout(() => {
-      deadlines.delete(duelId);
-      closeOverdueGames(duelId, startAt).catch((error: unknown) =>
-        console.error(`Could not close the overdue Games of Duel ${duelId}`, error),
+      closeOverdueGames(duelId, startAt).then(
+        () => deadlines.delete(duelId),
+        (error: unknown) => {
+          console.error(`Could not close the overdue Games of Duel ${duelId}`, error);
+          deadlines.delete(duelId);
+          // Tried again until the Duel is finalised or expires: a failed finalisation is retried here.
+          watchDeadline(duelId, startAt, END_GRACE_MS);
+        },
       );
-    }, deadline - Date.now());
+    }, delayMs);
     deadlines.set(duelId, timer);
   };
 
@@ -218,7 +234,11 @@ export const createDuelRoutes = (
             type: "opponentEvent",
             event,
           });
-          if (ends) await finalise(ws.params.id);
+          // Tried again at the deadline when it fails.
+          if (ends)
+            await finalise(ws.params.id).catch((error: unknown) =>
+              console.error(`Could not finalise Duel ${ws.params.id}`, error),
+            );
         },
         async close(ws) {
           const seat = seated.get(ws.id);
