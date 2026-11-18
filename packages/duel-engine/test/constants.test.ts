@@ -5,6 +5,7 @@ import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   END_GRACE_MS,
+  START_WINDOW_MS,
   drawWords,
 } from "../src/index.ts";
 
@@ -25,4 +26,8 @@ test("CONFIG-2: a Duel draws 250 Target words", () => {
 test("CONFIG-3: the Countdown lasts 3 seconds and the end grace period 2 seconds", () => {
   expect(COUNTDOWN_MS).toBe(3000);
   expect(END_GRACE_MS).toBe(2000);
+});
+
+test("CONFIG-4: a start is accepted up to 1 second before or after the announced Start", () => {
+  expect(START_WINDOW_MS).toBe(1000);
 });

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { DUEL_WORD_COUNT } from "@repo/duel-engine";
+import { DUEL_WORD_COUNT, START_WINDOW_MS } from "@repo/duel-engine";
 import { createApp } from "../src/app.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -183,6 +183,8 @@ test("a Player who closed their socket is shown away, then takes their own seat 
   await first.next();
   const opponent = await openSocket(duelSocketUrl(id), opponentCookie);
   await opponent.next();
+  // Both seats are connected: the Countdown comes before anything else.
+  await opponent.next();
 
   first.close();
   const away = await opponent.next();
@@ -244,4 +246,109 @@ test("a Player reads who sits in a Duel, and is told when it does not exist", as
   });
   expect(missing.status).toBe(404);
   expect(await missing.json()).toEqual({ code: "DUEL_NOT_FOUND" });
+});
+
+test("the server answers a clock ping with the client instant echoed and its own instant", async () => {
+  const cookie = await signInPlayerWithNickname(uniqueNickname());
+  const { id } = (await (await createDuel(cookie)).json()) as { id: string };
+  const socket = await openSocket(duelSocketUrl(id), cookie);
+  await socket.next();
+
+  const before = Date.now();
+  socket.send({ type: "ping", clientAt: 123.5 });
+  const pong = await socket.next();
+  const after = Date.now();
+  socket.close();
+
+  expect(pong).toEqual({ type: "pong", clientAt: 123.5, serverAt: expect.any(Number) });
+  const serverAt = pong.type === "pong" ? pong.serverAt : Number.NaN;
+  expect(serverAt).toBeGreaterThanOrEqual(before);
+  expect(serverAt).toBeLessThanOrEqual(after);
+});
+
+test("the Countdown is announced to both Participants once both are connected, with a Start 3 seconds ahead", async () => {
+  const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+  const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+  const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+  const creator = await openSocket(duelSocketUrl(id), creatorCookie);
+  await creator.next();
+
+  const before = Date.now();
+  const opponent = await openSocket(duelSocketUrl(id), opponentCookie);
+  await opponent.next();
+  const opponentCountdown = await opponent.next();
+  await creator.next();
+  const creatorCountdown = await creator.next();
+  const after = Date.now();
+  creator.close();
+  opponent.close();
+
+  expect(opponentCountdown).toEqual({ type: "countdown", startAt: expect.any(Number) });
+  expect(creatorCountdown).toEqual(opponentCountdown);
+  const startAt = opponentCountdown.type === "countdown" ? opponentCountdown.startAt : Number.NaN;
+  expect(startAt).toBeGreaterThanOrEqual(before + 3000);
+  expect(startAt).toBeLessThanOrEqual(after + 3000);
+});
+
+// Seats two Players in a Duel of an app whose Countdown is short enough to wait for, and reads the Start.
+const startDuel = async (countdownMs: number) => {
+  const quick = createApp(testDb.db, auth, testRedis.redis, { countdownMs }).listen(0);
+  const socketUrl = (duelId: string) =>
+    `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
+  const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+  const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+  const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+  const creator = await openSocket(socketUrl(id), creatorCookie);
+  await creator.next();
+  const opponent = await openSocket(socketUrl(id), opponentCookie);
+  await opponent.next();
+  const countdown = await opponent.next();
+  if (countdown.type !== "countdown")
+    throw new Error(`Expected the Countdown, got ${countdown.type}`);
+  return {
+    creator,
+    opponent,
+    startAt: countdown.startAt,
+    stop: async () => {
+      creator.close();
+      opponent.close();
+      await quick.stop(true);
+    },
+  };
+};
+
+test("an Event before the Start and a start too early are refused, a start at the announced instant is accepted", async () => {
+  const { creator, opponent, startAt, stop } = await startDuel(1500);
+  try {
+    creator.send({ type: "event", event: { type: "keyDown", at: 1, code: "KeyA" } });
+    creator.send({ type: "event", event: { type: "insert", at: 2, text: "a" } });
+    creator.send({ type: "event", event: { type: "start", at: 3 } });
+    await Bun.sleep(startAt - Date.now());
+    creator.send({ type: "event", event: { type: "start", at: 4 } });
+    creator.send({ type: "event", event: { type: "insert", at: 5, text: "s" } });
+
+    expect(await opponent.next()).toEqual({
+      type: "opponentEvent",
+      event: { type: "start", at: 4 },
+    });
+    expect(await opponent.next()).toEqual({
+      type: "opponentEvent",
+      event: { type: "insert", at: 5, text: "s" },
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("a start sent too long after the announced instant is refused", async () => {
+  const { creator, opponent, startAt, stop } = await startDuel(0);
+  try {
+    await Bun.sleep(startAt + START_WINDOW_MS + 100 - Date.now());
+    creator.send({ type: "event", event: { type: "start", at: 1 } });
+    creator.send({ type: "event", event: { type: "insert", at: 2, text: "s" } });
+
+    expect(await opponent.staysSilent(300)).toBe(true);
+  } finally {
+    await stop();
+  }
 });
