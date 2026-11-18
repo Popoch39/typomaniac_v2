@@ -10,4 +10,8 @@ export default defineConfig({
     // `compiler` runs Oxc's Rust React Compiler (oxc-transform-react) instead of the Babel plugin.
     react({ compiler: true }),
   ],
+  // Front and API share one origin, as in production: the API, its WebSocket included, answers under /api.
+  server: {
+    proxy: { "/api": { target: "http://localhost:3000", ws: true } },
+  },
 });
