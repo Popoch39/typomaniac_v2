@@ -78,6 +78,7 @@ Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-
 - Dans les tests : `signInPlayer(auth)` (`test/helpers/auth.ts`) crée un Player sans Nickname (nom vide, donc pas de Nickname par défaut) et rend `{ player, cookie }`, le cookie étant à passer dans l'en-tête `cookie` de la requête. Pour lui donner un Nickname, passer par `PUT /api/me/nickname`.
 - Connexion par GitHub et Discord seulement, voir `docs/adr/0004-oauth-only-sign-in-merge-by-verified-email.md`. `refuseUnverifiedEmail` (`user.validateUserInfo`) refuse toute adresse que le fournisseur ne marque pas vérifiée. `trustedProviders` et la désactivation de `/link-social` n'ont de sens qu'avec lui : ne pas toucher à l'un sans relire l'ADR.
 - À cause de `validateUserInfo`, `internalAdapter.createUser` échoue hors d'une requête (`validation_context_missing`) : dans un test, passer par `signInPlayer` ou par le faux fournisseur de `test/oauth.test.ts`, qui remplace les API HTTP de GitHub et Discord et joue le vrai flux.
+- Connexion de dev : `POST /api/dev/sign-in` (`src/modules/dev/`) connecte en un clic à `dev_alice` ou `dev_bob`, créés au premier appel, pour jouer un Duel contre soi-même dans deux fenêtres. Répond 404 sauf si `DEV_SIGN_IN=enabled` ; l'API refuse de démarrer avec lui sous `NODE_ENV=production`. Le front n'affiche ses boutons qu'en `import.meta.env.DEV`.
 - Importer un plugin par son sous-chemin (`better-auth/plugins/<nom>`), pas par `better-auth/plugins`, qui tire des modules gênants pour la compilation en binaire.
 
 ### Régénérer le schéma
