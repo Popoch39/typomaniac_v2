@@ -16,7 +16,11 @@
     "../src/features/game/words/judgeLetter.ts",
     "../src/features/game/words/withoutSeparator.ts",
     "../src/features/duel/clock",
-    "../src/features/duel/caret"
+    "../src/features/duel/caret",
+    "../src/features/duel/message"
   ],
-  "references": [{ "path": "../../../packages/typing-engine" }]
+  "references": [
+    { "path": "../../../packages/typing-engine" },
+    { "path": "../../../packages/duel-engine" }
+  ]
 }
