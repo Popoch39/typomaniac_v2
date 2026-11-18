@@ -17,7 +17,8 @@
     "../src/features/game/words/withoutSeparator.ts",
     "../src/features/duel/clock",
     "../src/features/duel/caret",
-    "../src/features/duel/message"
+    "../src/features/duel/message",
+    "../src/shared/api/describeApiError.ts"
   ],
   "references": [
     { "path": "../../../packages/typing-engine" },
