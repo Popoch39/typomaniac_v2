@@ -5,7 +5,7 @@ export function DuelInviteLink() {
   if (link === null) return null;
 
   return (
-    <p className="duel-invite-link">
+    <p>
       Send this link to your Opponent: <code>{link}</code>
     </p>
   );

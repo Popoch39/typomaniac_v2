@@ -17,7 +17,7 @@
 
 ## Styles : Tailwind CSS v4 + shadcn/ui
 
-- Le style passe par les classes Tailwind (v4, plugin `@tailwindcss/vite`) dans le JSX. Pas de nouveau fichier `.css` par composant : `DuelScreen.css`, `GameScreen.css` et `OpponentCaret.css` sont l'héritage en attente de migration, ne pas en ajouter d'autres.
+- Le style passe par les classes Tailwind (v4, plugin `@tailwindcss/vite`) dans le JSX. Pas de fichier `.css` par composant : seul `src/index.css` porte du CSS (thème, base, et ce que Tailwind ne sait pas exprimer en classe, sous `@theme` / `@utility`).
 - Les couleurs passent par les tokens du thème (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `border-border`, `bg-sidebar`…), définis dans `src/index.css`. Jamais de couleur en dur dans une classe. Le thème clair/sombre suit le système (`prefers-color-scheme`) : la variante `dark:` est branchée dessus, pas sur une classe `.dark`.
 - Les primitives d'UI viennent de shadcn/ui (base Radix, style `radix-nova`, voir `components.json`). Elles vivent dans `src/shared/components/ui/`, le hook `use-mobile.ts` dans `src/shared/hooks/` et `cn` dans `src/shared/lib/utils.ts`. Avant d'écrire un bouton, une carte, un avatar, une tooltip… chercher le composant shadcn correspondant.
 - Ajouter un composant uniquement avec la CLI, depuis `apps/frontend/` : `bunx shadcn@latest add <composant>`, puis `bun run fmt` à la racine. Ne pas écrire un composant shadcn à la main.
