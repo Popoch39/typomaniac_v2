@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useActiveWordScroll } from "../hooks/useActiveWordScroll.ts";
 import { useWord } from "../hooks/useWord.ts";
 import { Caret } from "./Caret.tsx";
 import { Letter } from "./Letter.tsx";
@@ -9,9 +10,10 @@ type WordProps = {
 
 export function Word({ index }: WordProps) {
   const { letters, caretIndex } = useWord(index);
+  const scrollRef = useActiveWordScroll(index);
 
   return (
-    <span className="word">
+    <span ref={scrollRef} className="word">
       {letters.map((letter, letterIndex) => (
         <Fragment key={letterIndex}>
           {letterIndex === caretIndex && <Caret />}

@@ -1,4 +1,5 @@
 import { useTypingInput } from "../hooks/useTypingInput.ts";
+import { LiveStatsBar } from "./LiveStatsBar.tsx";
 import { WordList } from "./WordList.tsx";
 
 export function TypingArea() {
@@ -16,6 +17,7 @@ export function TypingArea() {
         autoCorrect="off"
         spellCheck={false}
       />
+      <LiveStatsBar />
       <WordList />
     </div>
   );

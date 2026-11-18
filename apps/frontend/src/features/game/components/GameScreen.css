@@ -21,13 +21,53 @@
   pointer-events: none;
 }
 
+/* Three lines tall; no row gap, so that a word's height is exactly one line to scroll by. */
 .word-list {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4em 0.6em;
+  gap: 0 0.6em;
+  height: 5.4em;
+  overflow: hidden;
   font-family: var(--mono);
   font-size: 24px;
-  line-height: 1.4;
+  line-height: 1.8;
+}
+
+.config-bar {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.config-group {
+  display: flex;
+  gap: 8px;
+}
+
+.config-option {
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.config-option[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.live-stats-bar {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.live-stats-progress {
+  color: var(--accent);
 }
 
 .letter-untyped {
