@@ -121,7 +121,9 @@ test("two Players choosing the same Nickname at the same time: exactly one gets 
     chooseNickname("turing", second.cookie),
   ]);
 
-  expect(responses.map((response) => response.status).toSorted()).toEqual([200, 409]);
+  expect(responses.map((response) => response.status).toSorted((a, b) => a - b)).toEqual([
+    200, 409,
+  ]);
 });
 
 test("a Player changes their Nickname, which frees the old one for another Player", async () => {
