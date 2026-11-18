@@ -29,12 +29,12 @@ test("OUTCOME-2: at equal WPM, the higher Accuracy wins", () => {
   expect(getOutcome(result(80, 97.49), result(80, 97.5))).toBe("loss");
 });
 
-test("OUTCOME-3: at equal WPM and equal Accuracy, the Duel is a draw", () => {
+test("OUTCOME-3: at equal WPM and equal Accuracy, the Round is a draw", () => {
   expect(getOutcome(result(80, 97.5), result(80, 97.5))).toBe("draw");
   expect(getOutcome(result(0, 0), result(0, 0))).toBe("draw");
 });
 
-test("OUTCOME-4: the two Outcomes of a Duel are always win and loss, or draw and draw", () => {
+test("OUTCOME-4: the two Outcomes of a Round are always win and loss, or draw and draw", () => {
   const results = [result(60, 90), result(60, 95), result(70, 90), result(70, 95)];
   const pairs = results.flatMap((first) => results.map((second) => [first, second] as const));
 

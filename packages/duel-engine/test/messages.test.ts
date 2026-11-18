@@ -20,7 +20,9 @@ const serverMessages: ServerMessage[] = [
   {
     type: "state",
     seat: 1,
-    round: 1,
+    round: 2,
+    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] }],
+    startAt: 9000,
     words: ["cat", "dog"],
     participants: [
       { seat: 0, name: "ada", connected: true },
@@ -32,9 +34,16 @@ const serverMessages: ServerMessage[] = [
   { type: "countdown", round: 1, startAt: 4000, words: ["cat", "dog"] },
   { type: "opponentEvent", event: { type: "insert", at: 4200, text: "c" } },
   {
-    type: "end",
+    type: "roundEnd",
+    round: 1,
     results: [getResult(finished), getResult(finished)],
     outcomes: ["draw", "draw"],
+    nextStartAt: 42_000,
+  },
+  {
+    type: "end",
+    outcomes: ["draw", "draw"],
+    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["draw", "draw"] }],
   },
 ];
 

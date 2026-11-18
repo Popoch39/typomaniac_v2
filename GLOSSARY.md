@@ -32,6 +32,10 @@ _Avoid_: match, game (reserved for one player's Game), series, versus, battle, r
 One leg of a Duel, in which each Participant plays their own Game on the same Target words and the same Start.
 _Avoid_: game (reserved for one player's Game), set, heat, match
 
+**Round score**:
+The Rounds each Participant has won so far in a Duel, such as 1-0. A drawn Round counts for neither.
+_Avoid_: score alone (which says neither of what nor between whom), sets, points
+
 **Custom Duel**:
 An unrated Duel, created by a Participant and joined through its invite link; Guests may take part.
 _Avoid_: private duel, friendly, lobby, unranked duel
