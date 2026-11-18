@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import { eventTime } from "../clock/eventTime.ts";
 import { type BrowserKey, translateKey } from "../input/translateKey.ts";
 import { useGameStore } from "../store/useGameStore.ts";
 
@@ -7,9 +8,7 @@ export function useKeyPresses() {
   const applyEvent = useGameStore((state) => state.applyEvent);
 
   const onKey = (type: BrowserKey["type"], event: KeyboardEvent<HTMLInputElement>) => {
-    // Monotonic and sub-millisecond, in epoch milliseconds so a server can bound it against receipt.
-    const at = performance.timeOrigin + performance.now();
-    const gameEvent = translateKey({ type, code: event.code, repeat: event.repeat }, at);
+    const gameEvent = translateKey({ type, code: event.code, repeat: event.repeat }, eventTime());
     if (gameEvent !== null) applyEvent(gameEvent);
   };
 
