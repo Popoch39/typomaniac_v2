@@ -34,7 +34,7 @@ _Avoid_: game (reserved for one player's Game), set, heat, match
 
 **Round score**:
 The Rounds each Participant has won so far in a Duel, such as 1-0. A drawn Round counts for neither.
-_Avoid_: score alone (which says neither of what nor between whom), sets, points
+_Avoid_: score alone (which says neither of what nor between whom), sets, Points (reserved for what a Game of a Duel is worth)
 
 **Custom Duel**:
 An unrated Duel, created by a Participant and joined through its invite link; Guests may take part.
@@ -48,8 +48,12 @@ _Avoid_: player (reserved for a signed-in person), contestant, competitor
 The other Participant of a Duel, seen from one Participant.
 _Avoid_: enemy, rival, adversary
 
+**Points**:
+What a Participant's Game in a Duel is worth, an integer: `round(WPM × (Accuracy / 100)² × 10)`, so Accuracy counts twice. Nothing typed is worth 0 Points. Points belong to a Duel, not to a Game's measures: a solo Game has none.
+_Avoid_: score, LP (reserved for ranked progression), Round score (reserved for Rounds won)
+
 **Outcome** (`Outcome`):
-What a Round or a Duel means for one Participant: `win`, `loss` or `draw`. A Round goes to the higher WPM, then to the higher Accuracy; otherwise it is a draw. A Duel goes to whoever won more Rounds; otherwise it is a draw.
+What a Round or a Duel means for one Participant: `win`, `loss` or `draw`. A Round goes to the Participant with more Points; equal Points make it a draw, with no tie-break. A Duel goes to whoever won more Rounds; otherwise it is a draw.
 _Avoid_: result (reserved for a Game's Result), score, verdict, issue
 
 **Countdown**:
@@ -64,7 +68,7 @@ _Avoid_: test (reserved for automated tests), run
 
 **Result** (`Result`):
 What a finished Game produces: its duration and the measures of the player's typing.
-_Avoid_: score, points
+_Avoid_: score
 
 **Mode**:
 What decides the end of a Game: `time` for a fixed duration, `words` for a fixed number of words.
@@ -136,8 +140,8 @@ A Player's hidden level estimate, an integer moved by Elo after each Duel, which
 _Avoid_: Elo, rating, score
 
 **LP**:
-The points a ranked Player wins or loses in a Duel within their Division; 100 LP promote to the next Division.
-_Avoid_: points, score, league points
+What a ranked Player wins or loses in a Duel within their Division; 100 LP promote to the next Division.
+_Avoid_: Points (reserved for what a Game of a Duel is worth), score, league points
 
 **Tier** (`Tier`):
 A band of the ladder: `bronze`, `silver`, `gold`, `platinum`, `diamond`, then `master`, the highest.
