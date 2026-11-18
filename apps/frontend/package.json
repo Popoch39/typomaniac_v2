@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@repo/duel-engine": "*",
     "@repo/typing-engine": "*",
     "@tanstack/react-query": "^5.108.0",
     "@tanstack/react-router": "^1.170.46",
