@@ -1,7 +1,7 @@
 import type { SignedInPlayer } from "../hooks/useSignedInPlayer.ts";
 
 interface PlayerNicknameProps {
-  player: SignedInPlayer;
+  player: Pick<SignedInPlayer, "nickname">;
 }
 
 export function PlayerNickname({ player }: PlayerNicknameProps) {

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as DevRouteImport } from './routes/dev'
 import { Route as ShellCustomRouteImport } from './routes/_shell/custom'
+import { Route as ShellLeaderboardRouteImport } from './routes/_shell/leaderboard'
 import { Route as ShellProfileRouteImport } from './routes/_shell/profile'
 import { Route as ShellRankedRouteImport } from './routes/_shell/ranked'
 import { Route as DuelDuelIdRouteImport } from './routes/duel.$duelId'
@@ -36,6 +37,11 @@ const ShellCustomRoute = ShellCustomRouteImport.update({
   path: '/custom',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellLeaderboardRoute = ShellLeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellProfileRoute = ShellProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -56,6 +62,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dev': typeof DevRoute
   '/custom': typeof ShellCustomRoute
+  '/leaderboard': typeof ShellLeaderboardRoute
   '/profile': typeof ShellProfileRoute
   '/ranked': typeof ShellRankedRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dev': typeof DevRoute
   '/custom': typeof ShellCustomRoute
+  '/leaderboard': typeof ShellLeaderboardRoute
   '/profile': typeof ShellProfileRoute
   '/ranked': typeof ShellRankedRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
@@ -74,21 +82,37 @@ export interface FileRoutesById {
   '/_shell': typeof ShellRouteWithChildren
   '/dev': typeof DevRoute
   '/_shell/custom': typeof ShellCustomRoute
+  '/_shell/leaderboard': typeof ShellLeaderboardRoute
   '/_shell/profile': typeof ShellProfileRoute
   '/_shell/ranked': typeof ShellRankedRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev' | '/custom' | '/profile' | '/ranked' | '/duel/$duelId'
+  fullPaths:
+    | '/'
+    | '/dev'
+    | '/custom'
+    | '/leaderboard'
+    | '/profile'
+    | '/ranked'
+    | '/duel/$duelId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev' | '/custom' | '/profile' | '/ranked' | '/duel/$duelId'
+  to:
+    | '/'
+    | '/dev'
+    | '/custom'
+    | '/leaderboard'
+    | '/profile'
+    | '/ranked'
+    | '/duel/$duelId'
   id:
     | '__root__'
     | '/'
     | '/_shell'
     | '/dev'
     | '/_shell/custom'
+    | '/_shell/leaderboard'
     | '/_shell/profile'
     | '/_shell/ranked'
     | '/duel/$duelId'
@@ -131,6 +155,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellCustomRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/leaderboard': {
+      id: '/_shell/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof ShellLeaderboardRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/profile': {
       id: '/_shell/profile'
       path: '/profile'
@@ -157,12 +188,14 @@ declare module '@tanstack/react-router' {
 
 interface ShellRouteChildren {
   ShellCustomRoute: typeof ShellCustomRoute
+  ShellLeaderboardRoute: typeof ShellLeaderboardRoute
   ShellProfileRoute: typeof ShellProfileRoute
   ShellRankedRoute: typeof ShellRankedRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellCustomRoute: ShellCustomRoute,
+  ShellLeaderboardRoute: ShellLeaderboardRoute,
   ShellProfileRoute: ShellProfileRoute,
   ShellRankedRoute: ShellRankedRoute,
 }
