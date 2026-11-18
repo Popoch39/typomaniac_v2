@@ -15,13 +15,24 @@
   ```
   Jamais `const { score, addPoint } = useGameStore()` : sans sélecteur, le composant se re-rend à chaque changement du store.
 
+## Styles : Tailwind CSS v4 + shadcn/ui
+
+- Le style passe par les classes Tailwind (v4, plugin `@tailwindcss/vite`) dans le JSX. Pas de fichier `.css` par composant : seul `src/index.css` porte du CSS (thème, base, et ce que Tailwind ne sait pas exprimer en classe, sous `@theme` / `@utility`).
+- Les couleurs passent par les tokens du thème (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `border-border`, `bg-sidebar`…), définis dans `src/index.css`. Jamais de couleur en dur dans une classe. Le thème clair/sombre suit le système (`prefers-color-scheme`) : la variante `dark:` est branchée dessus, pas sur une classe `.dark`.
+- Les primitives d'UI viennent de shadcn/ui (base Radix, style `radix-nova`, voir `components.json`). Elles vivent dans `src/shared/components/ui/`, le hook `use-mobile.ts` dans `src/shared/hooks/` et `cn` dans `src/shared/lib/utils.ts`. Avant d'écrire un bouton, une carte, un avatar, une tooltip… chercher le composant shadcn correspondant.
+- Ajouter un composant uniquement avec la CLI, depuis `apps/frontend/` : `bunx shadcn@latest add <composant>`, puis `bun run fmt` à la racine. Ne pas écrire un composant shadcn à la main.
+- Les fichiers générés par shadcn sont du code vendored : on ne les modifie pas, on les habille depuis nos composants (`className`, props). Un composant à nous qui s'en sert garde son nom de domaine (`PlayerAvatar` autour d'`Avatar`, `ShellSidebar` autour de `Sidebar`).
+- Le breakpoint `md` (768px) sépare le téléphone (message plein écran, `max-md:`) du reste ; la rail d'icônes de la sidebar couvre 768–1024px.
+
 ## Effets
 
 `useEffect` est interdit sauf exception validée par l'utilisateur : demander avant d'en écrire un. À la place :
 
 - valeur dérivée → la calculer pendant le rendu ;
 - réaction à une action utilisateur → la gérer dans le handler de l'événement ;
-- synchronisation entre stores ou avec l'extérieur → l'action du store ou `subscribe` de Zustand.
+- synchronisation entre stores ou avec l'extérieur → l'action du store ou `subscribe` de Zustand (ou `useSyncExternalStore` pour une source du navigateur, comme `matchMedia`).
+
+Seule exception validée : les fichiers générés par shadcn (`src/shared/components/ui/`, `src/shared/hooks/use-mobile.ts`) gardent leurs `useEffect`. Pour eux seuls, `apps/frontend/.oxlintrc.json` coupe `react/set-state-in-effect` et `react/only-export-components`. Notre propre code n'en écrit toujours pas.
 
 ## Appels API
 

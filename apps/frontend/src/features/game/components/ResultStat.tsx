@@ -6,8 +6,8 @@ type ResultStatProps = {
 export function ResultStat({ label, value }: ResultStatProps) {
   return (
     <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-foreground">{value}</dd>
     </div>
   );
 }

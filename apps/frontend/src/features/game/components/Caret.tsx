@@ -1,3 +1,5 @@
+import { caretClassName } from "../../../shared/lib/caretClassName.ts";
+
 export function Caret() {
-  return <span className="caret" />;
+  return <span className={`${caretClassName} bg-primary`} />;
 }

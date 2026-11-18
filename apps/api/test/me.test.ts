@@ -59,6 +59,18 @@ test("a Player with no Nickname reads their own profile, without their email", a
   );
 
   expect(response.status).toBe(200);
-  expect(await response.clone().json()).toEqual({ id: player.id, nickname: null });
+  expect(await response.clone().json()).toEqual({ id: player.id, nickname: null, avatarUrl: null });
   expect(await response.text()).not.toContain("ada@example.com");
+});
+
+test("a Player whose provider gave a picture reads it as their Avatar", async () => {
+  const image = "https://avatars.githubusercontent.com/u/1?v=4";
+  const { player, cookie } = await signInPlayer(auth, { image });
+
+  const response = await app.handle(
+    new Request("http://localhost/api/me", { headers: { cookie } }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ id: player.id, nickname: null, avatarUrl: image });
 });

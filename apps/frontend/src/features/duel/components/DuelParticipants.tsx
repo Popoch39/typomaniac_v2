@@ -4,11 +4,16 @@ export function DuelParticipants() {
   const { self, opponent, opponentAway } = useDuelParticipants();
 
   return (
-    <p className="duel-participants">
-      <span>{self?.name}</span> vs{" "}
-      {opponent ? <span>{opponent.name}</span> : <span>waiting for an Opponent…</span>}
+    // Each name in the colour of its caret, the Participant's own first.
+    <p className="text-xl text-muted-foreground">
+      <span className="font-medium text-primary">{self?.name}</span> vs{" "}
+      {opponent ? (
+        <span className="font-medium text-opponent">{opponent.name}</span>
+      ) : (
+        <span>waiting for an Opponent…</span>
+      )}
       {opponentAway && (
-        <span className="opponent-away" role="status">
+        <span className="opacity-60" role="status">
           {" "}
           (disconnected)
         </span>

@@ -38,7 +38,11 @@ test("a Player chooses their Nickname and reads it back with the case they typed
 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ id: player.id, nickname: "Ada_Lovelace-1815" });
-  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: "Ada_Lovelace-1815" });
+  expect(await readProfile(cookie)).toEqual({
+    id: player.id,
+    nickname: "Ada_Lovelace-1815",
+    avatarUrl: null,
+  });
 });
 
 test("a Guest choosing a Nickname is told they are not signed in", async () => {
@@ -63,7 +67,7 @@ test.each([
 
   expect(response.status).toBe(422);
   expect(await response.json()).toEqual({ code: "NICKNAME_INVALID" });
-  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null });
+  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null, avatarUrl: null });
 });
 
 test("a badly formatted Nickname gets the same answer in production", async () => {
@@ -98,7 +102,7 @@ test.each(["admin", "Admin", "TYPOMANIAC", "Guest", "nUlL", "mod"])(
 
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual({ code: "NICKNAME_RESERVED" });
-    expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null });
+    expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null, avatarUrl: null });
   },
 );
 
@@ -113,8 +117,16 @@ test("a Nickname already taken by another Player is refused, whatever the case",
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ code: "NICKNAME_TAKEN" });
   }
-  expect(await readProfile(second.cookie)).toEqual({ id: second.player.id, nickname: null });
-  expect(await readProfile(first.cookie)).toEqual({ id: first.player.id, nickname: "Hopper" });
+  expect(await readProfile(second.cookie)).toEqual({
+    id: second.player.id,
+    nickname: null,
+    avatarUrl: null,
+  });
+  expect(await readProfile(first.cookie)).toEqual({
+    id: first.player.id,
+    nickname: "Hopper",
+    avatarUrl: null,
+  });
 });
 
 test("two Players choosing the same Nickname at the same time: exactly one gets it", async () => {
@@ -139,10 +151,18 @@ test("a Player changes their Nickname, which frees the old one for another Playe
   const changed = await chooseNickname("Hedy", first.cookie);
 
   expect(changed.status).toBe(200);
-  expect(await readProfile(first.cookie)).toEqual({ id: first.player.id, nickname: "Hedy" });
+  expect(await readProfile(first.cookie)).toEqual({
+    id: first.player.id,
+    nickname: "Hedy",
+    avatarUrl: null,
+  });
   const taken = await chooseNickname("lamarr", second.cookie);
   expect(taken.status).toBe(200);
-  expect(await readProfile(second.cookie)).toEqual({ id: second.player.id, nickname: "lamarr" });
+  expect(await readProfile(second.cookie)).toEqual({
+    id: second.player.id,
+    nickname: "lamarr",
+    avatarUrl: null,
+  });
 });
 
 test("a Player takes their own Nickname again with another case", async () => {
@@ -152,7 +172,11 @@ test("a Player takes their own Nickname again with another case", async () => {
   const response = await chooseNickname("JohnSon", cookie);
 
   expect(response.status).toBe(200);
-  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: "JohnSon" });
+  expect(await readProfile(cookie)).toEqual({
+    id: player.id,
+    nickname: "JohnSon",
+    avatarUrl: null,
+  });
 });
 
 test("Better Auth's own routes cannot set the Nickname", async () => {
@@ -167,7 +191,7 @@ test("Better Auth's own routes cannot set the Nickname", async () => {
   );
 
   expect(response.status).toBe(400);
-  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null });
+  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null, avatarUrl: null });
 });
 
 const probe = new Elysia()

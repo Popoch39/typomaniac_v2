@@ -6,9 +6,11 @@ type ResultJsonProps = {
 
 export function ResultJson({ result }: ResultJsonProps) {
   return (
-    <details className="result-json">
-      <summary>Raw Result</summary>
-      <pre>{JSON.stringify(result, null, 2)}</pre>
+    <details>
+      <summary className="cursor-pointer text-muted-foreground">Raw Result</summary>
+      <pre className="max-h-[480px] overflow-auto bg-muted p-4 font-mono text-[14px]">
+        {JSON.stringify(result, null, 2)}
+      </pre>
     </details>
   );
 }

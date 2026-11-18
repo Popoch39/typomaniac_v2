@@ -7,7 +7,7 @@ export function ResultPanel() {
   const result = useResult();
 
   return (
-    <section className="result-panel">
+    <section className="flex flex-col gap-8">
       <ResultHeadline result={result} />
       <ResultDetails result={result} />
       <ResultJson result={result} />

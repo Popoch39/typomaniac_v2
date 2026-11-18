@@ -11,6 +11,8 @@ export const createPlayerRoutes = (db: Db, auth: Auth) =>
     .get("/", { signedIn: true }, ({ player }) => ({
       id: player.id,
       nickname: player.nickname ?? null,
+      // The picture Better Auth stored from the provider at creation, loaded straight from its CDN.
+      avatarUrl: player.image ?? null,
     }))
     .put(
       "/nickname",

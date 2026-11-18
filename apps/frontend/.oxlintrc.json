@@ -3,5 +3,14 @@
   "extends": ["../../.oxlintrc.json"],
   "rules": {
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/shared/components/ui/**", "src/shared/hooks/use-mobile.ts"],
+      "rules": {
+        "react/only-export-components": "off",
+        "react/set-state-in-effect": "off"
+      }
+    }
+  ]
 }
