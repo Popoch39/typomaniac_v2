@@ -5,6 +5,9 @@ import { entryKey, entryKeyPrefix, waitingKey } from "./keys.ts";
 /** How long a Queue entry outlives the last refresh by the API instance holding its socket. */
 export const QUEUE_ENTRY_EXPIRY_MS = 15_000;
 
+/** A Player's entry in the Queue as held by one socket: only that socket refreshes or removes it. */
+export type EntryHolder = { readonly playerId: string; readonly connection: string };
+
 // A Player already queued keeps their instant of entry: a socket that takes their place over takes
 // their waiting time with it. Entering and naming the socket that holds the entry are one step.
 const ENTER = `
@@ -19,8 +22,8 @@ return queuedAt
 /** Queues the Player, held by `connection` from now on, and gives their instant of entry. */
 export const enterQueue = async (
   redis: Redis,
-  playerId: string,
-  entry: { mmr: number; connection: string; now: number; expiryMs: number },
+  { playerId, connection }: EntryHolder,
+  entry: { mmr: number; now: number; expiryMs: number },
 ): Promise<number> => {
   const queuedAt: string = await redis.client.eval(
     ENTER,
@@ -29,7 +32,7 @@ export const enterQueue = async (
     waitingKey(redis),
     entry.now,
     entry.mmr,
-    entry.connection,
+    connection,
     entry.expiryMs,
     playerId,
   );
@@ -44,7 +47,7 @@ redis.call('ZREM', KEYS[2], ARGV[2])
 return 1
 `;
 
-export const leaveQueue = async (redis: Redis, playerId: string, connection: string) => {
+export const leaveQueue = async (redis: Redis, { playerId, connection }: EntryHolder) => {
   await redis.client.eval(
     LEAVE,
     2,
@@ -64,8 +67,7 @@ return 1
 /** Pushes the expiry of the entry back, and tells whether `connection` still holds it. */
 export const refreshQueueEntry = async (
   redis: Redis,
-  playerId: string,
-  connection: string,
+  { playerId, connection }: EntryHolder,
   expiryMs: number,
 ): Promise<boolean> => {
   const held: number = await redis.client.eval(

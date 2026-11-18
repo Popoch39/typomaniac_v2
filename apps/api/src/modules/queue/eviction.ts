@@ -1,15 +1,13 @@
 import type { Redis } from "../../redis/client.ts";
+import type { EntryHolder } from "./service.ts";
 
-type Presence = {
-  readonly playerId: string;
-  /** The socket this presence stands for, as named in the Player's Queue entry. */
-  readonly connection: string;
+type Presence = EntryHolder & {
   /** Tells the socket it was replaced and closes it. */
   readonly evict: () => void;
 };
 
 /** What travels on the channel: the Player's place in the Queue was taken over by `connection`. */
-type Published = { readonly playerId: string; readonly connection: string };
+type Published = EntryHolder;
 
 /**
  * Keeps a Player to one socket in the Queue through a Redis channel, so that a socket opened on
@@ -43,7 +41,7 @@ export const createEvictions = (redis: Redis) => {
       await redis.subscriber.unsubscribe(channel, listener);
     },
     /** Evicts every socket of the Player but `connection`, on whichever instance it is held. */
-    takeOver: async (playerId: string, connection: string) => {
+    takeOver: async ({ playerId, connection }: EntryHolder) => {
       const published: Published = { playerId, connection };
       await redis.client.publish(channel, JSON.stringify(published));
     },
