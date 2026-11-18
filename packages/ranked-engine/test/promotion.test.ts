@@ -1,11 +1,9 @@
 import { expect, test } from "bun:test";
-import { DEFAULT_RANKED_CONFIG, applyDuel, type Standing } from "../src/index.ts";
+import { DEFAULT_RANKED_CONFIG, applyDuel } from "../src/index.ts";
+import { ranked } from "./helpers/standing.ts";
 
-// Placement is over, so K is the regular K-factor, 32. A Duel against an equal opponent moves the
-// MMR by 16, which lands it on the Division's reference when it starts 16 away: gap 0, 20 LP.
-function ranked(mmr: number, rank: Standing["rank"]): Standing {
-  return { mmr, duelsPlayed: 20, rank };
-}
+// A Duel against an equal opponent moves the MMR by 16, half the regular K-factor, which lands it
+// on the Division's reference when it starts 16 away: gap 0, 20 LP.
 
 test("PROMO-1: a win past 100 LP promotes to the next Division, the excess carried over and the LP delta the gain applied", () => {
   // Silver II reference: 900 + 6 × 50 = 1200

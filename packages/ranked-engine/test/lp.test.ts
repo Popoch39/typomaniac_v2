@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import { DEFAULT_RANKED_CONFIG, applyDuel, type Standing } from "../src/index.ts";
+import { ranked } from "./helpers/standing.ts";
 
 // Silver II is 6 Divisions above Bronze IV: its reference is 900 + 6 × 50 = 1200.
-// Placement is over, so K is the regular K-factor, 32.
 function silverII(mmr: number, lp = 50): Standing {
-  return { mmr, duelsPlayed: 20, rank: { tier: "silver", division: 2, lp } };
+  return ranked(mmr, { tier: "silver", division: 2, lp });
 }
 
 test("LP-2: with the MMR on the Division's reference, a win gives the base LP and a loss takes it", () => {
@@ -125,9 +125,7 @@ test("PROMO-2: a loss larger than the current LP leaves the Player at 0 LP in th
 });
 
 test("LP-1: a Master Player at 0 LP is measured against the Master threshold, one step above Diamond I", () => {
-  expect(
-    applyDuel({ mmr: 1884, duelsPlayed: 20, rank: { tier: "master", lp: 0 } }, 1884, "win"),
-  ).toEqual({
+  expect(applyDuel(ranked(1884, { tier: "master", lp: 0 }), 1884, "win")).toEqual({
     // 1884 + 16 = 1900; Master threshold 900 + 20 × 50 = 1900: gap 0 → +20
     standing: { mmr: 1900, duelsPlayed: 21, rank: { tier: "master", lp: 20 } },
     mmrDelta: 16,

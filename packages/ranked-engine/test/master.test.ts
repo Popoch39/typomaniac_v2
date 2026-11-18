@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test";
 import { DEFAULT_RANKED_CONFIG, applyDuel, type Standing } from "../src/index.ts";
+import { ranked } from "./helpers/standing.ts";
 
-// Placement is over, so K is the regular K-factor, 32: a Duel against an equal opponent moves the MMR by 16.
+// A Duel against an equal opponent moves the MMR by 16, half the regular K-factor.
 // The Master reference is 900 + 20 × 50 = 1900, plus 50 MMR per 100 LP held, rounded down.
 function master(mmr: number, lp: number): Standing {
-  return { mmr, duelsPlayed: 20, rank: { tier: "master", lp } };
+  return ranked(mmr, { tier: "master", lp });
 }
 
 test("LP-1: the Master reference adds 50 MMR per 100 LP held, rounded down", () => {
