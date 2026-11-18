@@ -251,6 +251,29 @@ export const appendEvents = async (
   return appended === 1;
 };
 
+/**
+ * Starts at the announced Start the Game of a Participant who comes back past the start window
+ * without having started it: their own start would be refused, and their clock ran on meanwhile.
+ * Gives the Events appended, `null` when the Game needs none.
+ */
+export const startLateGame = async (
+  redis: Redis,
+  duelId: string,
+  seat: Seat,
+  game: {
+    readonly journal: readonly GameEvent[];
+    readonly startAt: number | null;
+    readonly now: number;
+    readonly expiryMs: number;
+  },
+): Promise<GameEvent[] | null> => {
+  const { journal, startAt, now, expiryMs } = game;
+  if (journal.length > 0 || startAt === null || now - startAt <= START_WINDOW_MS) return null;
+  const events: GameEvent[] = [{ type: "start", at: startAt }];
+  const appended = await appendEvents(redis, duelId, seat, events, { ends: false, expiryMs });
+  return appended ? events : null;
+};
+
 /** The Game played on journal `events`, as the server rebuilds it. */
 export const replayGame = (words: readonly string[], events: readonly GameEvent[]): Game =>
   events.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));

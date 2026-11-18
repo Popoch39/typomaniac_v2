@@ -615,6 +615,33 @@ test("a Participant who comes back on another API instance resumes the same Game
   }
 });
 
+test("a Participant who comes back after the Start without having started has their Game started at the Start, and types on", async () => {
+  const { creator, opponent, startAt, reopenCreator, stop } = await startDuel(0);
+  try {
+    creator.close();
+    await opponent.next();
+    await Bun.sleep(startAt + START_WINDOW_MS + 100 - Date.now());
+
+    const again = await reopenCreator();
+    const state = await again.next();
+    again.send({ type: "event", event: { type: "insert", at: startAt + 2000, text: "a" } });
+    const toOpponent = [await opponent.next(), await opponent.next(), await opponent.next()];
+    again.close();
+
+    expect(state).toMatchObject({
+      type: "state",
+      journals: [[{ type: "start", at: startAt }], []],
+    });
+    expect(toOpponent).toEqual([
+      { type: "presence", participant: expect.objectContaining({ seat: 0, connected: true }) },
+      { type: "opponentEvent", event: { type: "start", at: startAt } },
+      { type: "opponentEvent", event: { type: "insert", at: startAt + 2000, text: "a" } },
+    ]);
+  } finally {
+    await stop();
+  }
+});
+
 test("the server refuses addWords from a client: no word is added during a Duel", async () => {
   const { creator, opponent, stop } = await startDuel(0);
   try {

@@ -31,6 +31,7 @@ import {
   releaseSeat,
   replayGame,
   saveDuel,
+  startLateGame,
 } from "./service.ts";
 
 export type DuelOptions = { readonly expiryMs?: number; readonly countdownMs?: number };
@@ -150,6 +151,13 @@ export const createDuelRoutes = (
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
           const journals = await readJournals(redis, ws.params.id);
+          const lateStart = await startLateGame(redis, ws.params.id, self.seat, {
+            journal: journals[self.seat],
+            startAt: duel.startAt,
+            now: Date.now(),
+            expiryMs,
+          });
+          if (lateStart) journals[self.seat] = lateStart;
           const game = replayGame(duel.words, journals[self.seat]);
           const send = (message: ServerMessage) => {
             // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
@@ -175,6 +183,8 @@ export const createDuelRoutes = (
             journals,
           });
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
+          for (const event of lateStart ?? [])
+            await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });
           const start = await announceStart(redis, ws.params.id, {
             startAt: Date.now() + countdownMs,
             expiryMs,
