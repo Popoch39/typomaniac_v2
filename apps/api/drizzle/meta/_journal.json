@@ -29,6 +29,13 @@
       "when": 1794991022791,
       "tag": "0003_rename_pseudo_to_nickname",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795008691841,
+      "tag": "0004_duel",
+      "breakpoints": true
     }
   ]
 }

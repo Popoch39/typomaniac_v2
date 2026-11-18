@@ -1,8 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
-import { DUEL_WORD_COUNT, START_WINDOW_MS } from "@repo/duel-engine";
-import { count } from "drizzle-orm";
+import { DUEL_GAME_CONFIG, DUEL_WORD_COUNT, START_WINDOW_MS } from "@repo/duel-engine";
+import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
+import { count, eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
-import { user } from "../src/db/schema.ts";
+import { duel, duelGame, user } from "../src/db/schema.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
@@ -406,17 +407,22 @@ test("the Countdown is announced to both Participants once both are connected, w
 });
 
 // Seats two Players in a Duel of an app whose Countdown is short enough to wait for, and reads the Start.
-const startDuel = async (countdownMs: number) => {
+const startDuel = async (
+  countdownMs: number,
+  cookies: { creatorCookie?: string; opponentCookie?: string } = {},
+) => {
   const quick = createApp(testDb.db, auth, testRedis.redis, { countdownMs }).listen(0);
   const socketUrl = (duelId: string) =>
     `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
-  const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
-  const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+  const creatorCookie = cookies.creatorCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
+  const opponentCookie =
+    cookies.opponentCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
   const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
   const creator = await openSocket(socketUrl(id), creatorCookie);
   await creator.next();
   const opponent = await openSocket(socketUrl(id), opponentCookie);
-  await opponent.next();
+  const state = await opponent.next();
+  if (state.type !== "state") throw new Error(`Expected the state, got ${state.type}`);
   const countdown = await opponent.next();
   if (countdown.type !== "countdown")
     throw new Error(`Expected the Countdown, got ${countdown.type}`);
@@ -426,7 +432,9 @@ const startDuel = async (countdownMs: number) => {
   return {
     creator,
     opponent,
+    duelId: id,
     startAt: countdown.startAt,
+    words: state.words,
     reopenCreator: () => openSocket(socketUrl(id), creatorCookie),
     stop: async () => {
       creator.close();
@@ -522,6 +530,190 @@ test("the server refuses addWords from a client: no word is added during a Duel"
   }
 });
 
+test("a Tick reaching 30 seconds ends the Game, and the Events sent after its end are refused", async () => {
+  const { creator, opponent, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    creator.send({ type: "event", event: { type: "insert", at: 30_020, text: "a" } });
+    creator.send({ type: "event", event: { type: "tick", at: 31_010 } });
+
+    expect(await opponent.next()).toEqual({
+      type: "opponentEvent",
+      event: { type: "start", at: 10 },
+    });
+    expect(await opponent.next()).toEqual({
+      type: "opponentEvent",
+      event: { type: "tick", at: 30_010 },
+    });
+    expect(await opponent.staysSilent(300)).toBe(true);
+  } finally {
+    await stop();
+  }
+});
+
+// Skips the Opponent's Events and presence changes, which may come before or after the end.
+const nextEnd = async (socket: Awaited<ReturnType<typeof openSocket>>) => {
+  for (;;) {
+    const message = await socket.next();
+    if (message.type === "end") return message;
+  }
+};
+
+test("once both Games are finished, both Participants receive both Results and both Outcomes", async () => {
+  const { creator, opponent, words, stop } = await startDuel(0);
+  try {
+    const [firstWord = ""] = words;
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "insert", at: 1010, text: `${firstWord} ` } });
+    creator.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+
+    const ends = [await nextEnd(creator), await nextEnd(opponent)];
+
+    expect(ends[0]).toEqual(ends[1]);
+    expect(ends[0]).toMatchObject({
+      type: "end",
+      // The first word and its Separator, exactly typed in half a minute, at 5 characters a word.
+      results: [
+        { duration: 30, wpm: ((firstWord.length + 1) / 5) * 2, accuracy: 100 },
+        { duration: 30, wpm: 0 },
+      ],
+      outcomes: ["win", "loss"],
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("a finished Duel is saved with both Games, their Results, journals and Outcomes, a Guest's without a Player", async () => {
+  const { player, cookie: creatorCookie } = await signInPlayer(auth);
+  const nicknamed = await fetch(`${origin}/api/me/nickname`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie: creatorCookie },
+    body: JSON.stringify({ nickname: uniqueNickname() }),
+  });
+  expect(nicknamed.status).toBe(200);
+  const guestCookie = guestCookieOf(await createDuel());
+  const { creator, opponent, duelId, startAt, words, stop } = await startDuel(0, {
+    creatorCookie,
+    opponentCookie: guestCookie,
+  });
+  try {
+    const creatorJournal: GameEvent[] = [
+      { type: "start", at: 10 },
+      { type: "insert", at: 1010, text: `${words[0]} ` },
+      { type: "tick", at: 30_010 },
+    ];
+    const guestJournal: GameEvent[] = [
+      { type: "start", at: 11 },
+      { type: "insert", at: 1011, text: "x" },
+      { type: "tick", at: 30_011 },
+    ];
+    for (const event of creatorJournal) creator.send({ type: "event", event });
+    for (const event of guestJournal) opponent.send({ type: "event", event });
+    const { results } = await nextEnd(creator);
+    await nextEnd(opponent);
+
+    const [saved] = await testDb.db.select().from(duel).where(eq(duel.id, duelId));
+    const games = await testDb.db
+      .select()
+      .from(duelGame)
+      .where(eq(duelGame.duelId, duelId))
+      .orderBy(duelGame.seat);
+
+    expect(saved).toMatchObject({
+      config: { mode: "time", seconds: 30 },
+      words,
+      startedAt: new Date(startAt),
+    });
+    expect(saved?.endedAt.getTime()).toBeGreaterThanOrEqual(startAt);
+    expect(games).toEqual([
+      {
+        duelId,
+        seat: 0,
+        playerId: player.id,
+        result: results[0],
+        journal: creatorJournal,
+        outcome: "win",
+      },
+      {
+        duelId,
+        seat: 1,
+        playerId: null,
+        result: results[1],
+        journal: guestJournal,
+        outcome: "loss",
+      },
+    ]);
+  } finally {
+    await stop();
+  }
+});
+
+test("replaying a saved journal gives the saved Result", async () => {
+  const { creator, opponent, duelId, words, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "insert", at: 900, text: "x" } });
+    creator.send({ type: "event", event: { type: "delete", at: 1000, unit: "char" } });
+    creator.send({ type: "event", event: { type: "insert", at: 1500, text: `${words[0]} ` } });
+    creator.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+    await nextEnd(creator);
+
+    const games = await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId));
+
+    expect(games).toHaveLength(2);
+    for (const game of games) {
+      const replayed = game.journal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
+      expect(getResult(replayed)).toEqual(game.result);
+    }
+  } finally {
+    await stop();
+  }
+});
+
+test("nothing is written to the database for a Duel that never finishes", async () => {
+  const cookie = await signInPlayerWithNickname(uniqueNickname());
+  const { id } = (await (await createDuel(cookie)).json()) as { id: string };
+  const alone = await openSocket(duelSocketUrl(id), cookie);
+  await alone.next();
+  alone.send({ type: "event", event: { type: "start", at: 10 } });
+  alone.send({ type: "event", event: { type: "tick", at: 30_010 } });
+  await Bun.sleep(300);
+  alone.close();
+
+  expect(await testDb.db.select().from(duel).where(eq(duel.id, id))).toEqual([]);
+  expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, id))).toEqual([]);
+});
+
+test("a Game whose client goes silent is ended by the server 2 seconds after the deadline, at its start plus 30 seconds", async () => {
+  const { creator, opponent, startAt, words, stop } = await startDuel(0);
+  try {
+    const [firstWord = ""] = words;
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "start", at: 500 } });
+    opponent.send({ type: "event", event: { type: "insert", at: 1500, text: `${firstWord} ` } });
+
+    const end = await nextEnd(creator);
+
+    expect(Date.now()).toBeGreaterThanOrEqual(startAt + 32_000);
+    expect(end).toMatchObject({
+      results: [
+        { duration: 30, wpm: 0 },
+        { duration: 30, wpm: ((firstWord.length + 1) / 5) * 2 },
+      ],
+      outcomes: ["loss", "win"],
+    });
+  } finally {
+    await stop();
+  }
+}, 40_000);
+
 test("two Participants on two API instances sharing Redis receive each other's Events", async () => {
   const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
   const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
@@ -554,6 +746,41 @@ test("two Participants on two API instances sharing Redis receive each other's E
       { type: "opponentEvent", event: { type: "start", at: 11 } },
       { type: "opponentEvent", event: { type: "insert", at: 21, text: "b" } },
     ]);
+  } finally {
+    await first.stop(true);
+    await second.stop(true);
+  }
+});
+
+test("with two API instances on one Redis, a Duel is finalised and saved exactly once", async () => {
+  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const socketUrl = (port: number | undefined, duelId: string) =>
+    `ws://localhost:${port}/api/duels/${duelId}/socket`;
+  try {
+    const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const creator = await openSocket(socketUrl(first.server?.port, id), creatorCookie);
+    await creator.next();
+    const opponent = await openSocket(socketUrl(second.server?.port, id), opponentCookie);
+    for (const socket of [opponent, opponent, creator, creator]) await socket.next();
+
+    // Both final Ticks at once, so that both instances see both Games ended.
+    for (const socket of [creator, opponent]) {
+      socket.send({ type: "event", event: { type: "start", at: 10 } });
+      socket.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    }
+    const ends = [await nextEnd(creator), await nextEnd(opponent)];
+    const silent = [await creator.staysSilent(300), await opponent.staysSilent(0)];
+    creator.close();
+    opponent.close();
+
+    expect(ends[0]).toMatchObject({ type: "end", outcomes: ["draw", "draw"] });
+    expect(ends[1]).toEqual(ends[0]);
+    expect(silent).toEqual([true, true]);
+    expect(await testDb.db.select().from(duel).where(eq(duel.id, id))).toHaveLength(1);
+    expect(await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, id))).toHaveLength(2);
   } finally {
     await first.stop(true);
     await second.stop(true);

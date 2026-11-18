@@ -1,25 +1,43 @@
 import {
   type ClientMessage,
+  DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   drawWords,
+  getOutcome,
   type Participant,
   type Seat,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
-import type { GameEvent } from "@repo/typing-engine";
+import {
+  applyEvent,
+  createGame,
+  type Game,
+  type GameEvent,
+  type GameStatus,
+  getResult,
+} from "@repo/typing-engine";
+import type { Db } from "../../db/client.ts";
+import { duel, duelGame } from "../../db/schema.ts";
 import type { Redis } from "../../redis/client.ts";
 
 /** How long a Duel can be joined after its creation. */
 export const DUEL_EXPIRY_MS = 10 * 60 * 1000;
 
 /** Who sits on a seat: a Player shown by their Nickname, or a Guest by their generated display name. */
-export type Identity = { readonly id: string; readonly name: string };
+export type Identity = {
+  readonly id: string;
+  readonly name: string;
+  /** `null` for a Guest. */
+  readonly playerId: string | null;
+};
 
 export type Duel = {
   readonly words: readonly string[];
   readonly participants: readonly Participant[];
   /** The id of the identity holding each seat, never sent to a client. */
   readonly holderIds: readonly (string | undefined)[];
+  /** The Player holding each seat, `null` for a Guest or an empty seat. */
+  readonly playerIds: readonly (string | null)[];
   /** The announced Start instant in server time, `null` until the Countdown is announced. */
   readonly startAt: number | null;
 };
@@ -56,6 +74,7 @@ end
 for seat = 0, 1 do
   if redis.call('HEXISTS', KEYS[1], 'holder' .. seat) == 0 then
     redis.call('HSET', KEYS[1], 'holder' .. seat, ARGV[1], 'name' .. seat, ARGV[2], 'connected' .. seat, '1')
+    if ARGV[3] ~= '' then redis.call('HSET', KEYS[1], 'player' .. seat, ARGV[3]) end
     return tostring(seat)
   end
 end
@@ -73,6 +92,7 @@ export const claimSeat = async (
     duelKey(redis, duelId),
     identity.id,
     identity.name,
+    identity.playerId ?? "",
   );
   if (claimed === "0") return 0;
   if (claimed === "1") return 1;
@@ -99,8 +119,15 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     return [{ seat, name, connected: fields[`connected${seat}`] === "1" }];
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
+  const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
   const startAt = fields.startAt === undefined ? null : Number(fields.startAt);
-  return { words: JSON.parse(fields.words) as string[], participants, holderIds, startAt };
+  return {
+    words: JSON.parse(fields.words) as string[],
+    participants,
+    holderIds,
+    playerIds,
+    startAt,
+  };
 };
 
 // Atomic, so two instances seating the two Participants at once announce a single Start. Once
@@ -111,6 +138,8 @@ local startAt = redis.call('HGET', KEYS[1], 'startAt')
 if startAt then return {startAt, '0'} end
 if redis.call('HGET', KEYS[1], 'connected0') ~= '1' or redis.call('HGET', KEYS[1], 'connected1') ~= '1' then return {} end
 redis.call('HSET', KEYS[1], 'startAt', ARGV[1])
+-- Counted again from the Start, so that a Duel joined late does not expire before it is finalised.
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
 return {ARGV[1], '1'}
 `;
 
@@ -121,13 +150,14 @@ return {ARGV[1], '1'}
 export const announceStart = async (
   redis: Redis,
   duelId: string,
-  startAt: number,
+  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
 ): Promise<{ startAt: number; announced: boolean } | null> => {
   const answer: string[] = await redis.client.eval(
     ANNOUNCE_START,
     1,
     duelKey(redis, duelId),
     startAt,
+    expiryMs,
   );
   const [announcedAt, announced] = answer;
   if (announcedAt === undefined) return null;
@@ -137,42 +167,129 @@ export const announceStart = async (
 /**
  * Whether the server takes an Event of a Participant's Game. Nothing counts before the Start, and
  * the `start` itself only near the announced instant, so that neither Participant gets a head start.
+ * Nothing counts after the end either: a finished Game cannot be added to.
  * No client adds words: both Games are played on the words drawn with the Duel.
  */
 export const isEventAccepted = (
   event: Extract<ClientMessage, { type: "event" }>["event"],
-  game: { readonly started: boolean; readonly startAt: number | null; readonly now: number },
+  game: { readonly status: GameStatus; readonly startAt: number | null; readonly now: number },
 ) => {
-  if (event.type === "addWords") return false;
-  if (event.type !== "start") return game.started;
-  if (game.started || game.startAt === null) return false;
+  if (event.type === "addWords" || game.status === "finished") return false;
+  if (event.type !== "start") return game.status === "running";
+  if (game.status !== "ready" || game.startAt === null) return false;
   return Math.abs(game.now - game.startAt) <= START_WINDOW_MS;
 };
 
 const journalKey = (redis: Redis, duelId: string, seat: Seat) =>
   redis.name("duel", duelId, "journal", String(seat));
 
-// One script, so a journal never lives on without its expiry.
+// One script, so a journal never lives on without its expiry, and nothing is appended to a Game
+// that has ended, whichever instance ended it.
 const APPEND = `
-redis.call('RPUSH', KEYS[1], ARGV[1])
-redis.call('PEXPIRE', KEYS[1], ARGV[2])
+if redis.call('HGET', KEYS[1], 'ended' .. ARGV[1]) == '1' then return 0 end
+for index = 4, #ARGV do redis.call('RPUSH', KEYS[2], ARGV[index]) end
+redis.call('PEXPIRE', KEYS[2], ARGV[2])
+if ARGV[3] == '1' and redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'ended' .. ARGV[1], '1') end
+return 1
 `;
 
-/** Appends an accepted Event to the journal of the Game played on `seat`. */
-export const appendEvent = async (
+/**
+ * Appends accepted Events to the journal of the Game played on `seat`, and marks the Game ended
+ * when they end it. Gives whether they were appended: never once the Game has ended.
+ */
+export const appendEvents = async (
   redis: Redis,
   duelId: string,
   seat: Seat,
-  event: GameEvent,
-  expiryMs: number,
+  events: readonly GameEvent[],
+  { ends, expiryMs }: { readonly ends: boolean; readonly expiryMs: number },
 ) => {
-  await redis.client.eval(
+  const appended: number = await redis.client.eval(
     APPEND,
-    1,
+    2,
+    duelKey(redis, duelId),
     journalKey(redis, duelId, seat),
-    JSON.stringify(event),
+    seat,
     expiryMs,
+    ends ? "1" : "0",
+    ...events.map((event) => JSON.stringify(event)),
   );
+  return appended === 1;
+};
+
+/** The Game played on journal `events`, as the server rebuilds it. */
+export const replayGame = (words: readonly string[], events: readonly GameEvent[]): Game =>
+  events.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
+
+/**
+ * The Events that end a Game still open after its deadline: its final Tick, 30 seconds after its
+ * start. A Game that never started is started at the announced Start, so the time away counts.
+ */
+export const closingEvents = (game: Game, startAt: number): GameEvent[] => {
+  const durationMs = DUEL_GAME_CONFIG.seconds * 1000;
+  if (game.startedAt === null)
+    return [
+      { type: "start", at: startAt },
+      { type: "tick", at: startAt + durationMs },
+    ];
+  return [{ type: "tick", at: game.startedAt + durationMs }];
+};
+
+// Atomic, so that of every instance that sees both Games ended, a single one finalises the Duel.
+const CLAIM_FINALISATION = `
+if redis.call('HGET', KEYS[1], 'ended0') ~= '1' or redis.call('HGET', KEYS[1], 'ended1') ~= '1' then return 0 end
+return redis.call('HSETNX', KEYS[1], 'finalised', '1')
+`;
+
+/** Whether this call claimed the finalisation of a Duel whose Games have both ended. */
+export const claimFinalisation = async (redis: Redis, duelId: string) => {
+  const claimed: number = await redis.client.eval(CLAIM_FINALISATION, 1, duelKey(redis, duelId));
+  return claimed === 1;
+};
+
+/**
+ * Judges a Duel whose two Games are finished from their journals, and saves it with both Games in
+ * one transaction. Gives both Results and both Outcomes, indexed by seat.
+ */
+export const saveDuel = async (
+  db: Db,
+  duelId: string,
+  played: {
+    readonly words: readonly string[];
+    readonly playerIds: readonly (string | null)[];
+    readonly startAt: number;
+    readonly journals: readonly [GameEvent[], GameEvent[]];
+  },
+) => {
+  const { words, playerIds, startAt, journals } = played;
+  const results = [
+    getResult(replayGame(words, journals[0])),
+    getResult(replayGame(words, journals[1])),
+  ] as const;
+  const outcomes = [
+    getOutcome(results[0], results[1]),
+    getOutcome(results[1], results[0]),
+  ] as const;
+  await db.transaction(async (tx) => {
+    await tx.insert(duel).values({
+      id: duelId,
+      config: DUEL_GAME_CONFIG,
+      words: [...words],
+      startedAt: new Date(startAt),
+      endedAt: new Date(),
+    });
+    await tx.insert(duelGame).values(
+      SEATS.map((seat) => ({
+        duelId,
+        seat,
+        playerId: playerIds[seat] ?? null,
+        result: results[seat],
+        journal: journals[seat],
+        outcome: outcomes[seat],
+      })),
+    );
+  });
+  return { results, outcomes };
 };
 
 /** The journals of both Games so far, indexed by seat. */

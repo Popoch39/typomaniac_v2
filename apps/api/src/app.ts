@@ -14,6 +14,6 @@ export const createApp = (db: Db, auth: Auth, redis: Redis, duelOptions?: DuelOp
     .mount(auth.handler)
     .get("/health", () => "ok")
     .use(createPlayerRoutes(db, auth))
-    .use(createDuelRoutes(auth, redis, duelOptions));
+    .use(createDuelRoutes(db, auth, redis, duelOptions));
 
 export type App = ReturnType<typeof createApp>;
