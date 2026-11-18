@@ -19,6 +19,7 @@ const messages: ServerMessage[] = [
     startAt: null,
     words: null,
     participants: [],
+    ranks: null,
     journals: [[], []],
   },
   // Between two Rounds: the Round that ended, and the Start of the next one before its words.
@@ -30,6 +31,7 @@ const messages: ServerMessage[] = [
     startAt: 9000,
     words: null,
     participants: [],
+    ranks: null,
     journals: [[], []],
   },
   {
@@ -43,6 +45,8 @@ const messages: ServerMessage[] = [
       { seat: 0, name: "ada", connected: true },
       { seat: 1, name: "Guest 4821", connected: false },
     ],
+    // A ranked Duel: each Player's Rank, or none while Unranked.
+    ranks: [{ tier: "gold", division: 2, lp: 40 }, null],
     journals: [
       [
         { type: "start", at: 0 },
@@ -137,6 +141,7 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     startAt: null,
     words: ["cat"],
     participants: [],
+    ranks: null,
     journals: [[], []],
   };
   const roundEnd = {
@@ -187,6 +192,9 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     { ...state, rounds: [{ results: bothResults }] },
     { ...state, startAt: undefined },
     { ...state, startAt: "soon" },
+    { ...state, ranks: undefined },
+    { ...state, ranks: [null] },
+    { ...state, ranks: [null, { tier: "wood", division: 2, lp: 0 }] },
     { ...roundEnd, round: 0 },
     { ...roundEnd, results: [getResult(finished)] },
     { ...roundEnd, results: [getResult(finished), { ...getResult(finished), history: null }] },

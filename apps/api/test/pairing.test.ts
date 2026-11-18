@@ -3,7 +3,7 @@ import type { MatchmakerTickOptions } from "@repo/queue";
 import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import { createApp } from "../src/app.ts";
 import { readDuel } from "../src/modules/duel/service.ts";
-import { proposePairing, tickMatchmaker } from "../src/modules/queue/service.ts";
+import { proposePairing, readQueueEntry, tickMatchmaker } from "../src/modules/queue/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -190,8 +190,9 @@ test("when both accept, a ranked Duel exists with one seat held by each Player, 
   const duelId = await nextDuelId(adaSocket);
   expect(await nextDuelId(bobSocket)).toBe(duelId);
   await Promise.all([adaSocket.closed, bobSocket.closed]);
-  expect(await queue.queuedAtOf(ada)).toBeNull();
-  expect(await queue.queuedAtOf(bob)).toBeNull();
+  // Read from the Queue itself: its HTTP route now refuses them for the Duel they are in.
+  expect(await readQueueEntry(queue.redis, ada.id)).toBeNull();
+  expect(await readQueueEntry(queue.redis, bob.id)).toBeNull();
   const duel = await readDuel(queue.redis, duelId);
   expect(duel?.kind).toBe("ranked");
   expect(duel?.playerIds.toSorted()).toEqual([ada.id, bob.id].toSorted());

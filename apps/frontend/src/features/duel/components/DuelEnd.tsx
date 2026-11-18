@@ -1,5 +1,6 @@
 import { useDuelEnd } from "../hooks/useDuelEnd.ts";
 import { useDuelRounds } from "../hooks/useDuelRounds.ts";
+import { DuelBackToRanked } from "./DuelBackToRanked.tsx";
 import { DuelRankedEnd } from "./DuelRankedEnd.tsx";
 import { DuelRoundResults } from "./DuelRoundResults.tsx";
 import { DuelRoundScore } from "./DuelRoundScore.tsx";
@@ -14,6 +15,7 @@ export function DuelEnd() {
       <h1>{end.outcome}</h1>
       <DuelRoundScore />
       <DuelRankedEnd />
+      <DuelBackToRanked />
       {rounds.map(({ number, title, sides }) => (
         <DuelRoundResults key={number} title={title} sides={sides} />
       ))}

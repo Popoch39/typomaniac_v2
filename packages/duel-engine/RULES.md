@@ -12,6 +12,7 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 | CONFIG-4 | The server accepts a Participant's `start` up to 1 second before or after the announced Start, on its own clock.         |
 | CONFIG-5 | An Event may be stamped up to 1 second behind its receipt before its timestamp is moved up.                              |
 | CONFIG-6 | A Duel is won with 2 Rounds and has 3 Rounds at most. The pause between two Rounds lasts 5 seconds.                      |
+| CONFIG-7 | A ranked Duel whose Players are not both connected has its first Countdown announced 10 seconds after its creation.      |
 
 ## Outcome of a Round
 

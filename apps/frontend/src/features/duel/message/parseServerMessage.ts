@@ -99,6 +99,8 @@ const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
     startAt: isNullOr(isNumber),
     words: isNullOr(isListOf(isString)),
     participants: isListOf(isParticipant),
+    // `null` for a Custom Duel, but never left out.
+    ranks: (ranks) => ranks !== undefined && isNullOr(isPairOf(isNullOr(isRank)))(ranks),
     journals: isPairOf(isListOf(isGameEvent)),
   },
   presence: { participant: isParticipant },

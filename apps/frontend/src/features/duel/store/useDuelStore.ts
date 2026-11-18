@@ -8,6 +8,7 @@ import {
   type Seat,
   type ServerMessage,
 } from "@repo/duel-engine";
+import type { Rank } from "@repo/ranked-engine";
 import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
 import { create } from "zustand";
 import { queryClient } from "../../../shared/api/queryClient.ts";
@@ -34,6 +35,8 @@ type DuelState = {
     | "disconnected";
   readonly seat: Seat | null;
   readonly participants: readonly Participant[];
+  /** The Rank of each Player of a ranked Duel, indexed by seat; `null` for a Custom Duel. */
+  readonly ranks: readonly [Rank | null, Rank | null] | null;
   /** The current Round, which every Event sent to the server names. */
   readonly round: number | null;
   /** The Rounds already finished, in order: the Round score is counted from them. */
@@ -94,6 +97,7 @@ const initialState = {
   phase: "connecting",
   seat: null,
   participants: [],
+  ranks: null,
   round: null,
   rounds: [],
   words: [],
@@ -157,6 +161,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
         phase: afterRound ? "roundEnd" : "waiting",
         seat: message.seat,
         participants: message.participants,
+        ranks: message.ranks,
         round: message.round,
         rounds: message.rounds,
         words: message.words ?? [],

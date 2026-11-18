@@ -4,13 +4,16 @@ import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-e
 import type { Standing } from "@repo/ranked-engine";
 import { eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
-import { duel, duelParticipant } from "../src/db/schema.ts";
+import type { DuelOptions } from "../src/modules/duel/index.ts";
+import { createRelay } from "../src/modules/duel/relay.ts";
+import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
+import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
 import { tickMatchmaker } from "../src/modules/queue/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
-import { openSocket, openSocketOf } from "./helpers/socket.ts";
+import { openSocket, openSocketOf, requestUpgrade } from "./helpers/socket.ts";
 
 const testDb = await createTestDb();
 const auth = createTestAuth(testDb.db);
@@ -109,14 +112,19 @@ const play = async (players: Seated, rounds: readonly ("first" | "second" | "dra
 };
 
 // A ranked Duel as the Queue creates it: both Players enter the Queue, the matchmaker's tick pairs
-// them and both accept. Each test gets its own Redis namespace, so nobody else is ever queued.
-const openRankedDuel = async (
+// them and both accept. Nobody is seated yet. Each test gets its own Redis namespace, so nobody else
+// is ever queued. `createdAt` brackets the instant the Duel was created.
+const pairRankedDuel = async (
   standings: readonly [Standing?, Standing?] = [],
-  { instances = 1, db = testDb.db } = {},
+  {
+    instances = 1,
+    db = testDb.db,
+    options = { countdownMs: 0, roundPauseMs: 0 } as DuelOptions,
+  } = {},
 ) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: instances }, () =>
-    createApp(db, auth, testRedis.redis, { countdownMs: 0, roundPauseMs: 0 }).listen(0),
+    createApp(db, auth, testRedis.redis, options).listen(0),
   );
   closers.push(async () => {
     for (const app of apps) await app.stop(true);
@@ -138,6 +146,7 @@ const openRankedDuel = async (
     queued.push(socket);
   }
   await tickMatchmaker(testRedis.redis, Date.now());
+  const before = Date.now();
   for (const socket of queued) {
     const proposal = await socket.next();
     if (proposal.type !== "proposed") throw new Error(`Expected proposed, got ${proposal.type}`);
@@ -147,7 +156,13 @@ const openRankedDuel = async (
   for (const socket of queued) paired.push(await socket.next());
   const [pairing] = paired;
   if (pairing?.type !== "paired") throw new Error(`Expected paired, got ${pairing?.type}`);
+  const createdAt = { before, after: Date.now() };
   const { duelId } = pairing;
+  return { duelId, apps, redis: testRedis.redis, origins, origin, accounts, createdAt };
+};
+
+const openRankedDuel = async (...args: Parameters<typeof pairRankedDuel>) => {
+  const { duelId, origins, origin, accounts } = await pairRankedDuel(...args);
   return { duelId, origin, players: await seat(origins, duelId, accounts) };
 };
 
@@ -446,3 +461,176 @@ test("a finalisation retried after its save moves no Standing again, and announc
   });
   expect(await savedParticipants(duelId)).toHaveLength(2);
 }, 40_000);
+
+const queueSocketUrl = (origin: string) => `${origin.replace(/^http/, "ws")}/api/queue/socket`;
+
+test("the Queue refuses a Player while their ranked Duel is unfinished, says why over HTTP with the Duel, and accepts them again once it has ended", async () => {
+  const { duelId, origins, origin, accounts } = await pairRankedDuel();
+  const [first] = accounts;
+
+  const refused = await requestUpgrade(queueSocketUrl(origin), first.cookie);
+  expect(refused.status).toBe(409);
+  expect(await refused.json()).toEqual({ code: "RANKED_DUEL_UNFINISHED", duelId });
+  const reason = await fetch(`${origin}/api/queue`, { headers: { cookie: first.cookie } });
+  expect(reason.status).toBe(409);
+  expect(await reason.json()).toEqual({ code: "RANKED_DUEL_UNFINISHED", duelId });
+
+  await play(await seat(origins, duelId, accounts), ["first", "first"]);
+
+  const socket = await openSocketOf<QueueServerMessage, QueueClientMessage>(
+    queueSocketUrl(origin),
+    first.cookie,
+  );
+  expect(await socket.next()).toMatchObject({ type: "queued" });
+  socket.close();
+});
+
+test("the first Round of a ranked Duel starts as soon as both Players are connected", async () => {
+  // Far from the time to connect: only both Players being there can announce the Countdown.
+  const { duelId, origins, accounts, createdAt } = await pairRankedDuel([], {
+    options: { countdownMs: 0, connectMs: 60_000 },
+  });
+
+  const players = await seat(origins, duelId, accounts);
+  const countdowns = [
+    await nextOfType(players[0], "countdown"),
+    await nextOfType(players[1], "countdown"),
+  ];
+
+  for (const { round, startAt } of countdowns) {
+    expect(round).toBe(1);
+    expect(startAt - createdAt.after).toBeLessThan(1000);
+  }
+});
+
+// The delays of the instances a test stands in for when it sweeps at instants of its own.
+const sweptDelays = { expiryMs: DUEL_EXPIRY_MS, countdownMs: 3000, roundPauseMs: 5000 };
+
+test("a ranked Duel nobody connects to has its Countdown announced 10 seconds after its creation, and is played to its end and saved as ranked, every Game at 0 WPM", async () => {
+  const { duelId, apps, redis, accounts, createdAt } = await pairRankedDuel();
+  // Nobody is left to connect, and no instance sweeps but the test.
+  for (const app of apps) await app.stop(true);
+  const relay = createRelay(redis);
+  const sweep = (now: number) => sweepDuels(testDb.db, redis, relay, sweptDelays, now);
+
+  // Not yet 10 seconds after the creation: nothing is announced.
+  await sweep(createdAt.before + 9999);
+  await sweep(createdAt.after + 10_000);
+  const first = createdAt.after + 10_000 + 3000;
+  const starts = [first, first + 40_000, first + 80_000];
+  for (const startAt of starts) {
+    await sweep(startAt - 3000);
+    await sweep(startAt + 32_000);
+  }
+
+  expect(await testDb.db.select({ kind: duel.kind }).from(duel).where(eq(duel.id, duelId))).toEqual(
+    [{ kind: "ranked" }],
+  );
+  const rounds = await testDb.db
+    .select()
+    .from(duelRound)
+    .where(eq(duelRound.duelId, duelId))
+    .orderBy(duelRound.round);
+  expect(rounds.map(({ startedAt }) => startedAt.getTime())).toEqual(starts);
+  const games = await testDb.db.select().from(duelGame).where(eq(duelGame.duelId, duelId));
+  expect(games).toHaveLength(6);
+  for (const { result } of games) expect(result.wpm).toBe(0);
+  expect((await savedParticipants(duelId)).map(({ outcome }) => outcome)).toEqual(["draw", "draw"]);
+  for (const { id } of accounts)
+    expect(await readStanding(testDb.db, id)).toEqual({ mmr: 1200, duelsPlayed: 1, rank: null });
+});
+
+test("a ranked Duel with one Player connected starts without the other once the time to connect has passed, and is played to its end and saved, the absent Games at 0 WPM", async () => {
+  const connectMs = 200;
+  const { duelId, origin, redis, accounts, createdAt } = await pairRankedDuel([], {
+    options: { countdownMs: 0, roundPauseMs: 0, connectMs },
+  });
+  const [present, absent] = accounts;
+  const socket = await openSocket(
+    `${origin.replace(/^http/, "ws")}/api/duels/${duelId}/socket`,
+    present.cookie,
+  );
+  const player = { socket, received: [] as ServerMessage[] };
+  const { seat: presentSeat } = await nextOfType(player, "state");
+
+  const countdown = await nextOfType(player, "countdown");
+  expect(countdown.startAt).toBeGreaterThanOrEqual(createdAt.before + connectMs);
+  await Bun.sleep(Math.max(0, countdown.startAt - Date.now()));
+  socket.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
+  socket.send({
+    type: "event",
+    round: 1,
+    event: { type: "insert", at: 1010, text: `${countdown.words[0]} ` },
+  });
+  socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
+  // The Games left open are closed at their deadlines, those of the present Player too from the
+  // second Round on: the sweeps stand for the instants they fall due.
+  const relay = createRelay(redis);
+  const delays = { expiryMs: DUEL_EXPIRY_MS, countdownMs: 0, roundPauseMs: 0 };
+  const sweep = (now: number) => sweepDuels(testDb.db, redis, relay, delays, now);
+  const starts = [countdown.startAt, countdown.startAt + 32_000, countdown.startAt + 64_000];
+  for (const startAt of starts) {
+    await sweep(startAt);
+    await sweep(startAt + 32_000);
+  }
+  const end = await nextOfType(player, "end");
+
+  expect(end.outcomes[presentSeat]).toBe("win");
+  expect(end.ranked?.[presentSeat]).toEqual(toldInPlacement);
+  const games = await testDb.db
+    .select()
+    .from(duelGame)
+    .where(eq(duelGame.duelId, duelId))
+    .orderBy(duelGame.round, duelGame.seat);
+  const absentGames = games.filter(({ seat }) => seat !== presentSeat);
+  expect(absentGames).toHaveLength(3);
+  for (const { result } of absentGames) expect(result.wpm).toBe(0);
+  expect(absentGames[0]?.journal).toEqual([
+    { type: "start", at: countdown.startAt },
+    { type: "tick", at: countdown.startAt + 30_000 },
+  ]);
+  expect(await readStanding(testDb.db, present.id)).toEqual({
+    mmr: 1232,
+    duelsPlayed: 1,
+    rank: null,
+  });
+  expect(await readStanding(testDb.db, absent.id)).toEqual({
+    mmr: 1168,
+    duelsPlayed: 1,
+    rank: null,
+  });
+  socket.close();
+});
+
+test("each Player of a ranked Duel is shown both Ranks, Unranked as none, and a Custom Duel shows no Rank", async () => {
+  // At the MMR of a new Player, so that both are paired at once.
+  const ranked = await openRankedDuel([{ ...goldTwo(40), mmr: 1200 }]);
+  const ranks = ranked.players.map(({ seat: playerSeat }, index) => ({
+    seat: playerSeat,
+    rank: index === 0 ? { tier: "gold", division: 2, lp: 40 } : null,
+  }));
+  const bySeat = ranks.toSorted((a, b) => a.seat - b.seat).map(({ rank }) => rank);
+  for (const { received } of ranked.players) {
+    const state = received.find((message) => isOfType(message, "state"));
+    expect(state).toMatchObject({ ranks: bySeat });
+  }
+
+  const testRedis = await createTestRedis();
+  const app = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  closers.push(async () => {
+    await app.stop(true);
+    await testRedis.drop();
+  });
+  const origin = `http://localhost:${app.server?.port}`;
+  const accounts = [await signIn(origin, goldTwo(40)), await signIn(origin)] as const;
+  const created = await fetch(`${origin}/api/duels`, {
+    method: "POST",
+    headers: { cookie: accounts[0].cookie },
+  });
+  const { id: duelId } = (await created.json()) as { id: string };
+  const custom = await seat([origin], duelId, accounts);
+  for (const { received } of custom) {
+    const state = received.find((message) => isOfType(message, "state"));
+    expect(state).toMatchObject({ ranks: null });
+  }
+});

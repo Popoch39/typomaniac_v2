@@ -5,6 +5,7 @@ import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   END_GRACE_MS,
+  RANKED_CONNECT_MS,
   START_WINDOW_MS,
   drawWords,
 } from "../src/index.ts";
@@ -30,4 +31,8 @@ test("CONFIG-3: the Countdown lasts 3 seconds and the end grace period 2 seconds
 
 test("CONFIG-4: a start is accepted up to 1 second before or after the announced Start", () => {
   expect(START_WINDOW_MS).toBe(1000);
+});
+
+test("CONFIG-7: a ranked Duel waits 10 seconds after its creation for both Players before its first Countdown", () => {
+  expect(RANKED_CONNECT_MS).toBe(10_000);
 });

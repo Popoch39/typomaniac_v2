@@ -71,9 +71,26 @@ const finishedRound = { results: pair(result), outcomes: pair(outcome) };
 
 const lp = t.Integer();
 
+// The shape the `standing` module answers with, written again since a model is not imported across
+// modules. `null` for an Unranked Player.
+const rank = t.Union([
+  t.Object({
+    tier: t.Union([
+      t.Literal("bronze"),
+      t.Literal("silver"),
+      t.Literal("gold"),
+      t.Literal("platinum"),
+      t.Literal("diamond"),
+    ]),
+    division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
+    lp,
+  }),
+  t.Object({ tier: t.Literal("master"), lp }),
+  t.Null(),
+]);
+
 // Every field a Player may see of what a ranked Duel did to a Standing. The MMR is hidden (ADR
-// 0006): left out here, it is stripped from whatever the end carries. The Rank has the shape the
-// `standing` module answers with, written again since a model is not imported across modules.
+// 0006): left out here, it is stripped from whatever the end carries.
 const rankedEnd = t.Object({
   lpDelta: lp,
   rankChange: t.Union([
@@ -82,21 +99,7 @@ const rankedEnd = t.Object({
     t.Literal("demoted"),
     t.Literal("none"),
   ]),
-  rank: t.Union([
-    t.Object({
-      tier: t.Union([
-        t.Literal("bronze"),
-        t.Literal("silver"),
-        t.Literal("gold"),
-        t.Literal("platinum"),
-        t.Literal("diamond"),
-      ]),
-      division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
-      lp,
-    }),
-    t.Object({ tier: t.Literal("master"), lp }),
-    t.Null(),
-  ]),
+  rank,
   placement: t.Object({ played: t.Integer(), total: t.Integer() }),
 });
 
@@ -118,6 +121,7 @@ export const IdSocket = {
         startAt: t.Union([t.Number(), t.Null()]),
         words: t.Union([list(t.String()), t.Null()]),
         participants: list(participant),
+        ranks: t.Union([pair(rank), t.Null()]),
         journals: pair(list(gameEvent)),
       }),
       t.Object({ type: t.Literal("presence"), participant }),

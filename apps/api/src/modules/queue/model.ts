@@ -1,9 +1,16 @@
 import { t } from "elysia";
 
+// The Player has a ranked Duel to finish first, the one named.
+const rankedDuelUnfinished = t.Object({
+  code: t.Literal("RANKED_DUEL_UNFINISHED"),
+  duelId: t.String(),
+});
+
 export const RootGet = {
   Response: {
     // The instant the Player entered the Queue, `null` when they are not queued.
     200: t.Object({ queuedAt: t.Union([t.Number(), t.Null()]) }),
+    409: rankedDuelUnfinished,
   },
 };
 
@@ -26,5 +33,7 @@ export const Socket = {
       }),
       t.Object({ type: t.Literal("paired"), duelId: t.String() }),
     ]),
+    // The other statuses refuse the upgrade.
+    409: rankedDuelUnfinished,
   },
 };
