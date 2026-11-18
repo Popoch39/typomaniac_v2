@@ -19,19 +19,14 @@ export function rankAfter(
   config: RankedConfig,
 ): { rank: Rank; rankChange: RankChange } {
   const lp = rank.lp + lpDelta;
-  if (rank.tier !== "master") {
-    const above = lp >= config.lpPerDivision ? adjacentDivision(rank, 1) : undefined;
-    if (above !== undefined) {
-      return { rank: { ...above, lp: lp - config.lpPerDivision }, rankChange: "promoted" };
-    }
-    const below = rank.lp === 0 && lpDelta < 0 ? adjacentDivision(rank, -1) : undefined;
-    if (below !== undefined) {
-      return { rank: { ...below, lp: config.demotionLp }, rankChange: "demoted" };
-    }
+  const above = lp >= config.lpPerDivision ? adjacentDivision(rank, 1) : undefined;
+  if (above !== undefined) {
+    return { rank: { ...above, lp: lp - config.lpPerDivision }, rankChange: "promoted" };
   }
-  // Bronze IV at 0 LP is the floor. Until Master has its own rules, Diamond I and Master stop one LP short of the next Division.
-  return {
-    rank: { ...rank, lp: Math.min(config.lpPerDivision - 1, Math.max(0, lp)) },
-    rankChange: "none",
-  };
+  const below = rank.lp === 0 && lpDelta < 0 ? adjacentDivision(rank, -1) : undefined;
+  if (below !== undefined) {
+    return { rank: { ...below, lp: config.demotionLp }, rankChange: "demoted" };
+  }
+  // Bronze IV at 0 LP is the floor, and Master, with nothing above it, keeps every LP won.
+  return { rank: { ...rank, lp: Math.max(0, lp) }, rankChange: "none" };
 }

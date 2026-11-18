@@ -39,16 +39,18 @@ test("PROMO-1: a promotion from Division I leads to Division IV of the next Tier
   });
 });
 
-// Temporary: promotion to Master replaces this limit.
-test("PROMO-1: a win in Diamond I stops at 99 LP while Master does not exist", () => {
+test("PROMO-1: a promotion from Diamond I leads to Master, which has no Division", () => {
   // Diamond I reference: 900 + 19 × 50 = 1850
-  expect(applyDuel(ranked(1834, { tier: "diamond", division: 1, lp: 90 }), 1834, "win")).toEqual({
-    // 1834 + 16 = 1850; gap 0 → +20; 90 + 20 = 110, stopped at 99
-    standing: { mmr: 1850, duelsPlayed: 21, rank: { tier: "diamond", division: 1, lp: 99 } },
+  const update = applyDuel(ranked(1834, { tier: "diamond", division: 1, lp: 90 }), 1834, "win");
+
+  expect(update).toEqual({
+    // 1834 + 16 = 1850; gap 0 → +20; 90 + 20 = 110 → Master at 110 − 100 = 10
+    standing: { mmr: 1850, duelsPlayed: 21, rank: { tier: "master", lp: 10 } },
     mmrDelta: 16,
     lpDelta: 20,
-    rankChange: "none",
+    rankChange: "promoted",
   });
+  expect(update.standing.rank).not.toHaveProperty("division");
 });
 
 test("PROMO-3: a loss at 0 LP demotes to the Division below at 75 LP, the LP delta the loss applied", () => {

@@ -14,24 +14,27 @@ function referenceMmr(index: number, config: RankedConfig): number {
   return config.bronzeIvMmr + index * config.mmrPerDivision;
 }
 
-/** LP-1 reference of the Rank; Master starts one step above Diamond I. */
-export function rankReferenceMmr(rank: Rank, config: RankedConfig): number {
-  const index =
-    rank.tier === "master"
-      ? LADDER.length
-      : LADDER.findIndex((step) => step.tier === rank.tier && step.division === rank.division);
-  return referenceMmr(index, config);
+/** Master sits one step above Diamond I, past the end of the ladder. */
+function ladderIndex(rank: Rank): number {
+  return rank.tier === "master"
+    ? LADDER.length
+    : LADDER.findIndex((step) => step.tier === rank.tier && step.division === rank.division);
 }
 
-/** The Division one step above or below on the ladder, or `undefined` past its ends. */
+/** LP-1 reference of the Rank; in Master it rises with the LP held, so gains shrink as the LP outgrow the MMR. */
+export function rankReferenceMmr(rank: Rank, config: RankedConfig): number {
+  const reference = referenceMmr(ladderIndex(rank), config);
+  if (rank.tier !== "master") return reference;
+  return reference + Math.floor((rank.lp * config.mmrPerDivision) / config.lpPerDivision);
+}
+
+/** The Division one step above or below on the ladder, Master above Diamond I, or `undefined` past Bronze IV and Master. */
 export function adjacentDivision(
-  rank: DivisionRank,
+  rank: Rank,
   step: 1 | -1,
-): Omit<DivisionRank, "lp"> | undefined {
-  const index = LADDER.findIndex(
-    (division) => division.tier === rank.tier && division.division === rank.division,
-  );
-  return LADDER[index + step];
+): Omit<DivisionRank, "lp"> | { tier: "master" } | undefined {
+  const index = ladderIndex(rank) + step;
+  return index === LADDER.length ? { tier: "master" } : LADDER[index];
 }
 
 /** The highest Division whose reference MMR is at or below the MMR, at 0 LP, between Bronze IV and the Placement ceiling. */
