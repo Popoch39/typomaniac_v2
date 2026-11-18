@@ -1,4 +1,4 @@
-import type { Participant, ServerMessage } from "@repo/duel-engine";
+import { COUNTDOWN_MS, type Participant, type ServerMessage } from "@repo/duel-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Redis } from "../../redis/client.ts";
@@ -6,21 +6,33 @@ import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
-import { claimSeat, createDuel, DUEL_EXPIRY_MS, readDuel, releaseSeat } from "./service.ts";
+import {
+  announceStart,
+  claimSeat,
+  createDuel,
+  DUEL_EXPIRY_MS,
+  isEventAccepted,
+  readDuel,
+  releaseSeat,
+} from "./service.ts";
 
-export type DuelOptions = { readonly expiryMs?: number };
+export type DuelOptions = { readonly expiryMs?: number; readonly countdownMs?: number };
 
 export const createDuelRoutes = (
   auth: Auth,
   redis: Redis,
-  { expiryMs = DUEL_EXPIRY_MS }: DuelOptions = {},
+  { expiryMs = DUEL_EXPIRY_MS, countdownMs = COUNTDOWN_MS }: DuelOptions = {},
 ) => {
   const relay = createRelay(redis);
-  // What each open socket is seated as, set on open and read on close.
-  const seated = new Map<
-    string,
-    { participant: Participant; delivery: Parameters<typeof relay.join>[1] }
-  >();
+  type Seating = {
+    participant: Participant;
+    delivery: Parameters<typeof relay.join>[1];
+    /** The Start this socket was told of, in server time, whichever instance announced it. */
+    startAt: number | null;
+    started: boolean;
+  };
+  // What each open socket is seated as, set on open and read on messages and on close.
+  const seated = new Map<string, Seating>();
 
   return (
     new Elysia({ prefix: "/api/duels" })
@@ -48,7 +60,10 @@ export const createDuelRoutes = (
       .ws("/:id/socket", {
         participant: true,
         params: DuelModel.IdSocket.Params,
-        async beforeHandle({ params, identity, request, status }) {
+        body: DuelModel.IdSocket.Body,
+        async beforeHandle({ body, params, identity, request, status }) {
+          // Also runs before each message, which carries a body: the seat is claimed on the upgrade only.
+          if (body !== undefined) return;
           // A plain request must not claim a seat it could never use.
           if (request.headers.get("upgrade")?.toLowerCase() !== "websocket")
             return status(426, { code: "UPGRADE_REQUIRED" });
@@ -65,9 +80,14 @@ export const createDuelRoutes = (
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
-          const send = (message: ServerMessage) => ws.send(JSON.stringify(message));
+          const send = (message: ServerMessage) => {
+            // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
+            if (message.type === "countdown") entry.startAt = message.startAt;
+            ws.send(JSON.stringify(message));
+          };
           const delivery = { seat: self.seat, send };
-          seated.set(ws.id, { participant: self, delivery });
+          const entry: Seating = { participant: self, delivery, startAt: null, started: false };
+          seated.set(ws.id, entry);
           await relay.join(ws.params.id, delivery);
           send({
             type: "state",
@@ -77,6 +97,26 @@ export const createDuelRoutes = (
             journals: [[], []],
           });
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
+          const start = await announceStart(redis, ws.params.id, Date.now() + countdownMs);
+          if (!start) return;
+          const countdown = { type: "countdown", startAt: start.startAt } as const;
+          send(countdown);
+          if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
+        },
+        async message(ws, message) {
+          const now = Date.now();
+          if (message.type === "ping") {
+            ws.send(JSON.stringify({ type: "pong", clientAt: message.clientAt, serverAt: now }));
+            return;
+          }
+          const seat = seated.get(ws.id);
+          const { event } = message;
+          if (!seat || !isEventAccepted(event, { ...seat, now })) return;
+          if (event.type === "start") seat.started = true;
+          await relay.publish(ws.params.id, seat.participant.seat, {
+            type: "opponentEvent",
+            event,
+          });
         },
         async close(ws) {
           const seat = seated.get(ws.id);

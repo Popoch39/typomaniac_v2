@@ -24,6 +24,8 @@ type GameState = {
   /** Keys the typing area, so a restart or a config change remounts it and its input takes the focus again. */
   readonly restartCount: number;
   readonly applyEvent: (event: GameEvent) => void;
+  /** Replaces the Game with one on given words, such as the Target words of a Duel. */
+  readonly loadGame: (config: GameConfig, words: readonly string[]) => void;
   readonly restart: () => void;
   readonly setConfig: (config: GameConfig) => void;
 };
@@ -59,14 +61,12 @@ export const useGameStore = create<GameState>()((set, get) => {
     if (game.status === "finished") stopTicking();
   };
 
-  const startNewGame = (config: GameConfig) => {
+  const replaceGame = (game: Game) => {
     stopTicking();
-    set((state) => ({
-      game: newGame(config),
-      readAt: eventTime(),
-      restartCount: state.restartCount + 1,
-    }));
+    set((state) => ({ game, readAt: eventTime(), restartCount: state.restartCount + 1 }));
   };
+
+  const startNewGame = (config: GameConfig) => replaceGame(newGame(config));
 
   return {
     game: newGame(DEFAULT_CONFIG),
@@ -84,6 +84,7 @@ export const useGameStore = create<GameState>()((set, get) => {
       }
       if (game.status === "finished") stopTicking();
     },
+    loadGame: (config, words) => replaceGame(createGame(config, words)),
     restart: () => startNewGame(get().game.config),
     setConfig: startNewGame,
   };

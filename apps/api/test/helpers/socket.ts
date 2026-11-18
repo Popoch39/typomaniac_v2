@@ -1,4 +1,4 @@
-import type { ServerMessage } from "@repo/duel-engine";
+import type { ClientMessage, ServerMessage } from "@repo/duel-engine";
 
 // A real WebSocket client that queues what the server sends, so a test awaits each message in order.
 export const openSocket = async (url: string, cookie: string) => {
@@ -21,7 +21,13 @@ export const openSocket = async (url: string, cookie: string) => {
     if (message) return Promise.resolve(message);
     return new Promise<ServerMessage>((resolve) => waiting.push(resolve));
   };
-  return { next, close: () => socket.close() };
+  const send = (message: ClientMessage) => socket.send(JSON.stringify(message));
+  // Whether nothing arrives for that long: how a test sees that the server dropped a message.
+  const staysSilent = async (ms: number) => {
+    await Bun.sleep(ms);
+    return received.length === 0;
+  };
+  return { next, send, staysSilent, close: () => socket.close() };
 };
 
 // Asks for the upgrade over plain HTTP, so that a refused upgrade shows its status and body.

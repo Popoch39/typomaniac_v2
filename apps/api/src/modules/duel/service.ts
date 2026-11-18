@@ -1,4 +1,11 @@
-import { DUEL_WORD_COUNT, drawWords, type Participant, type Seat } from "@repo/duel-engine";
+import {
+  type ClientMessage,
+  DUEL_WORD_COUNT,
+  drawWords,
+  type Participant,
+  type Seat,
+  START_WINDOW_MS,
+} from "@repo/duel-engine";
 import type { Redis } from "../../redis/client.ts";
 
 /** How long a Duel can be joined after its creation. */
@@ -12,6 +19,8 @@ export type Duel = {
   readonly participants: readonly Participant[];
   /** The id of the identity holding each seat, never sent to a client. */
   readonly holderIds: readonly (string | undefined)[];
+  /** The announced Start instant in server time, `null` until the Countdown is announced. */
+  readonly startAt: number | null;
 };
 
 const SEATS: readonly Seat[] = [0, 1];
@@ -89,5 +98,50 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     return [{ seat, name, connected: fields[`connected${seat}`] === "1" }];
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
-  return { words: JSON.parse(fields.words) as string[], participants, holderIds };
+  const startAt = fields.startAt === undefined ? null : Number(fields.startAt);
+  return { words: JSON.parse(fields.words) as string[], participants, holderIds, startAt };
+};
+
+// Atomic, so two instances seating the two Participants at once announce a single Start. Once
+// announced, the Start never moves: a Participant who comes back gets the same instant.
+const ANNOUNCE_START = `
+if redis.call('EXISTS', KEYS[1]) == 0 then return {} end
+local startAt = redis.call('HGET', KEYS[1], 'startAt')
+if startAt then return {startAt, '0'} end
+if redis.call('HGET', KEYS[1], 'connected0') ~= '1' or redis.call('HGET', KEYS[1], 'connected1') ~= '1' then return {} end
+redis.call('HSET', KEYS[1], 'startAt', ARGV[1])
+return {ARGV[1], '1'}
+`;
+
+/**
+ * Announces the Start at `startAt` once both seats are connected. Gives the Start instant, and
+ * whether this call announced it, or `null` while a seat is still empty or away.
+ */
+export const announceStart = async (
+  redis: Redis,
+  duelId: string,
+  startAt: number,
+): Promise<{ startAt: number; announced: boolean } | null> => {
+  const answer: string[] = await redis.client.eval(
+    ANNOUNCE_START,
+    1,
+    duelKey(redis, duelId),
+    startAt,
+  );
+  const [announcedAt, announced] = answer;
+  if (announcedAt === undefined) return null;
+  return { startAt: Number(announcedAt), announced: announced === "1" };
+};
+
+/**
+ * Whether the server takes an Event of a Participant's Game. Nothing counts before the Start, and
+ * the `start` itself only near the announced instant, so that neither Participant gets a head start.
+ */
+export const isEventAccepted = (
+  event: Extract<ClientMessage, { type: "event" }>["event"],
+  game: { readonly started: boolean; readonly startAt: number | null; readonly now: number },
+) => {
+  if (event.type !== "start") return game.started;
+  if (game.started || game.startAt === null) return false;
+  return Math.abs(game.now - game.startAt) <= START_WINDOW_MS;
 };
