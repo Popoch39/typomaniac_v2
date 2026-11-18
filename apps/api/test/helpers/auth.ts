@@ -17,7 +17,8 @@ export const signInPlayer = async (auth: Auth, { email }: { email?: string } = {
   const { internalAdapter, authCookies, secret } = await auth.$context;
   // createUser runs the address check, which Better Auth only allows inside a request.
   const { user: player } = await internalAdapter.createOAuthUser(
-    { name: "Ada", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true },
+    // An empty provider username yields no default Nickname, so the Player starts without one.
+    { name: "", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true },
     { providerId: "github", accountId: crypto.randomUUID() },
   );
   const { token } = await internalAdapter.createSession(player.id);

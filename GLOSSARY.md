@@ -11,7 +11,7 @@ A signed-in person, whose results are kept and stay attached to them from one vi
 _Avoid_: User, account, member
 
 **Nickname**:
-A **Player**'s public name, which they choose themselves and can change whenever they want. Two Players cannot hold the same one, even with different casing.
+A **Player**'s public name. It starts as their GitHub or Discord username, adapted to the Nickname rules, and they can change it whenever they want. Two Players cannot hold the same one, even with different casing.
 _Avoid_: Username, user name, handle, identifier
 
 **Guest**:

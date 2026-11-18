@@ -8,7 +8,7 @@ const testDb = await createTestDb();
 const testRedis = await createTestRedis();
 const app = createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis);
 
-type Identity = { id: string; email: string; verified: boolean };
+type Identity = { id: string; email: string; verified: boolean; username?: string };
 
 // Stands in for GitHub and Discord: only their HTTP APIs are faked, the whole Better Auth flow runs for real.
 let identity: Identity;
@@ -19,13 +19,14 @@ const fakeProviders = async (input: string | URL | Request) => {
     case "https://discord.com/api/oauth2/token":
       return Response.json({ access_token: "provider-token", token_type: "bearer" });
     case "https://api.github.com/user":
-      return Response.json({ id: identity.id, login: "ada", email: null });
+      return Response.json({ id: identity.id, login: identity.username ?? "ada", email: null });
     case "https://api.github.com/user/emails":
       return Response.json([{ email: identity.email, primary: true, verified: identity.verified }]);
     case "https://discord.com/api/users/@me":
       return Response.json({
         id: identity.id,
-        username: "ada",
+        username: identity.username ?? "ada",
+        global_name: "Ada Lovelace",
         discriminator: "0",
         avatar: null,
         email: identity.email,
@@ -82,7 +83,7 @@ const currentSession = async (cookie: string) => {
     new Request("http://localhost/api/auth/get-session", { headers: { cookie } }),
   );
   return (await response.json()) as {
-    user: { id: string; email: string };
+    user: { id: string; email: string; nickname: string | null };
     session: { expiresAt: string };
   } | null;
 };
@@ -145,6 +146,86 @@ test("an unverified address cannot be attached to the Player who owns it", async
   expect(attacker.redirect.searchParams.get("error")).toBe("email_not_verified");
   expect(await currentSession(attacker.cookie)).toBeNull();
   expect((await currentSession(owner.cookie))?.user.email).toBe("victim@example.com");
+});
+
+test("a new Player starts with their GitHub username as Nickname", async () => {
+  const { cookie } = await signInWith("github", {
+    id: "8001",
+    email: "katherine@example.com",
+    verified: true,
+    username: "KJohnson",
+  });
+
+  expect((await currentSession(cookie))?.user.nickname).toBe("KJohnson");
+});
+
+test("a new Player starts with their Discord username, not their display name, as Nickname", async () => {
+  const { cookie } = await signInWith("discord", {
+    id: "8002",
+    email: "dorothy@example.com",
+    verified: true,
+    username: "dorothy.vaughan",
+  });
+
+  expect((await currentSession(cookie))?.user.nickname).toBe("dorothy_vaughan");
+});
+
+test("a username longer than a Nickname allows is cut to 20 characters", async () => {
+  const { cookie } = await signInWith("github", {
+    id: "8003",
+    email: "mary@example.com",
+    verified: true,
+    username: "mary-jackson-the-aerospace-engineer",
+  });
+
+  expect((await currentSession(cookie))?.user.nickname).toBe("mary-jackson-the-aer");
+});
+
+test.each([
+  [
+    "already taken by another Player, whatever the case",
+    "8101",
+    "Shannon",
+    "shannon",
+    /^shannon-\d{4}$/,
+  ],
+  ["reserved", "8201", null, "admin", /^admin-\d{4}$/],
+  ["too short", "8301", null, "x", /^x-\d{4}$/],
+])("a username %s gets a random suffix", async (_case, id, heldByAnother, username, expected) => {
+  if (heldByAnother !== null)
+    await signInWith("github", {
+      id: `${id}0`,
+      email: `first-${id}@example.com`,
+      verified: true,
+      username: heldByAnother,
+    });
+
+  const { cookie } = await signInWith("discord", {
+    id,
+    email: `second-${id}@example.com`,
+    verified: true,
+    username,
+  });
+
+  expect((await currentSession(cookie))?.user.nickname).toMatch(expected);
+});
+
+test("signing in with a second provider keeps the Nickname the first one gave", async () => {
+  const viaGithub = await signInWith("github", {
+    id: "8004",
+    email: "annie@example.com",
+    verified: true,
+    username: "AnnieEasley",
+  });
+  const viaDiscord = await signInWith("discord", {
+    id: "8005",
+    email: "annie@example.com",
+    verified: true,
+    username: "annie.discord",
+  });
+
+  expect((await currentSession(viaDiscord.cookie))?.user.nickname).toBe("AnnieEasley");
+  expect((await currentSession(viaGithub.cookie))?.user.nickname).toBe("AnnieEasley");
 });
 
 const post = (path: string, body: unknown, cookie = "") =>

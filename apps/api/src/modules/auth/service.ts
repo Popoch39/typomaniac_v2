@@ -1,6 +1,7 @@
 import { betterAuth, type ValidateUserInfoResult, type ValidateUserInfoSource } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Db } from "../../db/client.ts";
+import { assignDefaultNickname } from "../player/service.ts";
 import type { AuthConfig } from "./config.ts";
 
 // A Player is one email address: whoever gets a provider to present an address they do not own
@@ -31,9 +32,21 @@ export const createAuth = (db: Db, config: AuthConfig) =>
       updateAge: 60 * 60 * 24,
     },
     emailAndPassword: { enabled: false },
+    // name carries the provider username, not the display name it holds by default (often a real
+    // name on GitHub, any characters on Discord): the default Nickname is derived from it.
     socialProviders: {
-      github: config.github,
-      discord: config.discord,
+      github: { ...config.github, mapProfileToUser: (profile) => ({ name: profile.login }) },
+      discord: { ...config.discord, mapProfileToUser: (profile) => ({ name: profile.username }) },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Runs once the Player is committed, so the unique index judges the Nickname like any other write.
+          after: async (player) => {
+            await assignDefaultNickname(db, player.id, player.name);
+          },
+        },
+      },
     },
     user: {
       validateUserInfo: refuseUnverifiedEmail,
