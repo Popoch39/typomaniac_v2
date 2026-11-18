@@ -13,12 +13,15 @@ export const createTestAuth = (db: Db) =>
 
 // Goes through Better Auth's internal adapter rather than its test-utils plugin: 1.7.25 only exports that plugin
 // from the global "better-auth/plugins" entry, and it would have to sit in the production configuration.
-export const signInPlayer = async (auth: Auth, { email }: { email?: string } = {}) => {
+export const signInPlayer = async (
+  auth: Auth,
+  { email, image }: { email?: string; image?: string } = {},
+) => {
   const { internalAdapter, authCookies, secret } = await auth.$context;
   // createUser runs the address check, which Better Auth only allows inside a request.
   const { user: player } = await internalAdapter.createOAuthUser(
     // An empty provider username yields no default Nickname, so the Player starts without one.
-    { name: "", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true },
+    { name: "", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true, image },
     { providerId: "github", accountId: crypto.randomUUID() },
   );
   const { token } = await internalAdapter.createSession(player.id);
