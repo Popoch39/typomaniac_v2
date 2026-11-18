@@ -1,8 +1,10 @@
+import { useKeyPresses } from "../hooks/useKeyPresses.ts";
 import { useTypingInput } from "../hooks/useTypingInput.ts";
 import { WordList } from "./WordList.tsx";
 
 export function TypingArea() {
   const inputRef = useTypingInput();
+  const { onKeyDown, onKeyUp } = useKeyPresses();
 
   return (
     <div className="typing-area">
@@ -15,6 +17,8 @@ export function TypingArea() {
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
+        onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
       />
       <WordList />
     </div>
