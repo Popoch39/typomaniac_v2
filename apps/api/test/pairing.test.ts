@@ -5,7 +5,7 @@ import { createApp } from "../src/app.ts";
 import { readDuel } from "../src/modules/duel/service.ts";
 import { proposePairing, readQueueEntry, tickMatchmaker } from "../src/modules/queue/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
+import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 import { openSocket, openSocketOf, requestUpgrade } from "./helpers/socket.ts";
@@ -42,14 +42,7 @@ const openQueue = async (instances = 1) => {
     return { ...socket, queuedAt: queued.queuedAt };
   };
   const signIn = async (mmr?: number) => {
-    const { player, cookie } = await signInPlayer(auth);
-    const nickname = `p_${crypto.randomUUID().slice(0, 8)}`;
-    const response = await fetch(`${origin}/api/me/nickname`, {
-      method: "PUT",
-      headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ nickname }),
-    });
-    expect(response.status).toBe(200);
+    const { player, cookie, nickname } = await signInPlayerWithNickname(auth, origin);
     if (mmr !== undefined)
       await saveStanding(testDb.db, player.id, { mmr, duelsPlayed: 0, rank: null });
     return { id: player.id, nickname, cookie };

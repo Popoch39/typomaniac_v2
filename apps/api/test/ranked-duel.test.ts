@@ -10,7 +10,7 @@ import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
 import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
 import { tickMatchmaker } from "../src/modules/queue/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
+import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 import { openSocket, openSocketOf, requestUpgrade } from "./helpers/socket.ts";
@@ -43,13 +43,7 @@ const nextOfType = async <Type extends ServerMessage["type"]>(
 };
 
 const signIn = async (origin: string, standing?: Standing) => {
-  const { player, cookie } = await signInPlayer(auth);
-  const response = await fetch(`${origin}/api/me/nickname`, {
-    method: "PUT",
-    headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ nickname: `p_${crypto.randomUUID().slice(0, 8)}` }),
-  });
-  expect(response.status).toBe(200);
+  const { player, cookie } = await signInPlayerWithNickname(auth, origin);
   if (standing) await saveStanding(testDb.db, player.id, standing);
   return { id: player.id, cookie };
 };
