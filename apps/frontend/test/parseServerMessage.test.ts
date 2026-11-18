@@ -11,11 +11,33 @@ const finished = applyEvent(
 const messages: ServerMessage[] = [
   { type: "pong", clientAt: 1000, serverAt: 1500 },
   // Before the Countdown is announced, the Target words of the Round are held back.
-  { type: "state", seat: 0, round: 1, words: null, participants: [], journals: [[], []] },
+  {
+    type: "state",
+    seat: 0,
+    round: 1,
+    rounds: [],
+    startAt: null,
+    words: null,
+    participants: [],
+    journals: [[], []],
+  },
+  // Between two Rounds: the Round that ended, and the Start of the next one before its words.
+  {
+    type: "state",
+    seat: 0,
+    round: 2,
+    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] }],
+    startAt: 9000,
+    words: null,
+    participants: [],
+    journals: [[], []],
+  },
   {
     type: "state",
     seat: 1,
     round: 1,
+    rounds: [],
+    startAt: 4000,
     words: ["cat", "dog"],
     participants: [
       { seat: 0, name: "ada", connected: true },
@@ -37,9 +59,26 @@ const messages: ServerMessage[] = [
   { type: "countdown", round: 1, startAt: 4000, words: ["cat", "dog"] },
   { type: "opponentEvent", event: { type: "insert", at: 4200, text: "c" } },
   {
-    type: "end",
+    type: "roundEnd",
+    round: 1,
+    results: [getResult(finished), getResult(finished)],
+    outcomes: ["draw", "draw"],
+    nextStartAt: 42_000,
+  },
+  {
+    type: "roundEnd",
+    round: 2,
     results: [getResult(finished), getResult(finished)],
     outcomes: ["win", "loss"],
+    nextStartAt: null,
+  },
+  {
+    type: "end",
+    outcomes: ["win", "loss"],
+    rounds: [
+      { results: [getResult(finished), getResult(finished)], outcomes: ["draw", "draw"] },
+      { results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] },
+    ],
   },
 ];
 
@@ -54,6 +93,27 @@ test("a frame that is not JSON is not a message", () => {
 });
 
 test("a frame of an unknown type, or missing what its type requires, is not a message", () => {
+  const bothResults = [getResult(finished), getResult(finished)];
+  const state = {
+    type: "state",
+    seat: 0,
+    round: 1,
+    rounds: [],
+    startAt: null,
+    words: ["cat"],
+    participants: [],
+    journals: [[], []],
+  };
+  const roundEnd = {
+    type: "roundEnd",
+    round: 1,
+    results: bothResults,
+    outcomes: ["win", "loss"],
+    nextStartAt: null,
+  };
+  // Each is a message as long as nothing is taken from it.
+  expect(parseServerMessage(JSON.stringify(state))).not.toBeNull();
+  expect(parseServerMessage(JSON.stringify(roundEnd))).not.toBeNull();
   const malformed = [
     null,
     [],
@@ -70,25 +130,25 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     { type: "opponentEvent", event: { type: "insert", at: 10 } },
     { type: "opponentEvent", event: { type: "delete", at: 10, unit: "line" } },
     { type: "opponentEvent", event: { type: "jump", at: 10 } },
-    { type: "state", seat: 0, round: 1, words: ["cat"], participants: [], journals: [[]] },
-    { type: "state", seat: 0, words: ["cat"], participants: [], journals: [[], []] },
-    {
-      type: "state",
-      seat: 0,
-      round: "first",
-      words: ["cat"],
-      participants: [],
-      journals: [[], []],
-    },
-    { type: "state", seat: 0, round: 1, participants: [], journals: [[], []] },
-    { type: "state", seat: 0, round: 1, words: "cat", participants: [], journals: [[], []] },
-    { type: "end", results: [getResult(finished)], outcomes: ["win", "loss"] },
-    {
-      type: "end",
-      results: [getResult(finished), { ...getResult(finished), history: null }],
-      outcomes: ["win", "loss"],
-    },
-    { type: "end", results: [getResult(finished), getResult(finished)], outcomes: ["win", "tie"] },
+    { ...state, journals: [[]] },
+    { ...state, round: undefined },
+    { ...state, round: "first" },
+    { ...state, words: undefined },
+    { ...state, words: "cat" },
+    { ...state, rounds: undefined },
+    { ...state, rounds: [{ results: bothResults }] },
+    { ...state, startAt: undefined },
+    { ...state, startAt: "soon" },
+    { ...roundEnd, round: 0 },
+    { ...roundEnd, results: [getResult(finished)] },
+    { ...roundEnd, results: [getResult(finished), { ...getResult(finished), history: null }] },
+    { ...roundEnd, outcomes: ["win", "tie"] },
+    { ...roundEnd, nextStartAt: undefined },
+    { type: "end", outcomes: ["win", "loss"] },
+    { type: "end", outcomes: ["win"], rounds: [] },
+    { type: "end", outcomes: ["win", "loss"], rounds: [{ outcomes: ["win", "loss"] }] },
+    // The shape the end had when a Duel was a single Game each.
+    { type: "end", results: bothResults, outcomes: ["win", "loss"] },
   ];
 
   for (const frame of malformed) {

@@ -1,19 +1,20 @@
 import { useDuelEnd } from "../hooks/useDuelEnd.ts";
-import { DuelResult } from "./DuelResult.tsx";
+import { useDuelRounds } from "../hooks/useDuelRounds.ts";
+import { DuelRoundResults } from "./DuelRoundResults.tsx";
+import { DuelRoundScore } from "./DuelRoundScore.tsx";
 
 export function DuelEnd() {
   const end = useDuelEnd();
+  const rounds = useDuelRounds();
   if (end === null) return null;
 
   return (
-    <section>
-      <h2>{end.outcome}</h2>
-      {/* Both Results side by side, the Participant's own first. */}
-      <div className="grid grid-cols-2 gap-8">
-        {end.sides.map(({ seat, name, result }) => (
-          <DuelResult key={seat} name={name} result={result} />
-        ))}
-      </div>
+    <section className="flex flex-col gap-8">
+      <h1>{end.outcome}</h1>
+      <DuelRoundScore />
+      {rounds.map(({ number, title, sides }) => (
+        <DuelRoundResults key={number} title={title} sides={sides} />
+      ))}
     </section>
   );
 }
