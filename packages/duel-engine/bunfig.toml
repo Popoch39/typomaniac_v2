@@ -1,0 +1,5 @@
+[test]
+coverage = true
+coverageThreshold = { lines = 1.0, functions = 1.0 }
+# The typing engine is covered by its own test run.
+coveragePathIgnorePatterns = ["../typing-engine/**"]

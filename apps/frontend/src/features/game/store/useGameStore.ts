@@ -1,3 +1,4 @@
+import { drawWords } from "@repo/duel-engine";
 import {
   applyEvent as applyEngineEvent,
   createGame,
@@ -7,7 +8,6 @@ import {
 } from "@repo/typing-engine";
 import { create } from "zustand";
 import { eventTime } from "../clock/eventTime.ts";
-import { drawWords } from "../words/drawWords.ts";
 import { withoutSeparator } from "../words/withoutSeparator.ts";
 
 const DEFAULT_CONFIG: GameConfig = { mode: "time", seconds: 30 };
@@ -30,7 +30,7 @@ type GameState = {
 
 function newGame(config: GameConfig) {
   const wordCount = config.mode === "time" ? TIME_GAME_INITIAL_WORDS : config.wordCount;
-  return createGame(config, drawWords(wordCount));
+  return createGame(config, drawWords(wordCount, Math.random));
 }
 
 function withEnoughWords(game: Game) {
@@ -38,7 +38,7 @@ function withEnoughWords(game: Game) {
   if (game.config.mode !== "time" || wordsAhead >= TIME_GAME_MIN_WORDS_AHEAD) return game;
   const lastTarget = game.targetWords.at(-1);
   const lastWord = lastTarget === undefined ? undefined : withoutSeparator(lastTarget);
-  const words = drawWords(TIME_GAME_ADDED_WORDS, lastWord);
+  const words = drawWords(TIME_GAME_ADDED_WORDS, Math.random, lastWord);
   return applyEngineEvent(game, { type: "addWords", words });
 }
 

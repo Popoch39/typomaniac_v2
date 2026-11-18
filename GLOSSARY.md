@@ -18,6 +18,28 @@ _Avoid_: Username, user name, handle, identifier, pseudo
 A person who plays without having signed in; nothing is kept for them.
 _Avoid_: Anonymous, visitor, signed-out user, invité
 
+### Duel
+
+**Duel**:
+Any 1v1 between two **Participants**, each playing their own Game on the same Target words and the same Start. A _ranked Duel_ is the rated case, between two Players.
+_Avoid_: match, versus, battle, race, duel en ligne
+
+**Participant** (`Participant`):
+A Player or a Guest taking part in a Duel.
+_Avoid_: player (reserved for a signed-in person), contestant, competitor, participant au duel
+
+**Opponent**:
+The other Participant of a Duel, seen from one Participant.
+_Avoid_: enemy, rival, adversary, adversaire
+
+**Outcome** (`Outcome`):
+What a Duel means for one Participant: `win`, `loss` or `draw`. The higher WPM wins, then the higher Accuracy; otherwise it is a draw.
+_Avoid_: result (reserved for a Game's Result), score, verdict, issue
+
+**Countdown**:
+The delay between both Participants being connected and the Start of a Duel.
+_Avoid_: timer, delay, compte à rebours
+
 ### Game
 
 **Game** (`Game`):
