@@ -11,7 +11,7 @@ import { CreateDuelButton } from "./CreateDuelButton.tsx";
 export function CustomDuelPage() {
   return (
     <Page>
-      <h1>Custom</h1>
+      <h1>Custom Duel</h1>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Custom Duel</CardTitle>

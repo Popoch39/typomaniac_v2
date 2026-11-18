@@ -1,5 +1,8 @@
 import { useConfigBar } from "../hooks/useConfigBar.ts";
 
+const optionClassName =
+  "cursor-pointer border-0 bg-transparent px-2 py-1 text-muted-foreground aria-pressed:text-primary";
+
 export function ConfigBar() {
   const { modes, mode, values, value, selectMode, selectValue, keepTypingFocus } = useConfigBar();
 
@@ -10,7 +13,7 @@ export function ConfigBar() {
           <button
             key={option}
             type="button"
-            className="cursor-pointer border-0 bg-none px-2 py-1 text-muted-foreground aria-pressed:text-primary"
+            className={optionClassName}
             aria-pressed={option === mode}
             onMouseDown={keepTypingFocus}
             onClick={() => selectMode(option)}
@@ -24,7 +27,7 @@ export function ConfigBar() {
           <button
             key={option}
             type="button"
-            className="cursor-pointer border-0 bg-none px-2 py-1 text-muted-foreground aria-pressed:text-primary"
+            className={optionClassName}
             aria-pressed={option === value}
             onMouseDown={keepTypingFocus}
             onClick={() => selectValue(option)}
