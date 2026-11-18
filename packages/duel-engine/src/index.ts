@@ -10,7 +10,14 @@ export {
   START_WINDOW_MS,
   TIMESTAMP_TOLERANCE_MS,
 } from "./constants.ts";
-export type { ClientMessage, FinishedRound, Participant, Seat, ServerMessage } from "./messages.ts";
+export type {
+  ClientMessage,
+  FinishedRound,
+  Participant,
+  RankedEnd,
+  Seat,
+  ServerMessage,
+} from "./messages.ts";
 export { getOutcome } from "./outcome.ts";
 export { getDuelOutcomes, getRoundScore } from "./rounds.ts";
 export type { RoundOutcomes } from "./rounds.ts";

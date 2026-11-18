@@ -69,6 +69,37 @@ const outcome = t.Union([t.Literal("win"), t.Literal("loss"), t.Literal("draw")]
 
 const finishedRound = { results: pair(result), outcomes: pair(outcome) };
 
+const lp = t.Integer();
+
+// Every field a Player may see of what a ranked Duel did to a Standing. The MMR is hidden (ADR
+// 0006): left out here, it is stripped from whatever the end carries. The Rank has the shape the
+// `standing` module answers with, written again since a model is not imported across modules.
+const rankedEnd = t.Object({
+  lpDelta: lp,
+  rankChange: t.Union([
+    t.Literal("placed"),
+    t.Literal("promoted"),
+    t.Literal("demoted"),
+    t.Literal("none"),
+  ]),
+  rank: t.Union([
+    t.Object({
+      tier: t.Union([
+        t.Literal("bronze"),
+        t.Literal("silver"),
+        t.Literal("gold"),
+        t.Literal("platinum"),
+        t.Literal("diamond"),
+      ]),
+      division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
+      lp,
+    }),
+    t.Object({ tier: t.Literal("master"), lp }),
+    t.Null(),
+  ]),
+  placement: t.Object({ played: t.Integer(), total: t.Integer() }),
+});
+
 export const IdSocket = {
   Params: duelParams,
   Body: t.Union([
@@ -107,6 +138,7 @@ export const IdSocket = {
         type: t.Literal("end"),
         outcomes: pair(outcome),
         rounds: list(t.Object(finishedRound)),
+        ranked: t.Union([pair(rankedEnd), t.Null()]),
       }),
     ]),
     404: notFound,

@@ -99,7 +99,12 @@ test("a Duel saved before the migration reads as a single-Round Custom Duel, and
   ]);
   expect(
     await db
-      .select()
+      .select({
+        duelId: duelParticipant.duelId,
+        seat: duelParticipant.seat,
+        playerId: duelParticipant.playerId,
+        outcome: duelParticipant.outcome,
+      })
       .from(duelParticipant)
       .where(eq(duelParticipant.duelId, duelId))
       .orderBy(duelParticipant.seat),
