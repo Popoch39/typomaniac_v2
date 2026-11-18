@@ -1,11 +1,12 @@
 import {
   type ClientMessage,
   DUEL_GAME_CONFIG,
+  type Outcome,
   type Participant,
   type Seat,
   type ServerMessage,
 } from "@repo/duel-engine";
-import { applyEvent, createGame, type Game } from "@repo/typing-engine";
+import { applyEvent, createGame, type Game, type Result } from "@repo/typing-engine";
 import { create } from "zustand";
 import { eventTime } from "../../game/clock/eventTime.ts";
 import { useGameStore } from "../../game/store/useGameStore.ts";
@@ -20,7 +21,7 @@ export type DuelRefusal =
   | "unreachable";
 
 type DuelState = {
-  readonly phase: "connecting" | "waiting" | "countdown" | "running" | "refused";
+  readonly phase: "connecting" | "waiting" | "countdown" | "running" | "finished" | "refused";
   readonly seat: Seat | null;
   readonly participants: readonly Participant[];
   readonly words: readonly string[];
@@ -31,6 +32,11 @@ type DuelState = {
   /** Whole seconds left before the Start, shown during the Countdown. */
   readonly secondsLeft: number | null;
   readonly refusal: DuelRefusal | null;
+  /** The server's Results and Outcomes, indexed by seat, once both Games are finished. */
+  readonly end: {
+    readonly results: readonly [Result, Result];
+    readonly outcomes: readonly [Outcome, Outcome];
+  } | null;
   readonly join: (duelId: string) => void;
   readonly leave: () => void;
 };
@@ -102,6 +108,7 @@ const initialState = {
   clockOffset: null,
   secondsLeft: null,
   refusal: null,
+  end: null,
 } as const;
 
 export const useDuelStore = create<DuelState>()((set, get) => {
@@ -159,6 +166,12 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       startAt = message.startAt;
       if (get().phase === "waiting") set({ phase: "countdown" });
       scheduleStart();
+    } else if (message.type === "end") {
+      stopTimers();
+      stopForwarding?.();
+      stopForwarding = null;
+      const { results, outcomes } = message;
+      set({ phase: "finished", end: { results, outcomes } });
     }
   };
 

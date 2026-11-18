@@ -2,6 +2,7 @@ import "../../game/components/GameScreen.css";
 import { TypingArea } from "../../game/components/TypingArea.tsx";
 import { useDuelPhase } from "../hooks/useDuelPhase.ts";
 import { DuelCountdown } from "./DuelCountdown.tsx";
+import { DuelEnd } from "./DuelEnd.tsx";
 import { DuelInviteLink } from "./DuelInviteLink.tsx";
 import { DuelParticipants } from "./DuelParticipants.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
@@ -35,6 +36,7 @@ export function DuelScreen() {
           <TypingArea />
         </>
       )}
+      {phase === "finished" && <DuelEnd />}
     </main>
   );
 }
