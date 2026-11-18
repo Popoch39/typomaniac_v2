@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { translateKey } from "../src/features/game/input/translateInput.ts";
+import { translateKey } from "../src/features/game/input/translateKey.ts";
 
 test("a letter key down becomes a keyDown Event stamped with the given instant", () => {
   expect(translateKey({ type: "keydown", code: "KeyA", repeat: false }, 1234.5)).toEqual({

@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from "react";
-import { type BrowserKey, translateKey } from "../input/translateInput.ts";
+import { type BrowserKey, translateKey } from "../input/translateKey.ts";
 import { useGameStore } from "../store/useGameStore.ts";
 
 /** Key handlers for the hidden input: they feed the engine the KeyPresses behind Key consistency. */
