@@ -14,5 +14,8 @@
     "builtin": true,
     "browser": true
   },
-  "ignorePatterns": ["dist/**", "**/routeTree.gen.ts"]
+  "ignorePatterns": ["dist/**", "**/routeTree.gen.ts"],
+  "options": {
+    "typeAware": true
+  }
 }
