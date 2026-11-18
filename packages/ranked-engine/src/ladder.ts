@@ -23,6 +23,17 @@ export function rankReferenceMmr(rank: Rank, config: RankedConfig): number {
   return referenceMmr(index, config);
 }
 
+/** The Division one step above or below on the ladder, or `undefined` past its ends. */
+export function adjacentDivision(
+  rank: DivisionRank,
+  step: 1 | -1,
+): Omit<DivisionRank, "lp"> | undefined {
+  const index = LADDER.findIndex(
+    (division) => division.tier === rank.tier && division.division === rank.division,
+  );
+  return LADDER[index + step];
+}
+
 /** The highest Division whose reference MMR is at or below the MMR, at 0 LP, between Bronze IV and the Placement ceiling. */
 export function placedRank(mmr: number, config: RankedConfig): DivisionRank {
   const ceiling = config.placementCeiling;

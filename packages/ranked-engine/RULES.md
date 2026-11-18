@@ -48,13 +48,18 @@ The ladder runs from Bronze IV up to Diamond I: each Tier from Bronze to Diamond
 | LP-2 | The gap is the new MMR minus the reference, divided by the MMR per LP and truncated toward 0. A win gives the base LP plus the gap, a loss takes the base LP minus the gap, each bounded between the LP bounds. The LP delta is signed.                                                                     |
 | LP-3 | A draw moves the MMR and leaves the LP unchanged: the LP delta is 0.                                                                                                                                                                                                                                        |
 
-Each of these rules leaves the rank change at `none`. Until promotion exists, a win stops at 99 LP, one short of the next Division.
+Each of these rules leaves the rank change at `none`, unless a promotion or demotion follows.
 
 ## Promotion and demotion
 
-| Id      | Rule                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| PROMO-2 | A loss larger than the LP held leaves the Player at 0 LP in the same Division. The LP delta still reports the full loss of LP-2. |
+| Id      | Rule                                                                                                                                                                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PROMO-1 | A win that brings the LP to 100 or more moves the Player to the next Division, with the LP beyond 100 carried over: exactly 100 LP promotes at 0 LP. Division I of a Tier leads to Division IV of the next Tier. There is no promotion series. The LP delta is the gain of LP-2 and the rank change is `promoted`. |
+| PROMO-2 | A loss larger than the LP held leaves the Player at 0 LP in the same Division. The LP delta still reports the full loss of LP-2.                                                                                                                                                                                   |
+| PROMO-3 | A loss at 0 LP moves the Player to the Division below, at the demotion landing (75 LP by default). Division IV of a Tier leads to Division I of the Tier below. The LP delta is the loss of LP-2 and the rank change is `demoted`.                                                                                 |
+| PROMO-4 | Bronze IV at 0 LP is the floor: a loss there leaves the Rank unchanged and the rank change is `none`.                                                                                                                                                                                                              |
+
+The LP delta reports the gain or loss applied, never the difference between the LP shown before and after a change of Division. Until Master exists, a win in Diamond I stops at 99 LP, one short of the next Division.
 
 ## Purity
 

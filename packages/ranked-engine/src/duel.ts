@@ -39,6 +39,6 @@ export function applyDuel(
     return { standing: { mmr, duelsPlayed, rank: null }, mmrDelta, lpDelta: 0, rankChange: "none" };
   }
   const lpDelta = lpChange(standing.rank, mmr, outcome, config);
-  const rank = rankAfter(standing.rank, lpDelta, config);
-  return { standing: { mmr, duelsPlayed, rank }, mmrDelta, lpDelta, rankChange: "none" };
+  const { rank, rankChange } = rankAfter(standing.rank, lpDelta, config);
+  return { standing: { mmr, duelsPlayed, rank }, mmrDelta, lpDelta, rankChange };
 }

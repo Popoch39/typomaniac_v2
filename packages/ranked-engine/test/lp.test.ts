@@ -124,17 +124,6 @@ test("PROMO-2: a loss larger than the current LP leaves the Player at 0 LP in th
   });
 });
 
-// Temporary: promotion replaces this limit.
-test("LP-2: a win stops at 99 LP, the top of the Division, while promotion does not exist", () => {
-  expect(applyDuel(silverII(1184, 90), 1184, "win")).toEqual({
-    // 1184 + 16 = 1200; gap 0 → +20, from 90 LP stopped at 99
-    standing: { mmr: 1200, duelsPlayed: 21, rank: { tier: "silver", division: 2, lp: 99 } },
-    mmrDelta: 16,
-    lpDelta: 20,
-    rankChange: "none",
-  });
-});
-
 test("LP-1: a Master Player at 0 LP is measured against the Master threshold, one step above Diamond I", () => {
   expect(
     applyDuel({ mmr: 1884, duelsPlayed: 20, rank: { tier: "master", lp: 0 } }, 1884, "win"),
