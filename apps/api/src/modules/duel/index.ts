@@ -1,11 +1,4 @@
-import {
-  COUNTDOWN_MS,
-  DUEL_GAME_CONFIG,
-  END_GRACE_MS,
-  type Participant,
-  type Seat,
-  type ServerMessage,
-} from "@repo/duel-engine";
+import { COUNTDOWN_MS, type Participant, type ServerMessage } from "@repo/duel-engine";
 import { applyEvent, type Game } from "@repo/typing-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
@@ -18,20 +11,18 @@ import { createRelay } from "./relay.ts";
 import {
   announceStart,
   appendEvents,
-  claimFinalisation,
   claimSeat,
-  closingEvents,
+  closeOverdueGames,
+  createDeadlineWatch,
   createDuel,
   DUEL_EXPIRY_MS,
+  finaliseDuel,
   holdSeat,
   isEventAccepted,
   readDuel,
   readJournals,
-  recordEnd,
-  releaseFinalisation,
   releaseSeat,
   replayGame,
-  saveDuel,
   startLateGame,
 } from "./service.ts";
 
@@ -57,74 +48,16 @@ export const createDuelRoutes = (
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
 
-  // Run by whichever instance sees both Games ended: the claim lets only one of them through.
-  const finalise = async (duelId: string) => {
-    if (!(await claimFinalisation(redis, duelId))) return;
-    try {
-      const duel = await readDuel(redis, duelId);
-      // Expired meanwhile: nothing is left to save.
-      if (!duel) return;
-      if (duel.startAt === null) throw new Error(`Duel ${duelId} has ended without a Start`);
-      const { results, outcomes } = await saveDuel(db, duelId, {
-        words: duel.words,
-        playerIds: duel.playerIds,
-        startAt: duel.startAt,
-        journals: await readJournals(redis, duelId),
-      });
-      const end = { type: "end", results, outcomes } as const;
-      await recordEnd(redis, duelId, end);
-      await relay.publish(duelId, null, end);
-    } catch (error) {
-      await releaseFinalisation(redis, duelId);
-      throw error;
-    }
-  };
-
-  // Ends the Games whose clients went silent, at their start plus 30 seconds.
-  const closeOverdueGames = async (duelId: string, startAt: number) => {
-    const duel = await readDuel(redis, duelId);
-    if (!duel) return;
-    const journals = await readJournals(redis, duelId);
-    for (const seat of [0, 1] as const satisfies readonly Seat[]) {
-      const game = replayGame(duel.words, journals[seat]);
-      if (game.status === "finished") continue;
-      const events = closingEvents(game, startAt);
-      await appendEvents(redis, duelId, seat, events, { ends: true, expiryMs });
-    }
-    await finalise(duelId);
-  };
-
-  // One per Duel on each instance that holds one of its sockets; any of them can close it.
-  const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
-  const watchDeadline = (
-    duelId: string,
-    startAt: number,
-    delayMs = startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS - Date.now(),
-  ) => {
-    if (deadlines.has(duelId)) return;
-    const timer = setTimeout(() => {
-      closeOverdueGames(duelId, startAt).then(
-        () => deadlines.delete(duelId),
-        (error: unknown) => {
-          console.error(`Could not close the overdue Games of Duel ${duelId}`, error);
-          deadlines.delete(duelId);
-          // Tried again until the Duel is finalised or expires: a failed finalisation is retried here.
-          watchDeadline(duelId, startAt, END_GRACE_MS);
-        },
-      );
-    }, delayMs);
-    deadlines.set(duelId, timer);
-  };
+  const deadlines = createDeadlineWatch((duelId, startAt) =>
+    closeOverdueGames(db, redis, relay, duelId, { startAt, expiryMs }),
+  );
 
   return (
     new Elysia({ prefix: "/api/duels" })
       .use(createProtection(auth))
       .use(websocket())
       // A stopped instance closes no Game any more, as if it had crashed.
-      .onStop(() => {
-        for (const timer of deadlines.values()) clearTimeout(timer);
-        deadlines.clear();
-      })
+      .onStop(() => deadlines.stop())
       .post(
         "/",
         { participant: true, response: { 201: DuelModel.RootPost.Response } },
@@ -136,7 +69,7 @@ export const createDuelRoutes = (
         {
           participant: true,
           params: DuelModel.IdGet.Params,
-          response: { 200: DuelModel.IdGet.Response, 404: DuelModel.IdGet.NotFound },
+          response: DuelModel.IdGet.Response,
         },
         async ({ params, status }) => {
           const duel = await readDuel(redis, params.id);
@@ -148,6 +81,7 @@ export const createDuelRoutes = (
         participant: true,
         params: DuelModel.IdSocket.Params,
         body: DuelModel.IdSocket.Body,
+        response: DuelModel.IdSocket.Response,
         async beforeHandle({ body, params, identity, request, status }) {
           // Also runs before each message, which carries a body: the seat is claimed on the upgrade only.
           if (body !== undefined) return;
@@ -179,9 +113,9 @@ export const createDuelRoutes = (
             // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
             if (message.type === "countdown") {
               entry.startAt = message.startAt;
-              watchDeadline(ws.params.id, message.startAt);
+              deadlines.watch(ws.params.id, message.startAt);
             }
-            ws.send(JSON.stringify(message));
+            ws.send(message);
           };
           const connection = crypto.randomUUID();
           const delivery = { seat: self.seat, connection, send, evict: () => ws.close() };
@@ -214,37 +148,35 @@ export const createDuelRoutes = (
         async message(ws, message) {
           const now = Date.now();
           if (message.type === "ping") {
-            ws.send(JSON.stringify({ type: "pong", clientAt: message.clientAt, serverAt: now }));
+            ws.send({ type: "pong", clientAt: message.clientAt, serverAt: now });
             return;
           }
-          const seat = seated.get(ws.id);
+          const seating = seated.get(ws.id);
           const { event } = message;
-          if (!seat) return;
-          if (!isEventAccepted(event, { status: seat.game.status, startAt: seat.startAt, now }))
-            return;
-          seat.game = applyEvent(seat.game, event);
-          const ends = seat.game.status === "finished";
-          const appended = await appendEvents(redis, ws.params.id, seat.participant.seat, [event], {
+          if (!seating) return;
+          const { status } = seating.game;
+          if (!isEventAccepted(event, { status, startAt: seating.startAt, now })) return;
+          seating.game = applyEvent(seating.game, event);
+          const ends = seating.game.status === "finished";
+          const { seat } = seating.participant;
+          const appended = await appendEvents(redis, ws.params.id, seat, [event], {
             ends,
             expiryMs,
           });
           // Refused when the server already ended this Game, from this instance or another one.
           if (!appended) return;
-          await relay.publish(ws.params.id, seat.participant.seat, {
-            type: "opponentEvent",
-            event,
-          });
+          await relay.publish(ws.params.id, seat, { type: "opponentEvent", event });
           // Tried again at the deadline when it fails.
           if (ends)
-            await finalise(ws.params.id).catch((error: unknown) =>
+            await finaliseDuel(db, redis, relay, ws.params.id).catch((error: unknown) =>
               console.error(`Could not finalise Duel ${ws.params.id}`, error),
             );
         },
         async close(ws) {
-          const seat = seated.get(ws.id);
-          if (!seat) return;
+          const seating = seated.get(ws.id);
+          if (!seating) return;
           seated.delete(ws.id);
-          const { participant, connection, delivery } = seat;
+          const { participant, connection, delivery } = seating;
           await relay.leave(ws.params.id, delivery);
           // Replaced by a reconnection: the Participant is not away.
           if (!(await releaseSeat(redis, ws.params.id, participant.seat, connection))) return;

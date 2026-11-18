@@ -3,6 +3,7 @@ import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   drawWords,
+  END_GRACE_MS,
   getOutcome,
   type Participant,
   type Seat,
@@ -20,6 +21,7 @@ import {
 import type { Db } from "../../db/client.ts";
 import { duel, duelGame } from "../../db/schema.ts";
 import type { Redis } from "../../redis/client.ts";
+import type { Relay } from "./relay.ts";
 
 /** How long a Duel can be joined after its creation. */
 export const DUEL_EXPIRY_MS = 10 * 60 * 1000;
@@ -395,4 +397,88 @@ export const readJournals = async (
     return events.map((event) => JSON.parse(event) as GameEvent);
   };
   return [await read(0), await read(1)];
+};
+
+/**
+ * Saves a Duel whose two Games have ended, keeps its end and announces it to both Participants.
+ * Run by whichever instance sees both Games ended: the claim lets only one of them through, and is
+ * let go when the finalisation fails, so that it can be tried again.
+ */
+export const finaliseDuel = async (
+  db: Db,
+  redis: Redis,
+  relay: Pick<Relay, "publish">,
+  duelId: string,
+) => {
+  if (!(await claimFinalisation(redis, duelId))) return;
+  try {
+    const duel = await readDuel(redis, duelId);
+    // Expired meanwhile: nothing is left to save.
+    if (!duel) return;
+    if (duel.startAt === null) throw new Error(`Duel ${duelId} has ended without a Start`);
+    const { results, outcomes } = await saveDuel(db, duelId, {
+      words: duel.words,
+      playerIds: duel.playerIds,
+      startAt: duel.startAt,
+      journals: await readJournals(redis, duelId),
+    });
+    const end = { type: "end", results, outcomes } as const;
+    await recordEnd(redis, duelId, end);
+    await relay.publish(duelId, null, end);
+  } catch (error) {
+    await releaseFinalisation(redis, duelId);
+    throw error;
+  }
+};
+
+/** Ends the Games whose clients went silent, at their start plus 30 seconds, then finalises the Duel. */
+export const closeOverdueGames = async (
+  db: Db,
+  redis: Redis,
+  relay: Pick<Relay, "publish">,
+  duelId: string,
+  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
+) => {
+  const duel = await readDuel(redis, duelId);
+  if (!duel) return;
+  const journals = await readJournals(redis, duelId);
+  for (const seat of SEATS) {
+    const game = replayGame(duel.words, journals[seat]);
+    if (game.status === "finished") continue;
+    const events = closingEvents(game, startAt);
+    await appendEvents(redis, duelId, seat, events, { ends: true, expiryMs });
+  }
+  await finaliseDuel(db, redis, relay, duelId);
+};
+
+/**
+ * Runs `close` on each Duel once its deadline has passed, then again until it succeeds: a failed
+ * finalisation is tried again here, until the Duel is finalised or expires. Each instance that
+ * holds one of a Duel's sockets watches its deadline, so that any of them can close it.
+ */
+export const createDeadlineWatch = (close: (duelId: string, startAt: number) => Promise<void>) => {
+  const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
+  const watch = (
+    duelId: string,
+    startAt: number,
+    delayMs = startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS - Date.now(),
+  ) => {
+    if (deadlines.has(duelId)) return;
+    const timer = setTimeout(() => {
+      close(duelId, startAt).then(
+        () => deadlines.delete(duelId),
+        (error: unknown) => {
+          console.error(`Could not close the overdue Games of Duel ${duelId}`, error);
+          deadlines.delete(duelId);
+          watch(duelId, startAt, END_GRACE_MS);
+        },
+      );
+    }, delayMs);
+    deadlines.set(duelId, timer);
+  };
+  const stop = () => {
+    for (const timer of deadlines.values()) clearTimeout(timer);
+    deadlines.clear();
+  };
+  return { watch: (duelId: string, startAt: number) => watch(duelId, startAt), stop };
 };
