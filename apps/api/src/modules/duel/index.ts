@@ -2,7 +2,10 @@ import {
   anchorStart,
   boundEvent,
   COUNTDOWN_MS,
+  DUEL_GAME_CONFIG,
+  END_GRACE_MS,
   type Participant,
+  ROUND_PAUSE_MS,
   type ServerMessage,
 } from "@repo/duel-engine";
 import { applyEvent, type Game } from "@repo/typing-engine";
@@ -15,6 +18,7 @@ import type { Auth } from "../auth/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
+  announceCountdown,
   announceStart,
   appendEvents,
   claimSeat,
@@ -22,28 +26,40 @@ import {
   createDeadlineWatch,
   createDuel,
   DUEL_EXPIRY_MS,
-  finaliseDuel,
+  endRound,
+  finishedRounds,
   holdSeat,
   isEventAccepted,
   readDuel,
   readJournals,
+  readRounds,
   releaseSeat,
   replayGame,
   startLateGame,
 } from "./service.ts";
 
-export type DuelOptions = { readonly expiryMs?: number; readonly countdownMs?: number };
+export type DuelOptions = {
+  readonly expiryMs?: number;
+  readonly countdownMs?: number;
+  /** The pause between the end of a Round and the Countdown of the next one. */
+  readonly roundPauseMs?: number;
+};
 
 export const createDuelRoutes = (
   db: Db,
   auth: Auth,
   redis: Redis,
-  { expiryMs = DUEL_EXPIRY_MS, countdownMs = COUNTDOWN_MS }: DuelOptions = {},
+  {
+    expiryMs = DUEL_EXPIRY_MS,
+    countdownMs = COUNTDOWN_MS,
+    roundPauseMs = ROUND_PAUSE_MS,
+  }: DuelOptions = {},
 ) => {
   const relay = createRelay(redis);
+  const delays = { expiryMs, countdownMs, roundPauseMs };
   type Seating = {
     participant: Participant;
-    /** The Round this socket was seated in: the only one whose Events it takes. */
+    /** The Round this socket plays, the only one whose Events it takes: the last one it was told the Countdown of. */
     round: number;
     /** Tells this socket from an older or newer one of the same seat. */
     connection: string;
@@ -58,9 +74,27 @@ export const createDuelRoutes = (
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
 
-  const deadlines = createDeadlineWatch((duelId, startAt) =>
-    closeOverdueGames(db, redis, relay, duelId, { startAt, expiryMs }),
-  );
+  const deadlines = createDeadlineWatch(END_GRACE_MS);
+  // Closes the Games of a Round left open past their deadline, which also ends the Round.
+  const watchDeadline = (duelId: string, round: number, startAt: number) =>
+    deadlines.watch(
+      `${duelId}:${round}:deadline`,
+      startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS,
+      () => closeOverdueGames(db, redis, relay, duelId, round, delays),
+    );
+  // Follows a Round whose Start is fixed and whose Countdown is still to come: nobody has to be
+  // connected for it to be announced, nor for its Games to be closed.
+  const watchRound = (duelId: string, round: number, startAt: number) => {
+    const countdownAt = startAt - countdownMs;
+    deadlines.watch(`${duelId}:${round}:countdown`, countdownAt, () =>
+      // A timer may fire a moment early: the Countdown is still the one that ends at the Start.
+      announceCountdown(redis, relay, duelId, round, {
+        startAt: Math.max(Date.now() + countdownMs, startAt),
+        expiryMs,
+      }),
+    );
+    watchDeadline(duelId, round, startAt);
+  };
 
   return (
     new Elysia({ prefix: "/api/duels" })
@@ -111,7 +145,8 @@ export const createDuelRoutes = (
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
           const round = duel.round.number;
-          const { words, startAt, anchorAts } = duel.round;
+          const { words, startAt, announced, anchorAts } = duel.round;
+          const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
           const journals = await readJournals(redis, ws.params.id, round);
           const lateStart = await startLateGame(redis, ws.params.id, round, self.seat, {
             journal: journals[self.seat],
@@ -124,9 +159,17 @@ export const createDuelRoutes = (
           const send = (message: ServerMessage) => {
             // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
             if (message.type === "countdown") {
+              // The Countdown of a new Round: its Game is the one this socket plays from now on.
+              if (message.round !== entry.round) {
+                entry.round = message.round;
+                entry.game = replayGame(message.words, []);
+                entry.anchorAt = null;
+              }
               entry.startAt = message.startAt;
-              deadlines.watch(ws.params.id, message.startAt);
+              watchDeadline(ws.params.id, message.round, message.startAt);
             }
+            if (message.type === "roundEnd" && message.nextStartAt !== null)
+              watchRound(ws.params.id, message.round + 1, message.nextStartAt);
             ws.send(message);
           };
           const connection = crypto.randomUUID();
@@ -151,22 +194,31 @@ export const createDuelRoutes = (
             type: "state",
             seat: self.seat,
             round,
+            rounds,
+            startAt,
             // Held back until the Countdown, which brings them to both Participants at once.
-            words: startAt === null ? null : words,
+            words: announced ? words : null,
             participants: duel.participants,
             journals,
           });
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
           for (const event of lateStart ?? [])
             await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });
-          const start = await announceStart(redis, ws.params.id, round, {
-            startAt: Date.now() + countdownMs,
-            expiryMs,
-          });
-          if (!start) return;
-          const countdown = { type: "countdown", round, startAt: start.startAt, words } as const;
-          send(countdown);
-          if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
+          // A Participant back between two Rounds: this instance follows the coming one too.
+          if (startAt !== null && !announced) watchRound(ws.params.id, round, startAt);
+          // A Round that has ended has no Countdown left to be told of.
+          const start =
+            duel.round.end === null
+              ? await announceStart(redis, ws.params.id, round, {
+                  startAt: Date.now() + countdownMs,
+                  expiryMs,
+                })
+              : null;
+          if (start) {
+            const countdown = { type: "countdown", round, startAt: start.startAt, words } as const;
+            send(countdown);
+            if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
+          }
           if (duel.end) send(duel.end);
         },
         async message(ws, message) {
@@ -204,8 +256,8 @@ export const createDuelRoutes = (
           await relay.publish(ws.params.id, seat, { type: "opponentEvent", event: taken });
           // Tried again at the deadline when it fails.
           if (ends)
-            await finaliseDuel(db, redis, relay, ws.params.id, round).catch((error: unknown) =>
-              console.error(`Could not finalise Duel ${ws.params.id}`, error),
+            await endRound(db, redis, relay, ws.params.id, round, delays).catch((error: unknown) =>
+              console.error(`Could not end Round ${round} of Duel ${ws.params.id}`, error),
             );
         },
         async close(ws) {

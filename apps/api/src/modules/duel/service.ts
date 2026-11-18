@@ -3,9 +3,11 @@ import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   drawWords,
-  END_GRACE_MS,
+  type FinishedRound,
   finalTickAt,
+  getDuelOutcomes,
   getOutcome,
+  type Outcome,
   type Participant,
   type Seat,
   type ServerMessage,
@@ -42,10 +44,19 @@ export type Round = {
   /** Rounds are numbered from 1. */
   readonly number: number;
   readonly words: readonly string[];
-  /** The announced Start instant in server time, `null` until the Countdown is announced. */
+  /**
+   * The Start instant in server time, `null` until it is fixed: with its Countdown for the first
+   * Round, when the Round before it ends for a later one.
+   */
   readonly startAt: number | null;
+  /** Whether the Countdown was announced: only then do the Participants hold the Target words. */
+  readonly announced: boolean;
   /** The server instant the `start` of each seat's Game is anchored at, `null` until it starts. */
   readonly anchorAts: readonly (number | null)[];
+  /** Whether each seat's Game has ended. */
+  readonly gamesEnded: readonly boolean[];
+  /** Both Results and both Outcomes of the Round and the instant it ended, `null` until then. */
+  readonly end: (FinishedRound & { readonly endedAt: number }) | null;
 };
 
 export type Duel = {
@@ -171,13 +182,46 @@ export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat, conn
   return released === 1;
 };
 
+const readRound = async (redis: Redis, duelId: string, number: number): Promise<Round | null> => {
+  const round = await redis.client.hgetall(roundKey(redis, duelId, number));
+  if (round.words === undefined) return null;
+  const anchorAts = SEATS.map((seat) => {
+    const anchorAt = round[`anchor${seat}`];
+    return anchorAt === undefined ? null : Number(anchorAt);
+  });
+  return {
+    number,
+    words: JSON.parse(round.words) as string[],
+    startAt: round.startAt === undefined ? null : Number(round.startAt),
+    announced: round.announced === "1",
+    anchorAts,
+    gamesEnded: SEATS.map((seat) => round[`ended${seat}`] === "1"),
+    end: round.end === undefined ? null : (JSON.parse(round.end) as Round["end"]),
+  };
+};
+
+/** The Rounds of a Duel from the first one to Round `upTo`, in order. */
+export const readRounds = async (redis: Redis, duelId: string, upTo: number) => {
+  const rounds: Round[] = [];
+  for (let number = 1; number <= upTo; number += 1) {
+    const round = await readRound(redis, duelId, number);
+    if (round) rounds.push(round);
+  }
+  return rounds;
+};
+
+/** What a client is told of the finished Rounds among `rounds`. */
+export const finishedRounds = (rounds: readonly Round[]) =>
+  rounds.flatMap(({ end }): FinishedRound[] =>
+    end === null ? [] : [{ results: end.results, outcomes: end.outcomes }],
+  );
+
 export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | null> => {
   const fields = await redis.client.hgetall(duelKey(redis, duelId));
   if (fields.round === undefined) return null;
-  const number = Number(fields.round);
-  const round = await redis.client.hgetall(roundKey(redis, duelId, number));
+  const round = await readRound(redis, duelId, Number(fields.round));
   // Only when the Duel expired between the two reads.
-  if (round.words === undefined) return null;
+  if (!round) return null;
   const participants = SEATS.flatMap((seat): Participant[] => {
     const name = fields[`name${seat}`];
     if (name === undefined) return [];
@@ -185,31 +229,33 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
-  const startAt = round.startAt === undefined ? null : Number(round.startAt);
-  const anchorAts = SEATS.map((seat) => {
-    const anchorAt = round[`anchor${seat}`];
-    return anchorAt === undefined ? null : Number(anchorAt);
-  });
   const end = fields.end === undefined ? null : (JSON.parse(fields.end) as DuelEnd);
   return {
     kind: fields.kind === "ranked" ? "ranked" : "custom",
     participants,
     holderIds,
     playerIds,
-    round: { number, words: JSON.parse(round.words) as string[], startAt, anchorAts },
+    round,
     end,
   };
 };
 
-// Atomic, so two instances seating the two Participants at once announce a single Start. Once
-// announced, the Start never moves: a Participant who comes back gets the same instant. Nothing is
-// announced for a Round that is not the Duel's current one, nor for a Duel that expired.
+// Atomic, so that of every instance that could announce the Countdown of a Round, a single one
+// does. Once announced, the Start never moves: a Participant who comes back gets the same instant.
+// A Start fixed when the Round before ended is announced once its Countdown begins, whoever is
+// connected; the Start of a Round without one is fixed here, once both seats are connected.
+// Nothing is announced for a Round that is not the Duel's current one, nor for a Duel that expired.
 const ANNOUNCE_START = `
 if redis.call('HGET', KEYS[1], 'round') ~= ARGV[3] then return {} end
 local startAt = redis.call('HGET', KEYS[2], 'startAt')
-if startAt then return {startAt, '0'} end
+if redis.call('HGET', KEYS[2], 'announced') == '1' then return {startAt, '0'} end
+if startAt then
+  if tonumber(ARGV[1]) < tonumber(startAt) then return {} end
+  redis.call('HSET', KEYS[2], 'announced', '1')
+  return {startAt, '1'}
+end
 if redis.call('HGET', KEYS[1], 'connected0') ~= '1' or redis.call('HGET', KEYS[1], 'connected1') ~= '1' then return {} end
-redis.call('HSET', KEYS[2], 'startAt', ARGV[1])
+redis.call('HSET', KEYS[2], 'startAt', ARGV[1], 'announced', '1')
 -- Counted again from the Start, so that a Duel joined late does not expire before it is finalised.
 redis.call('PEXPIRE', KEYS[1], ARGV[2])
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
@@ -217,8 +263,10 @@ return {ARGV[1], '1'}
 `;
 
 /**
- * Announces the Start of `round` at `startAt` once both seats are connected. Gives the Start
- * instant, and whether this call announced it, or `null` while a seat is still empty or away.
+ * Announces the Countdown of `round`, `startAt` being the end of a Countdown that begins now. A
+ * Start already fixed is announced once `startAt` has reached it; otherwise the Start is fixed at
+ * `startAt` once both seats are connected. Gives the Start instant, and whether this call
+ * announced it, or `null` while there is nothing to announce yet.
  */
 export const announceStart = async (
   redis: Redis,
@@ -360,12 +408,31 @@ const FINALISATION_CLAIM_MS = 10_000;
 const finalisationKey = (redis: Redis, duelId: string) =>
   redis.name("duel", duelId, "finalisation");
 
-// Atomic, so that of every instance that sees both Games of the current Round ended, a single one
-// finalises the Duel at a time, and none once its end is recorded. The claim expires, so that a
-// crash cannot hold it.
+// Atomic, so that a Round ends exactly once, whichever instances see both of its Games ended: the
+// end is recorded with what follows it, either the Duel being decided or the next Round, created
+// with its Target words and a Start fixed at this moment. Only the instance that wins this step
+// announces the end of the Round.
+const END_ROUND = `
+if redis.call('HGET', KEYS[1], 'round') ~= ARGV[1] then return 0 end
+if redis.call('HGET', KEYS[2], 'ended0') ~= '1' or redis.call('HGET', KEYS[2], 'ended1') ~= '1' then return 0 end
+if redis.call('HEXISTS', KEYS[2], 'end') == 1 then return 0 end
+redis.call('HSET', KEYS[2], 'end', ARGV[2])
+if ARGV[3] == '' then
+  redis.call('HSET', KEYS[1], 'decided', '1')
+else
+  redis.call('HSET', KEYS[3], 'words', ARGV[4], 'startAt', ARGV[5])
+  redis.call('PEXPIRE', KEYS[3], ARGV[6])
+  redis.call('HSET', KEYS[1], 'round', ARGV[3])
+end
+redis.call('PEXPIRE', KEYS[1], ARGV[6])
+redis.call('PEXPIRE', KEYS[2], ARGV[6])
+return 1
+`;
+
+// Atomic, so that of every instance that sees the Duel decided, a single one finalises it at a
+// time, and none once its end is recorded. The claim expires, so that a crash cannot hold it.
 const CLAIM_FINALISATION = `
-if redis.call('HGET', KEYS[1], 'round') ~= ARGV[2] then return 0 end
-if redis.call('HGET', KEYS[3], 'ended0') ~= '1' or redis.call('HGET', KEYS[3], 'ended1') ~= '1' then return 0 end
+if redis.call('HGET', KEYS[1], 'decided') ~= '1' then return 0 end
 if redis.call('HEXISTS', KEYS[1], 'end') == 1 then return 0 end
 if redis.call('SET', KEYS[2], '1', 'NX', 'PX', ARGV[1]) then return 1 end
 return 0
@@ -381,16 +448,14 @@ export const recordEnd = async (redis: Redis, duelId: string, end: DuelEnd) => {
   await redis.client.eval(RECORD_END, 1, duelKey(redis, duelId), JSON.stringify(end));
 };
 
-/** Whether this call claimed the finalisation of a Duel whose Games of `round` have both ended. */
-export const claimFinalisation = async (redis: Redis, duelId: string, round: number) => {
+/** Whether this call claimed the finalisation of a Duel that its Rounds have decided. */
+export const claimFinalisation = async (redis: Redis, duelId: string) => {
   const claimed: number = await redis.client.eval(
     CLAIM_FINALISATION,
-    3,
+    2,
     duelKey(redis, duelId),
     finalisationKey(redis, duelId),
-    roundKey(redis, duelId, round),
     FINALISATION_CLAIM_MS,
-    round,
   );
   return claimed === 1;
 };
@@ -400,11 +465,18 @@ export const releaseFinalisation = async (redis: Redis, duelId: string) => {
   await redis.client.del(finalisationKey(redis, duelId));
 };
 
+/** A Round as it is saved: what it was played on, its instants, and both Games with their journals. */
+type PlayedRound = FinishedRound & {
+  readonly number: number;
+  readonly words: readonly string[];
+  readonly startAt: number;
+  readonly endedAt: number;
+  readonly journals: readonly [GameEvent[], GameEvent[]];
+};
+
 /**
- * Judges a Duel whose single Round has both Games finished from their journals, and saves it with
- * its Round, both Games and both participants in one transaction. Gives both Results and both
- * Outcomes, indexed by seat. A Duel saved already, by a finalisation that failed after its save,
- * is not saved again.
+ * Saves a decided Duel with every Round, their Games and both participants in one transaction.
+ * A Duel saved already, by a finalisation that failed after its save, is not saved again.
  */
 export const saveDuel = async (
   db: Db,
@@ -412,42 +484,49 @@ export const saveDuel = async (
   played: {
     readonly kind: DuelKind;
     readonly playerIds: readonly (string | null)[];
-    readonly round: number;
-    readonly words: readonly string[];
-    readonly startAt: number;
-    readonly journals: readonly [GameEvent[], GameEvent[]];
+    /** The Outcomes of the Duel, indexed by seat. */
+    readonly outcomes: readonly [Outcome, Outcome];
+    readonly rounds: readonly PlayedRound[];
   },
 ) => {
-  const { kind, playerIds, round, words, startAt, journals } = played;
-  const results = [
-    getResult(replayGame(words, journals[0])),
-    getResult(replayGame(words, journals[1])),
-  ] as const;
-  const outcomes = [
-    getOutcome(results[0], results[1]),
-    getOutcome(results[1], results[0]),
-  ] as const;
-  const startedAt = new Date(startAt);
-  const endedAt = new Date();
+  const { kind, playerIds, outcomes, rounds } = played;
+  const first = rounds.at(0);
+  const last = rounds.at(-1);
+  if (!first || !last) throw new Error(`Duel ${duelId} has ended without a Round`);
   await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(duel)
-      .values({ id: duelId, kind, config: DUEL_GAME_CONFIG, startedAt, endedAt })
+      .values({
+        id: duelId,
+        kind,
+        config: DUEL_GAME_CONFIG,
+        startedAt: new Date(first.startAt),
+        endedAt: new Date(last.endedAt),
+      })
       .onConflictDoNothing()
       .returning({ id: duel.id });
     if (inserted.length === 0) return;
-    await tx.insert(duelRound).values({ duelId, round, words: [...words], startedAt, endedAt });
-    await tx.insert(duelGame).values(
-      SEATS.map((seat) => ({
+    await tx.insert(duelRound).values(
+      rounds.map((round) => ({
         duelId,
-        round,
-        seat,
-        result: results[seat],
-        journal: journals[seat],
-        outcome: outcomes[seat],
+        round: round.number,
+        words: [...round.words],
+        startedAt: new Date(round.startAt),
+        endedAt: new Date(round.endedAt),
       })),
     );
-    // With a single Round, the Outcome of the Duel is the Outcome of that Round.
+    await tx.insert(duelGame).values(
+      rounds.flatMap((round) =>
+        SEATS.map((seat) => ({
+          duelId,
+          round: round.number,
+          seat,
+          result: round.results[seat],
+          journal: round.journals[seat],
+          outcome: round.outcomes[seat],
+        })),
+      ),
+    );
     await tx.insert(duelParticipant).values(
       SEATS.map((seat) => ({
         duelId,
@@ -457,7 +536,6 @@ export const saveDuel = async (
       })),
     );
   });
-  return { results, outcomes };
 };
 
 /** The journals of both Games of `round` so far, indexed by seat. */
@@ -477,34 +555,52 @@ export const readJournals = async (
   return [await read(0), await read(1)];
 };
 
+/** The delays a Duel moves from one Round to the next by. */
+export type RoundDelays = {
+  readonly expiryMs: number;
+  readonly countdownMs: number;
+  /** Between the end of a Round and the Countdown of the next one. */
+  readonly roundPauseMs: number;
+};
+
 /**
- * Saves a Duel whose two Games of `round` have ended, keeps its end and announces it to both
- * Participants. Run by whichever instance sees both Games ended: the claim lets only one of them
- * through, and is let go when the finalisation fails, so that it can be tried again.
+ * Saves a Duel that its Rounds have decided, keeps its end and announces it to both Participants.
+ * Run by whichever instance sees it decided: the claim lets only one of them through, and is let
+ * go when the finalisation fails, so that it can be tried again.
  */
 export const finaliseDuel = async (
   db: Db,
   redis: Redis,
   relay: Pick<Relay, "publish">,
   duelId: string,
-  round: number,
 ) => {
-  if (!(await claimFinalisation(redis, duelId, round))) return;
+  if (!(await claimFinalisation(redis, duelId))) return;
   try {
     const duel = await readDuel(redis, duelId);
     // Expired meanwhile: nothing is left to save.
     if (!duel) return;
-    const { number, words, startAt } = duel.round;
-    if (startAt === null) throw new Error(`Duel ${duelId} has ended without a Start`);
-    const { results, outcomes } = await saveDuel(db, duelId, {
-      kind: duel.kind,
-      playerIds: duel.playerIds,
-      round: number,
-      words,
-      startAt,
-      journals: await readJournals(redis, duelId, number),
-    });
-    const end = { type: "end", results, outcomes } as const;
+    const rounds: PlayedRound[] = [];
+    for (const { number, words, startAt, end } of await readRounds(
+      redis,
+      duelId,
+      duel.round.number,
+    )) {
+      if (startAt === null || end === null)
+        throw new Error(`Round ${number} of Duel ${duelId} has not ended`);
+      const journals = await readJournals(redis, duelId, number);
+      rounds.push({ number, words, startAt, journals, ...end });
+    }
+    const outcomes = getDuelOutcomes(rounds.map((round) => round.outcomes));
+    if (outcomes === null) throw new Error(`Duel ${duelId} is not decided`);
+    await saveDuel(db, duelId, { kind: duel.kind, playerIds: duel.playerIds, outcomes, rounds });
+    const end = {
+      type: "end",
+      outcomes,
+      rounds: rounds.map(({ results, outcomes: roundOutcomes }) => ({
+        results,
+        outcomes: roundOutcomes,
+      })),
+    } as const;
     await recordEnd(redis, duelId, end);
     await relay.publish(duelId, null, end);
   } catch (error) {
@@ -514,57 +610,141 @@ export const finaliseDuel = async (
 };
 
 /**
- * Ends the Games of the current Round whose clients went silent, at their start plus 30 seconds,
- * then finalises the Duel.
+ * Ends `round` once both of its Games have ended: judges it from their journals, and either
+ * creates the next Round, whose Start is fixed at this moment, or finalises the Duel when it is
+ * decided. Run by whichever instance sees both Games ended; the Round ends once all the same.
+ */
+export const endRound = async (
+  db: Db,
+  redis: Redis,
+  relay: Pick<Relay, "publish">,
+  duelId: string,
+  round: number,
+  { expiryMs, countdownMs, roundPauseMs }: RoundDelays,
+) => {
+  const rounds = await readRounds(redis, duelId, round);
+  const current = rounds.at(-1);
+  const isOver = current?.gamesEnded.every((ended) => ended) === true;
+  if (current?.number === round && rounds.length === round && current.end === null && isOver) {
+    const journals = await readJournals(redis, duelId, round);
+    const results = [
+      getResult(replayGame(current.words, journals[0])),
+      getResult(replayGame(current.words, journals[1])),
+    ] as const;
+    const outcomes = [
+      getOutcome(results[0], results[1]),
+      getOutcome(results[1], results[0]),
+    ] as const;
+    const earlier = finishedRounds(rounds).map((finished) => finished.outcomes);
+    const decided = getDuelOutcomes([...earlier, outcomes]) !== null;
+    const endedAt = Date.now();
+    const nextStartAt = decided ? null : endedAt + roundPauseMs + countdownMs;
+    const ended: number = await redis.client.eval(
+      END_ROUND,
+      3,
+      duelKey(redis, duelId),
+      roundKey(redis, duelId, round),
+      roundKey(redis, duelId, round + 1),
+      round,
+      JSON.stringify({ results, outcomes, endedAt }),
+      decided ? "" : round + 1,
+      // Drawn anew: no Round is played on the Target words of another.
+      JSON.stringify(drawWords(DUEL_WORD_COUNT, Math.random)),
+      nextStartAt ?? "",
+      expiryMs,
+    );
+    if (ended === 1)
+      await relay.publish(duelId, null, {
+        type: "roundEnd",
+        round,
+        results,
+        outcomes,
+        nextStartAt,
+      });
+  }
+  await finaliseDuel(db, redis, relay, duelId);
+};
+
+/**
+ * Announces the Countdown of `round` to both Participants once it begins, whoever is connected:
+ * its Start was fixed when the Round before it ended.
+ */
+export const announceCountdown = async (
+  redis: Redis,
+  relay: Pick<Relay, "publish">,
+  duelId: string,
+  round: number,
+  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
+) => {
+  const start = await announceStart(redis, duelId, round, { startAt, expiryMs });
+  if (!start?.announced) return;
+  const duel = await readDuel(redis, duelId);
+  if (duel?.round.number !== round) return;
+  const { words } = duel.round;
+  await relay.publish(duelId, null, { type: "countdown", round, startAt: start.startAt, words });
+};
+
+/**
+ * Ends the Games of `round` whose clients went silent, at their start plus 30 seconds, then ends
+ * the Round. A Game that never started is started at the Start of the Round.
  */
 export const closeOverdueGames = async (
   db: Db,
   redis: Redis,
   relay: Pick<Relay, "publish">,
   duelId: string,
-  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
+  round: number,
+  delays: RoundDelays,
 ) => {
   const duel = await readDuel(redis, duelId);
   if (!duel) return;
-  const { number, words } = duel.round;
-  const journals = await readJournals(redis, duelId, number);
-  for (const seat of SEATS) {
-    const game = replayGame(words, journals[seat]);
-    if (game.status === "finished") continue;
-    const events = closingEvents(journals[seat], startAt);
-    await appendEvents(redis, duelId, number, seat, events, { ends: true, expiryMs });
+  const { number, words, startAt } = duel.round;
+  if (number === round && startAt !== null) {
+    const journals = await readJournals(redis, duelId, round);
+    for (const seat of SEATS) {
+      const game = replayGame(words, journals[seat]);
+      if (game.status === "finished") continue;
+      const events = closingEvents(journals[seat], startAt);
+      const { expiryMs } = delays;
+      await appendEvents(redis, duelId, round, seat, events, { ends: true, expiryMs });
+    }
   }
-  await finaliseDuel(db, redis, relay, duelId, number);
+  await endRound(db, redis, relay, duelId, round, delays);
 };
 
 /**
- * Runs `close` on each Duel once its deadline has passed, then again until it succeeds: a failed
- * finalisation is tried again here, until the Duel is finalised or expires. Each instance that
- * holds one of a Duel's sockets watches its deadline, so that any of them can close it.
+ * Runs each watched step once its instant has come, then again every `retryMs` until it succeeds:
+ * a failed finalisation is tried again here, until the Duel is finalised or expires. Each instance
+ * that holds one of a Duel's sockets watches its steps, so that any of them can run them. A step
+ * is watched once per `key`.
  */
-export const createDeadlineWatch = (close: (duelId: string, startAt: number) => Promise<void>) => {
+export const createDeadlineWatch = (retryMs: number) => {
   const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
   const watch = (
-    duelId: string,
-    startAt: number,
-    delayMs = startAt + DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS - Date.now(),
+    key: string,
+    at: number,
+    run: () => Promise<void>,
+    delayMs = Math.max(0, at - Date.now()),
   ) => {
-    if (deadlines.has(duelId)) return;
+    if (deadlines.has(key)) return;
     const timer = setTimeout(() => {
-      close(duelId, startAt).then(
-        () => deadlines.delete(duelId),
+      run().then(
+        () => deadlines.delete(key),
         (error: unknown) => {
-          console.error(`Could not close the overdue Games of Duel ${duelId}`, error);
-          deadlines.delete(duelId);
-          watch(duelId, startAt, END_GRACE_MS);
+          console.error(`Could not run the watched step ${key}`, error);
+          deadlines.delete(key);
+          watch(key, at, run, retryMs);
         },
       );
     }, delayMs);
-    deadlines.set(duelId, timer);
+    deadlines.set(key, timer);
   };
   const stop = () => {
     for (const timer of deadlines.values()) clearTimeout(timer);
     deadlines.clear();
   };
-  return { watch: (duelId: string, startAt: number) => watch(duelId, startAt), stop };
+  return {
+    watch: (key: string, at: number, run: () => Promise<void>) => watch(key, at, run),
+    stop,
+  };
 };
