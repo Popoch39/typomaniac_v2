@@ -7,13 +7,19 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/frontend/package.json ./apps/frontend/
+COPY apps/matchmaker/package.json ./apps/matchmaker/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/typing-engine/package.json ./packages/typing-engine/
 COPY packages/duel-engine/package.json ./packages/duel-engine/
 COPY packages/ranked-engine/package.json ./packages/ranked-engine/
+COPY packages/redis/package.json ./packages/redis/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 RUN bun install --frozen-lockfile --filter api
 
+# The workspace packages the API imports are compiled from their sources: each one must be copied whole.
+COPY packages/typing-engine ./packages/typing-engine
+COPY packages/duel-engine ./packages/duel-engine
+COPY packages/redis ./packages/redis
 COPY apps/api ./apps/api
 ENV NODE_ENV=production
 # No full `--minify`: it renames functions and breaks OpenTelemetry span names.
