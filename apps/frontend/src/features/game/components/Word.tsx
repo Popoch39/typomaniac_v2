@@ -9,18 +9,18 @@ type WordProps = {
 };
 
 export function Word({ index }: WordProps) {
-  const { letters, caretIndex, isWrong } = useWord(index);
+  const { letters, hasCaretAtEnd, isWrong } = useWord(index);
   const scrollRef = useActiveWordScroll(index);
 
   return (
     <span ref={scrollRef} className={isWrong ? "word word-wrong" : "word"}>
       {letters.map((letter, letterIndex) => (
         <Fragment key={letterIndex}>
-          {letterIndex === caretIndex && <Caret />}
+          {letter.hasCaretBefore && <Caret />}
           <Letter char={letter.char} state={letter.state} />
         </Fragment>
       ))}
-      {caretIndex === letters.length && <Caret />}
+      {hasCaretAtEnd && <Caret />}
     </span>
   );
 }

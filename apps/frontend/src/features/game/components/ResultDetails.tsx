@@ -1,4 +1,5 @@
 import type { Result } from "@repo/typing-engine";
+import { useResultDetails } from "../hooks/useResultDetails.ts";
 import { ResultStat } from "./ResultStat.tsx";
 
 type ResultDetailsProps = {
@@ -6,15 +7,15 @@ type ResultDetailsProps = {
 };
 
 export function ResultDetails({ result }: ResultDetailsProps) {
-  const { correct, incorrect, extra, missed } = result.charCounts;
+  const { duration, correct, incorrect, extra, missed } = useResultDetails(result);
 
   return (
     <dl className="result-details">
-      <ResultStat label="Duration" value={`${result.duration}s`} />
-      <ResultStat label="Correct" value={String(correct)} />
-      <ResultStat label="Incorrect" value={String(incorrect)} />
-      <ResultStat label="Extra" value={String(extra)} />
-      <ResultStat label="Missed" value={String(missed)} />
+      <ResultStat label="Duration" value={duration} />
+      <ResultStat label="Correct" value={correct} />
+      <ResultStat label="Incorrect" value={incorrect} />
+      <ResultStat label="Extra" value={extra} />
+      <ResultStat label="Missed" value={missed} />
     </dl>
   );
 }
