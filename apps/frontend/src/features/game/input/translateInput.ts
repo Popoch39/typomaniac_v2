@@ -8,6 +8,15 @@ export type BrowserInput = {
 
 /** The Event a browser input stands for at instant `at`, or null when it must not reach the engine. */
 export function translateInput(input: BrowserInput, at: number): GameEvent | null {
-  if (input.inputType !== "insertText" || input.data === null) return null;
-  return { type: "insert", at, text: input.data };
+  // Paste, drop and composition fall through: a Result must only come from direct typing.
+  switch (input.inputType) {
+    case "insertText":
+      return input.data === null ? null : { type: "insert", at, text: input.data };
+    case "deleteContentBackward":
+      return { type: "delete", at, unit: "char" };
+    case "deleteWordBackward":
+      return { type: "delete", at, unit: "word" };
+    default:
+      return null;
+  }
 }
