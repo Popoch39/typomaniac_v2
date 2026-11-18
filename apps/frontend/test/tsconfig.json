@@ -14,7 +14,9 @@
     ".",
     "../src/features/game/input",
     "../src/features/game/words/judgeLetter.ts",
-    "../src/features/duel/clock"
+    "../src/features/game/words/withoutSeparator.ts",
+    "../src/features/duel/clock",
+    "../src/features/duel/caret"
   ],
   "references": [{ "path": "../../../packages/typing-engine" }]
 }

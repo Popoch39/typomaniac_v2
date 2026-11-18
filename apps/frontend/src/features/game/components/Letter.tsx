@@ -1,3 +1,4 @@
+import { OpponentCaret } from "../../duel/components/OpponentCaret.tsx";
 import { useLetter } from "../hooks/useLetter.ts";
 import { Caret } from "./Caret.tsx";
 
@@ -12,6 +13,7 @@ export function Letter({ wordIndex, letterIndex }: LetterProps) {
   return (
     <>
       {hasCaretBefore && <Caret />}
+      <OpponentCaret wordIndex={wordIndex} letterIndex={letterIndex} />
       <span className={`letter letter-${state}`}>{char}</span>
     </>
   );

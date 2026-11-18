@@ -1,3 +1,4 @@
+import { OpponentCaret } from "../../duel/components/OpponentCaret.tsx";
 import { useActiveWordScroll } from "../hooks/useActiveWordScroll.ts";
 import { useWord } from "../hooks/useWord.ts";
 import { Caret } from "./Caret.tsx";
@@ -17,6 +18,7 @@ export function Word({ index }: WordProps) {
         <Letter key={letterIndex} wordIndex={index} letterIndex={letterIndex} />
       ))}
       {hasCaretAtEnd && <Caret />}
+      <OpponentCaret wordIndex={index} letterIndex={letterCount} />
     </span>
   );
 }
