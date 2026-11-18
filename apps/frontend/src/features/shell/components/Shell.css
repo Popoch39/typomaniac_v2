@@ -139,8 +139,12 @@
     align-items: center;
   }
 
-  /* "Guest" has no icon to sit next to: it stays readable to screen readers only. */
-  .player-block > .player-name {
+  /*
+   * "Guest" has no icon to sit next to, and the session check messages are too long for the rail:
+   * they stay readable to screen readers, and the session check keeps its icon and a tooltip.
+   */
+  .player-block > .player-name,
+  .player-block .session-check-message {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -149,12 +153,7 @@
     white-space: nowrap;
   }
 
-  /* The rail keeps only the Avatar at the bottom. */
-  .sidebar .sign-out {
-    display: none;
+  .player-block .session-check-icon {
+    display: block;
   }
-}
-
-.page {
-  padding: 32px;
 }
