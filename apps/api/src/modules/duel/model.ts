@@ -24,6 +24,8 @@ const list = <Item extends TSchema>(item: Item) => t.Immutable(t.Array(item));
 const pair = <Item extends TSchema>(item: Item) => t.Immutable(t.Tuple([item, item]));
 
 const at = t.Number();
+// Rounds are numbered from 1.
+const round = t.Integer({ minimum: 1 });
 
 const gameEvent = t.Union([
   t.Object({ type: t.Literal("start"), at }),
@@ -65,11 +67,47 @@ const result = t.Object({
 
 const outcome = t.Union([t.Literal("win"), t.Literal("loss"), t.Literal("draw")]);
 
+const finishedRound = { results: pair(result), outcomes: pair(outcome) };
+
+const lp = t.Integer();
+
+// The shape the `standing` module answers with, written again since a model is not imported across
+// modules. `null` for an Unranked Player.
+const rank = t.Union([
+  t.Object({
+    tier: t.Union([
+      t.Literal("bronze"),
+      t.Literal("silver"),
+      t.Literal("gold"),
+      t.Literal("platinum"),
+      t.Literal("diamond"),
+    ]),
+    division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
+    lp,
+  }),
+  t.Object({ tier: t.Literal("master"), lp }),
+  t.Null(),
+]);
+
+// Every field a Player may see of what a ranked Duel did to a Standing. The MMR is hidden (ADR
+// 0006): left out here, it is stripped from whatever the end carries.
+const rankedEnd = t.Object({
+  lpDelta: lp,
+  rankChange: t.Union([
+    t.Literal("placed"),
+    t.Literal("promoted"),
+    t.Literal("demoted"),
+    t.Literal("none"),
+  ]),
+  rank,
+  placement: t.Object({ played: t.Integer(), total: t.Integer() }),
+});
+
 export const IdSocket = {
   Params: duelParams,
   Body: t.Union([
     t.Object({ type: t.Literal("ping"), clientAt: t.Number() }),
-    t.Object({ type: t.Literal("event"), event: gameEvent }),
+    t.Object({ type: t.Literal("event"), round, event: gameEvent }),
   ]),
   Response: {
     // What the socket sends once open; the other statuses refuse the upgrade.
@@ -78,14 +116,34 @@ export const IdSocket = {
       t.Object({
         type: t.Literal("state"),
         seat,
-        words: list(t.String()),
+        round,
+        rounds: list(t.Object(finishedRound)),
+        startAt: t.Union([t.Number(), t.Null()]),
+        words: t.Union([list(t.String()), t.Null()]),
         participants: list(participant),
+        ranks: t.Union([pair(rank), t.Null()]),
         journals: pair(list(gameEvent)),
       }),
       t.Object({ type: t.Literal("presence"), participant }),
-      t.Object({ type: t.Literal("countdown"), startAt: t.Number() }),
+      t.Object({
+        type: t.Literal("countdown"),
+        round,
+        startAt: t.Number(),
+        words: list(t.String()),
+      }),
       t.Object({ type: t.Literal("opponentEvent"), event: gameEvent }),
-      t.Object({ type: t.Literal("end"), results: pair(result), outcomes: pair(outcome) }),
+      t.Object({
+        type: t.Literal("roundEnd"),
+        round,
+        ...finishedRound,
+        nextStartAt: t.Union([t.Number(), t.Null()]),
+      }),
+      t.Object({
+        type: t.Literal("end"),
+        outcomes: pair(outcome),
+        rounds: list(t.Object(finishedRound)),
+        ranked: t.Union([pair(rankedEnd), t.Null()]),
+      }),
     ]),
     404: notFound,
     409: t.Object({ code: t.Literal("DUEL_FULL") }),

@@ -9,6 +9,8 @@ const isNumber: Check = (value) => typeof value === "number" && Number.isFinite(
 const isString: Check = (value) => typeof value === "string";
 const isBoolean: Check = (value) => typeof value === "boolean";
 const isSeat: Check = (value) => value === 0 || value === 1;
+// Rounds are numbered from 1.
+const isRound: Check = (value) => Number.isInteger(value) && Number(value) >= 1;
 const isOutcome: Check = (value) => value === "win" || value === "loss" || value === "draw";
 
 const isListOf =
@@ -19,6 +21,10 @@ const isPairOf =
   (isItem: Check): Check =>
   (value) =>
     isListOf(isItem)(value) && Array.isArray(value) && value.length === 2;
+const isNullOr =
+  (isValue: Check): Check =>
+  (value) =>
+    value === null || isValue(value);
 const hasFields = (value: unknown, checks: Record<string, Check>) =>
   isRecord(value) && Object.entries(checks).every(([key, check]) => check(value[key]));
 
@@ -62,19 +68,56 @@ const isResult: Check = (value) =>
     inactiveAtEnd: isBoolean,
   });
 
+const isFinishedRound: Check = (value) =>
+  hasFields(value, { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) });
+
+const isRank: Check = (value) => {
+  if (!isRecord(value) || !Number.isInteger(value.lp)) return false;
+  if (value.tier === "master") return true;
+  return (
+    ["bronze", "silver", "gold", "platinum", "diamond"].includes(String(value.tier)) &&
+    [1, 2, 3, 4].includes(Number(value.division))
+  );
+};
+
+const isRankedEnd: Check = (value) =>
+  hasFields(value, {
+    lpDelta: (lpDelta) => Number.isInteger(lpDelta),
+    rankChange: (change) =>
+      change === "placed" || change === "promoted" || change === "demoted" || change === "none",
+    rank: isNullOr(isRank),
+    placement: (placement) => hasFields(placement, { played: isNumber, total: isNumber }),
+  });
+
 // What each type of message must carry, as the server's schemas send it.
 const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
   pong: { clientAt: isNumber, serverAt: isNumber },
   state: {
     seat: isSeat,
-    words: isListOf(isString),
+    round: isRound,
+    rounds: isListOf(isFinishedRound),
+    startAt: isNullOr(isNumber),
+    words: isNullOr(isListOf(isString)),
     participants: isListOf(isParticipant),
+    // `null` for a Custom Duel, but never left out.
+    ranks: (ranks) => ranks !== undefined && isNullOr(isPairOf(isNullOr(isRank)))(ranks),
     journals: isPairOf(isListOf(isGameEvent)),
   },
   presence: { participant: isParticipant },
-  countdown: { startAt: isNumber },
+  countdown: { round: isRound, startAt: isNumber, words: isListOf(isString) },
   opponentEvent: { event: isGameEvent },
-  end: { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) },
+  roundEnd: {
+    round: isRound,
+    results: isPairOf(isResult),
+    outcomes: isPairOf(isOutcome),
+    nextStartAt: isNullOr(isNumber),
+  },
+  end: {
+    outcomes: isPairOf(isOutcome),
+    rounds: isListOf(isFinishedRound),
+    // `null` for a Custom Duel, but never left out.
+    ranked: (ranked) => ranked !== undefined && isNullOr(isPairOf(isRankedEnd))(ranked),
+  },
 };
 
 const isMessageType = (type: unknown): type is ServerMessage["type"] =>

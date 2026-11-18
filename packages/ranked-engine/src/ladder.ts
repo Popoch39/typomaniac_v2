@@ -18,11 +18,19 @@ function referenceMmr(index: number, config: RankedConfig): number {
   return config.bronzeIvMmr + index * config.mmrPerDivision;
 }
 
-/** Master sits one step above Diamond I, past the end of the ladder. */
-function ladderIndex(rank: Rank): number {
+/** LADDER-1: the number of Divisions below the Rank's own; Master sits one step above Diamond I, past the end of the ladder. */
+export function ladderIndex(rank: Rank): number {
   return rank.tier === "master"
     ? LADDER.length
     : LADDER.findIndex((step) => isSameDivision(step, rank));
+}
+
+/** LADDER-2: the Rank a ladder index and the LP held stand for, the inverse of `ladderIndex`. */
+export function rankAtLadderIndex(index: number, lp: number): Rank {
+  if (index === LADDER.length) return { tier: "master", lp };
+  const step = LADDER[index];
+  if (step === undefined) throw new RangeError(`No Division at ladder index ${index}`);
+  return { ...step, lp };
 }
 
 /** LP-1 reference of the Rank; in Master it rises with the LP held, so gains shrink as the LP outgrow the MMR. */

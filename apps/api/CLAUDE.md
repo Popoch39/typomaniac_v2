@@ -18,7 +18,7 @@ src/
     client.ts       Ouverture et migration de la base
     schema.ts       Toutes les tables Drizzle
   redis/
-    client.ts       Ouverture de Redis (client de commandes + connexion d'abonnement), sous un namespace
+    client.ts       Ré-exporte l'ouverture de Redis du package `@repo/redis`, partagé avec `apps/matchmaker`
   modules/
     <module>/
       index.ts      Routes et comportement HTTP du module (instance ou plugin Elysia)
@@ -38,7 +38,7 @@ test/
 - Les tables restent toutes dans `src/db/schema.ts` : l'adaptateur Better Auth et drizzle-kit lisent ce seul fichier.
 - `src/app.ts` compose l'app et exporte `App` (type partagé avec le client Eden) sans écouter de port. Il ne déclare aucune route métier : une nouvelle route va dans son module.
 - `src/index.ts` est le seul endroit qui appelle `.listen()`.
-- `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse.
+- `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse. Les packages que l'API importe (`@repo/typing-engine`, `@repo/duel-engine`, `@repo/ranked-engine`, `@repo/matchmaking-engine`, `@repo/redis`, `@repo/queue`) sont compilés depuis leurs sources : leur dossier entier doit aussi être copié avant `bun build`, sinon l'import ne se résout pas. `apps/matchmaker/Dockerfile` suit la même règle.
 - Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet. Exception : une route WebSocket ne s'upgrade pas par `app.handle()`, ses tests font `.listen(0)` et passent par de vrais clients HTTP et WebSocket (`test/helpers/socket.ts`).
 
 ## Base de données
@@ -56,6 +56,7 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en cours (`src/modules/duel/`), voir `docs/adr/0007-live-duel-in-memory-engine-redis-journal.md`.
 
 - Redis local : lancé par le même `docker compose up -d` que Postgres ; `REDIS_URL` dans `apps/api/.env`. `src/index.ts` refuse de démarrer sans lui, avant d'ouvrir Postgres.
+- `openRedis` et `requireRedisUrl` vivent dans `packages/redis` (`@repo/redis`), que le matchmaker utilise aussi ; `src/redis/client.ts` les ré-exporte et reste le seul chemin d'import dans l'API.
 - `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.
 - Redis est injecté comme la base : `createApp(db, auth, redis)`.
 - Dans les tests : `const testRedis = await createTestRedis()` (`test/helpers/redis.ts`) ouvre Redis sous un namespace propre au fichier ; `afterAll` appelle `testRedis.drop()`, qui efface ses clés et ferme les connexions.

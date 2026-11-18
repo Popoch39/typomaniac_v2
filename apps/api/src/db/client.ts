@@ -14,6 +14,9 @@ export const openDatabase = (url: string) => drizzle({ client: new SQL(url), sch
 
 export type Db = ReturnType<typeof openDatabase>;
 
+/** What a `db.transaction` callback is given to read and write through. */
+export type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 // Arbitrary constant shared by every API process, so only one of them migrates at a time.
 // Kept within int4 so Postgres resolves it to the bigint overload without depending on how Bun binds numbers.
 const MIGRATION_LOCK_KEY = 738_120_451;

@@ -1,7 +1,7 @@
 import { useDuelParticipants } from "../hooks/useDuelParticipants.ts";
 
 export function DuelParticipants() {
-  const { self, opponent, opponentAway } = useDuelParticipants();
+  const { self, opponent, opponentAway, opponentRank } = useDuelParticipants();
 
   return (
     // Each name in the colour of its caret, the Participant's own first.
@@ -12,6 +12,7 @@ export function DuelParticipants() {
       ) : (
         <span>waiting for an Opponent…</span>
       )}
+      {opponent && opponentRank !== null && <span> ({opponentRank})</span>}
       {opponentAway && (
         <span className="opacity-60" role="status">
           {" "}

@@ -1,4 +1,11 @@
-import { COUNTDOWN_MS, type Participant, type ServerMessage } from "@repo/duel-engine";
+import {
+  anchorStart,
+  boundEvent,
+  COUNTDOWN_MS,
+  type Participant,
+  ROUND_PAUSE_MS,
+  type ServerMessage,
+} from "@repo/duel-engine";
 import { applyEvent, type Game } from "@repo/typing-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
@@ -12,56 +19,96 @@ import {
   announceStart,
   appendEvents,
   claimSeat,
-  closeOverdueGames,
-  createDeadlineWatch,
   createDuel,
   DUEL_EXPIRY_MS,
-  finaliseDuel,
+  DUEL_SWEEP_INTERVAL_MS,
+  endRound,
+  finishedRounds,
   holdSeat,
   isEventAccepted,
   readDuel,
   readJournals,
+  readRounds,
   releaseSeat,
   replayGame,
   startLateGame,
+  sweepDuels,
 } from "./service.ts";
 
-export type DuelOptions = { readonly expiryMs?: number; readonly countdownMs?: number };
+export type DuelOptions = {
+  readonly expiryMs?: number;
+  readonly countdownMs?: number;
+  /** The pause between the end of a Round and the Countdown of the next one. */
+  readonly roundPauseMs?: number;
+  /** How often this instance sweeps the Duels that have something due. */
+  readonly sweepIntervalMs?: number;
+  /**
+   * From the creation of a ranked Duel to the Countdown of its first Round, when its Players are not
+   * both connected by then.
+   */
+  readonly connectMs?: number;
+};
 
 export const createDuelRoutes = (
   db: Db,
   auth: Auth,
   redis: Redis,
-  { expiryMs = DUEL_EXPIRY_MS, countdownMs = COUNTDOWN_MS }: DuelOptions = {},
+  {
+    expiryMs = DUEL_EXPIRY_MS,
+    countdownMs = COUNTDOWN_MS,
+    roundPauseMs = ROUND_PAUSE_MS,
+    sweepIntervalMs = DUEL_SWEEP_INTERVAL_MS,
+  }: DuelOptions = {},
 ) => {
   const relay = createRelay(redis);
+  const delays = { expiryMs, countdownMs, roundPauseMs };
   type Seating = {
     participant: Participant;
+    /** The Round this socket plays, the only one whose Events it takes: the last one it was told the Countdown of. */
+    round: number;
     /** Tells this socket from an older or newer one of the same seat. */
     connection: string;
     delivery: Parameters<typeof relay.join>[1];
     /** The Start this socket was told of, in server time, whichever instance announced it. */
     startAt: number | null;
+    /** The server instant the `start` of the Participant's Game is anchored at, wherever it was received. */
+    anchorAt: number | null;
     /** This instance's copy of the Participant's Game, rebuilt from its journal on opening. */
     game: Game;
   };
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
 
-  const deadlines = createDeadlineWatch((duelId, startAt) =>
-    closeOverdueGames(db, redis, relay, duelId, { startAt, expiryMs }),
-  );
+  // Every instance sweeps the Duels that have something due, its own or not: a Duel moves forward
+  // whoever is connected to it, and on whichever instance. One sweep at a time: a slow one is not
+  // overtaken by the next.
+  let sweeper: ReturnType<typeof setInterval> | undefined;
+  let sweep: Promise<void> | undefined;
+  const runSweep = () => {
+    sweep ??= sweepDuels(db, redis, relay, delays, Date.now())
+      .catch((error: unknown) => console.error("Could not sweep the Duels", error))
+      .finally(() => {
+        sweep = undefined;
+      });
+  };
 
   return (
     new Elysia({ prefix: "/api/duels" })
       .use(createProtection(auth))
       .use(websocket())
-      // A stopped instance closes no Game any more, as if it had crashed.
-      .onStop(() => deadlines.stop())
+      .onStart(() => {
+        sweeper = setInterval(runSweep, sweepIntervalMs);
+      })
+      // A stopped instance advances no Duel any more, as if it had crashed; the sweep it is in the
+      // middle of is left to finish.
+      .onStop(async () => {
+        clearInterval(sweeper);
+        await sweep;
+      })
       .post(
         "/",
         { participant: true, response: { 201: DuelModel.RootPost.Response } },
-        async ({ status }) => status(201, { id: await createDuel(redis, expiryMs) }),
+        async ({ status }) => status(201, { id: await createDuel(redis, "custom", expiryMs) }),
       )
       // Lets a client tell why its upgrade was refused, which a browser WebSocket never shows.
       .get(
@@ -100,26 +147,52 @@ export const createDuelRoutes = (
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
-          const journals = await readJournals(redis, ws.params.id);
-          const lateStart = await startLateGame(redis, ws.params.id, self.seat, {
+          const round = duel.round.number;
+          const { words, startAt, announced, anchorAts } = duel.round;
+          const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
+          const journals = await readJournals(redis, ws.params.id, round);
+          const lateStart = await startLateGame(redis, ws.params.id, round, self.seat, {
             journal: journals[self.seat],
-            startAt: duel.startAt,
+            startAt,
             now: Date.now(),
             expiryMs,
           });
           if (lateStart) journals[self.seat] = lateStart;
-          const game = replayGame(duel.words, journals[self.seat]);
+          const game = replayGame(words, journals[self.seat]);
           const send = (message: ServerMessage) => {
             // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
             if (message.type === "countdown") {
+              // The Countdown of a new Round: its Game is the one this socket plays from now on.
+              if (message.round !== entry.round) {
+                entry.round = message.round;
+                entry.game = replayGame(message.words, []);
+                entry.anchorAt = null;
+              }
               entry.startAt = message.startAt;
-              deadlines.watch(ws.params.id, message.startAt);
             }
             ws.send(message);
           };
           const connection = crypto.randomUUID();
-          const delivery = { seat: self.seat, connection, send, evict: () => ws.close() };
-          const entry: Seating = { participant: self, connection, delivery, startAt: null, game };
+          // The relay delivers from the join on, which comes before the state: what it delivers
+          // until then is held back, so that the state is always the first message of a socket.
+          let heldBack: ServerMessage[] | null = [];
+          const delivery = {
+            seat: self.seat,
+            connection,
+            send: (message: ServerMessage) => (heldBack ? heldBack.push(message) : send(message)),
+            evict: () => ws.close(),
+          };
+          // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
+          const anchorAt = lateStart ? startAt : (anchorAts[self.seat] ?? null);
+          const entry: Seating = {
+            participant: self,
+            round,
+            connection,
+            delivery,
+            startAt: null,
+            anchorAt,
+            game,
+          };
           seated.set(ws.id, entry);
           await holdSeat(redis, ws.params.id, self.seat, connection);
           await relay.join(ws.params.id, delivery);
@@ -128,21 +201,33 @@ export const createDuelRoutes = (
           send({
             type: "state",
             seat: self.seat,
-            words: duel.words,
+            round,
+            rounds,
+            startAt,
+            // Held back until the Countdown, which brings them to both Participants at once.
+            words: announced ? words : null,
             participants: duel.participants,
+            ranks: duel.ranks,
             journals,
           });
+          for (const message of heldBack) send(message);
+          heldBack = null;
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
           for (const event of lateStart ?? [])
             await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });
-          const start = await announceStart(redis, ws.params.id, {
-            startAt: Date.now() + countdownMs,
-            expiryMs,
-          });
-          if (!start) return;
-          const countdown = { type: "countdown", startAt: start.startAt } as const;
-          send(countdown);
-          if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
+          // A Round that has ended has no Countdown left to be told of.
+          const start =
+            duel.round.end === null
+              ? await announceStart(redis, ws.params.id, round, {
+                  startAt: Date.now() + countdownMs,
+                  expiryMs,
+                })
+              : null;
+          if (start) {
+            const countdown = { type: "countdown", round, startAt: start.startAt, words } as const;
+            send(countdown);
+            if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
+          }
           if (duel.end) send(duel.end);
         },
         async message(ws, message) {
@@ -153,23 +238,36 @@ export const createDuelRoutes = (
           }
           const seating = seated.get(ws.id);
           const { event } = message;
-          if (!seating) return;
-          const { status } = seating.game;
-          if (!isEventAccepted(event, { status, startAt: seating.startAt, now })) return;
-          seating.game = applyEvent(seating.game, event);
+          if (!seating || message.round !== seating.round) return;
+          const { status, startedAt } = seating.game;
+          const { startAt } = seating;
+          if (!isEventAccepted(event, { status, startAt, now })) return;
+          // Only a start is accepted in a Game that has not started.
+          if (startedAt === null && startAt !== null) seating.anchorAt = anchorStart(now, startAt);
+          const { anchorAt } = seating;
+          // The Event as bounded by its receipt is the only one applied, journaled and relayed
+          // (ADR 0009). A start is the reference the later Events are bounded from.
+          const taken =
+            startedAt === null || anchorAt === null
+              ? event
+              : boundEvent(event, { startedAt, anchorAt, receivedAt: now });
+          seating.game = applyEvent(seating.game, taken);
           const ends = seating.game.status === "finished";
           const { seat } = seating.participant;
-          const appended = await appendEvents(redis, ws.params.id, seat, [event], {
+          const { round } = seating;
+          const appended = await appendEvents(redis, ws.params.id, round, seat, [taken], {
             ends,
             expiryMs,
+            anchorAt: startedAt === null ? anchorAt : null,
           });
           // Refused when the server already ended this Game, from this instance or another one.
           if (!appended) return;
-          await relay.publish(ws.params.id, seat, { type: "opponentEvent", event });
-          // Tried again at the deadline when it fails.
+          await relay.publish(ws.params.id, seat, { type: "opponentEvent", event: taken });
+          // Tried again by the sweep when it fails.
           if (ends)
-            await finaliseDuel(db, redis, relay, ws.params.id).catch((error: unknown) =>
-              console.error(`Could not finalise Duel ${ws.params.id}`, error),
+            await endRound(db, redis, relay, ws.params.id, round, delays, Date.now()).catch(
+              (error: unknown) =>
+                console.error(`Could not end Round ${round} of Duel ${ws.params.id}`, error),
             );
         },
         async close(ws) {

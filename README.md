@@ -2,9 +2,16 @@
 
 Turborepo monorepo on Bun.
 
+## Apps
+
+- `api`: HTTP and WebSocket backend
+- `frontend`: web client
+- `matchmaker`: worker with no HTTP and no WebSocket; one leader at a time, held by a Redis lock
+
 ## Packages
 
 - `@repo/ui`: React component library
+- `@repo/redis`: opening Redis, shared by `api` and `matchmaker`
 - `@repo/typescript-config`: shared `tsconfig`s
 
 ## Quality

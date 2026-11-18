@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { eventTime } from "../../game/clock/eventTime.ts";
+import { clientTime } from "../../game/clock/clientTime.ts";
 import { type ClockSample, estimateClockOffset } from "../clock/estimateClockOffset.ts";
 import { sendToDuel } from "../socket/duelSocket.ts";
 
@@ -18,7 +18,7 @@ const CLOCK_SAMPLE_COUNT = 5;
 let samples: ClockSample[] = [];
 
 function ping() {
-  sendToDuel({ type: "ping", clientAt: eventTime() });
+  sendToDuel({ type: "ping", clientAt: clientTime() });
 }
 
 export const useDuelClockStore = create<DuelClockState>()((set) => ({
@@ -28,7 +28,7 @@ export const useDuelClockStore = create<DuelClockState>()((set) => ({
     ping();
   },
   receivePong: ({ clientAt, serverAt }) => {
-    samples.push({ sentAt: clientAt, serverAt, receivedAt: eventTime() });
+    samples.push({ sentAt: clientAt, serverAt, receivedAt: clientTime() });
     if (samples.length < CLOCK_SAMPLE_COUNT) return ping();
     set({ clockOffset: estimateClockOffset(samples) });
   },

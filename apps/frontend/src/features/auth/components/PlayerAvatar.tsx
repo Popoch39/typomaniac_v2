@@ -3,7 +3,7 @@ import { useAvatar } from "../hooks/useAvatar.ts";
 import type { SignedInPlayer } from "../hooks/useSignedInPlayer.ts";
 
 interface PlayerAvatarProps {
-  player: SignedInPlayer;
+  player: Pick<SignedInPlayer, "nickname" | "avatarUrl">;
   className?: string;
 }
 

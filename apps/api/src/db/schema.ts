@@ -1,5 +1,6 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
 import type { Outcome, Seat } from "@repo/duel-engine";
+import type { RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -7,12 +8,15 @@ import {
   text,
   timestamp,
   boolean,
+  check,
   index,
+  integer,
   uniqueIndex,
   uuid,
   jsonb,
   smallint,
   primaryKey,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // Named so the route can tell a Nickname already taken from any other unique violation.
@@ -120,30 +124,111 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
-// A finished Duel, written once in the transaction that saves its two Games.
+// A Player's Standing: one row per Player and no Season. A Player without a row has the Standing of a new Player.
+export const standing = pgTable(
+  "standing",
+  {
+    playerId: text("player_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mmr: integer("mmr").notNull(),
+    duelsPlayed: integer("duels_played").notNull(),
+    // The Rank, as the ranked engine's ladder index of its Division (Master past the last one) and
+    // its LP, so that Ranks order without knowing the Tier names. Both null while Unranked.
+    ladderIndex: smallint("ladder_index"),
+    lp: integer("lp"),
+  },
+  (table) => [
+    check("standing_rank_whole", sql`(${table.ladderIndex} is null) = (${table.lp} is null)`),
+    // The Leaderboard's order, so that its top is read from the index rather than sorted; only
+    // ranked Players are listed.
+    index("standing_leaderboard_idx")
+      .on(
+        table.ladderIndex.desc().nullsFirst(),
+        table.lp.desc().nullsFirst(),
+        table.mmr.desc().nullsFirst(),
+        table.playerId.asc(),
+      )
+      .where(sql`${table.ladderIndex} is not null`),
+  ],
+);
+
+// A finished Duel, written once in the transaction that saves its Rounds, Games and participants.
 export const duel = pgTable("duel", {
   id: uuid("id").primaryKey(),
+  kind: text("kind", { enum: ["custom", "ranked"] }).notNull(),
   config: jsonb("config").$type<GameConfig>().notNull(),
-  words: jsonb("words").$type<string[]>().notNull(),
   startedAt: timestamp("started_at").notNull(),
   endedAt: timestamp("ended_at").notNull(),
 });
 
-// One row per seat of a Duel, with the full journal so that the Game can be replayed and audited.
+// One row per Round of a Duel, numbered from 1: the Target words both Games were played on, and its instants.
+export const duelRound = pgTable(
+  "duel_round",
+  {
+    duelId: uuid("duel_id")
+      .notNull()
+      .references(() => duel.id, { onDelete: "cascade" }),
+    round: smallint("round").notNull(),
+    words: jsonb("words").$type<string[]>().notNull(),
+    startedAt: timestamp("started_at").notNull(),
+    endedAt: timestamp("ended_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.duelId, table.round] })],
+);
+
+// One row per seat of a Round, with the full journal so that the Game can be replayed and audited.
 export const duelGame = pgTable(
   "duel_game",
+  {
+    duelId: uuid("duel_id").notNull(),
+    round: smallint("round").notNull(),
+    seat: smallint("seat").$type<Seat>().notNull(),
+    result: jsonb("result").$type<Result>().notNull(),
+    journal: jsonb("journal").$type<GameEvent[]>().notNull(),
+    // The Outcome of the Round for this seat.
+    outcome: text("outcome", { enum: ["win", "loss", "draw"] })
+      .$type<Outcome>()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.duelId, table.round, table.seat] }),
+    foreignKey({
+      columns: [table.duelId, table.round],
+      foreignColumns: [duelRound.duelId, duelRound.round],
+    }).onDelete("cascade"),
+  ],
+);
+
+// One row per seat of a Duel: who sat there and what the Duel meant for them. The columns after the
+// Outcome are those of a ranked Duel, all null for a Custom Duel: the Player's Standing before and
+// after it, stored as in `standing`, so that a change of Rank can be explained and audited.
+export const duelParticipant = pgTable(
+  "duel_participant",
   {
     duelId: uuid("duel_id")
       .notNull()
       .references(() => duel.id, { onDelete: "cascade" }),
     seat: smallint("seat").$type<Seat>().notNull(),
-    // Null for a Guest, who leaves no trace: the Game stays as the one of an unnamed Opponent.
+    // Null for a Guest, who leaves no trace: the seat stays as the one of an unnamed Opponent.
     playerId: text("player_id").references(() => user.id, { onDelete: "set null" }),
-    result: jsonb("result").$type<Result>().notNull(),
-    journal: jsonb("journal").$type<GameEvent[]>().notNull(),
+    // The Outcome of the Duel for this seat.
     outcome: text("outcome", { enum: ["win", "loss", "draw"] })
       .$type<Outcome>()
       .notNull(),
+    mmrBefore: integer("mmr_before"),
+    mmrAfter: integer("mmr_after"),
+    duelsPlayedBefore: integer("duels_played_before"),
+    duelsPlayedAfter: integer("duels_played_after"),
+    ladderIndexBefore: smallint("ladder_index_before"),
+    lpBefore: integer("lp_before"),
+    ladderIndexAfter: smallint("ladder_index_after"),
+    lpAfter: integer("lp_after"),
+    // The LP won or lost, signed.
+    lpDelta: integer("lp_delta"),
+    rankChange: text("rank_change", {
+      enum: ["placed", "promoted", "demoted", "none"],
+    }).$type<RankChange>(),
   },
   (table) => [primaryKey({ columns: [table.duelId, table.seat] })],
 );

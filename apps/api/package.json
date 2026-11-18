@@ -13,6 +13,10 @@
   },
   "dependencies": {
     "@repo/duel-engine": "*",
+    "@repo/matchmaking-engine": "*",
+    "@repo/queue": "*",
+    "@repo/ranked-engine": "*",
+    "@repo/redis": "*",
     "@repo/typing-engine": "*",
     "better-auth": "1.7.25",
     "drizzle-orm": "0.45.4",

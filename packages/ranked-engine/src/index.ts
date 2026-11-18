@@ -2,6 +2,7 @@ export { DEFAULT_RANKED_CONFIG } from "./config.ts";
 export type { RankedConfig } from "./config.ts";
 export { applyDuel } from "./duel.ts";
 export type { DuelUpdate } from "./duel.ts";
+export { ladderIndex, rankAtLadderIndex } from "./ladder.ts";
 export { expectedScore } from "./mmr.ts";
 export { createStanding } from "./standing.ts";
 export type { Division, Outcome, Rank, RankChange, Standing, Tier } from "./types.ts";

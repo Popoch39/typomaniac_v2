@@ -1,6 +1,6 @@
 # Typomaniac
 
-Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured, then of ranked play: how a Duel moves a Player's level and Rank.
+Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured, then of ranked play: how a Duel moves a Player's level and Rank, and how two Players are brought together for one.
 
 ## Language
 
@@ -25,8 +25,16 @@ _Avoid_: profile picture, pfp, image
 ### Duel
 
 **Duel**:
-Any 1v1 between two **Participants**, each playing their own Game on the same Target words and the same Start. A _ranked Duel_ is the rated case, between two Players; a **Custom Duel** is the unrated one.
-_Avoid_: match, game (reserved for one player's Game), versus, battle, race
+A 1v1 between two **Participants**, played as the best of three **Rounds**: the first to win two Rounds wins the Duel. A _ranked Duel_ is the rated case, between two Players; a **Custom Duel** is the unrated one.
+_Avoid_: match, game (reserved for one player's Game), series, versus, battle, race
+
+**Round**:
+One leg of a Duel, in which each Participant plays their own Game on the same Target words and the same Start.
+_Avoid_: game (reserved for one player's Game), set, heat, match
+
+**Round score**:
+The Rounds each Participant has won so far in a Duel, such as 1-0. A drawn Round counts for neither.
+_Avoid_: score alone (which says neither of what nor between whom), sets, points
 
 **Custom Duel**:
 An unrated Duel, created by a Participant and joined through its invite link; Guests may take part.
@@ -41,18 +49,18 @@ The other Participant of a Duel, seen from one Participant.
 _Avoid_: enemy, rival, adversary
 
 **Outcome** (`Outcome`):
-What a Duel means for one Participant: `win`, `loss` or `draw`. The higher WPM wins, then the higher Accuracy; otherwise it is a draw. It is decided from the Results, outside the ranked engine.
+What a Round or a Duel means for one Participant: `win`, `loss` or `draw`. A Round goes to the higher WPM, then to the higher Accuracy; otherwise it is a draw. A Duel goes to whoever won more Rounds; otherwise it is a draw.
 _Avoid_: result (reserved for a Game's Result), score, verdict, issue
 
 **Countdown**:
-The delay between both Participants being connected and the Start of a Duel.
+The delay that precedes the Start of each Round.
 _Avoid_: timer, delay
 
 ### Game
 
 **Game** (`Game`):
 A single player's typing session, from their first letter to their Result.
-_Avoid_: test (reserved for automated tests), round, run
+_Avoid_: test (reserved for automated tests), run
 
 **Result** (`Result`):
 What a finished Game produces: its duration and the measures of the player's typing.
@@ -140,8 +148,12 @@ A step inside a Tier, from IV, the lowest, to I, the highest. Master has no Divi
 _Avoid_: sub-tier, step, league
 
 **Rank** (`Rank`):
-A ranked Player's visible standing on the ladder: their Tier, their Division (except in Master) and their LP.
-_Avoid_: rating, league, level
+What a ranked Player sees and climbs on the ladder: their Tier, their Division (except in Master) and their LP.
+_Avoid_: rating, league, level, standing (reserved for the full Standing)
+
+**Standing**:
+A Player's ranked state: their MMR, the number of ranked Duels they have played and their Rank.
+_Avoid_: rank (reserved for its visible part), rating, record, stats, profile
 
 **Unranked**:
 A Player who has no Rank yet, while their Placement is not over.
@@ -150,3 +162,17 @@ _Avoid_: unrated, provisional
 **Placement**:
 A Player's first ranked Duels, during which they are Unranked and their MMR moves faster; the last one gives them their first Rank.
 _Avoid_: qualifiers, calibration, placement matches
+
+**Leaderboard**:
+The public list of ranked Players, ordered by Rank.
+_Avoid_: ladder (reserved for the scale of Tiers and Divisions), ranking, standings, top
+
+### Matchmaking
+
+**Queue**:
+Where a Player waits to be paired for a ranked Duel.
+_Avoid_: lobby, pool, waiting room, search
+
+**Pairing**:
+Two queued Players proposed to each other; it becomes a ranked Duel once both accept. The verb is _pair_: the Queue pairs two Players.
+_Avoid_: match, matchup, proposal, invitation

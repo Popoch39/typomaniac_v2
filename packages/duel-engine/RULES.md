@@ -7,18 +7,46 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 | Id       | Rule                                                                                                                     |
 | -------- | ------------------------------------------------------------------------------------------------------------------------ |
 | CONFIG-1 | A Duel Game is a `time` Game of 30 seconds: it ends at the first Tick that reaches 30 seconds after its Start.           |
-| CONFIG-2 | A Duel draws 250 Target words once, at its creation; no word is added during the Duel.                                   |
+| CONFIG-2 | A Round has 250 Target words, drawn once; no word is added during the Round.                                             |
 | CONFIG-3 | The Countdown lasts 3 seconds. The server waits 2 seconds after a Game's deadline before applying its final Tick itself. |
 | CONFIG-4 | The server accepts a Participant's `start` up to 1 second before or after the announced Start, on its own clock.         |
+| CONFIG-5 | An Event may be stamped up to 1 second behind its receipt before its timestamp is moved up.                              |
+| CONFIG-6 | A Duel is won with 2 Rounds and has 3 Rounds at most. The pause between two Rounds lasts 5 seconds.                      |
+| CONFIG-7 | A ranked Duel whose Players are not both connected has its first Countdown announced 10 seconds after its creation.      |
 
-## Outcome
+## Outcome of a Round
 
-| Id        | Rule                                                                                                         |
-| --------- | ------------------------------------------------------------------------------------------------------------ |
-| OUTCOME-1 | The Participant with the higher WPM wins, whatever the Accuracy.                                             |
-| OUTCOME-2 | At equal WPM, the Participant with the higher Accuracy wins.                                                 |
-| OUTCOME-3 | At equal WPM and equal Accuracy, the Duel is a draw.                                                         |
-| OUTCOME-4 | The Outcome is computed once per Participant; the two Outcomes of a Duel are win and loss, or draw and draw. |
+| Id        | Rule                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------- |
+| OUTCOME-1 | The Participant with the higher WPM wins the Round, whatever the Accuracy.                                    |
+| OUTCOME-2 | At equal WPM, the Participant with the higher Accuracy wins the Round.                                        |
+| OUTCOME-3 | At equal WPM and equal Accuracy, the Round is a draw.                                                         |
+| OUTCOME-4 | The Outcome is computed once per Participant; the two Outcomes of a Round are win and loss, or draw and draw. |
+
+## Rounds
+
+The Outcomes of a Duel are a function of the Outcomes of its Rounds so far (ADR 0010).
+
+| Id      | Rule                                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------- |
+| ROUND-1 | The Round score counts the Rounds each Participant won; a drawn Round counts for neither.                     |
+| ROUND-2 | A Duel is not decided while no Participant has won 2 Rounds and fewer than 3 Rounds are played.               |
+| ROUND-3 | The first Participant to win 2 Rounds wins the Duel and the Opponent loses it: a 2-0 Duel has no third Round. |
+| ROUND-4 | After 3 Rounds, the Duel goes to the Participant who won more Rounds.                                         |
+| ROUND-5 | After 3 Rounds won equally, the Duel is a draw.                                                               |
+
+## Timestamp bound
+
+The server compares elapsed times, never absolute clocks: the time elapsed on the client since its `start`, against the time elapsed on the server since the anchor of that `start` (ADR 0009).
+
+| Id          | Rule                                                                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| TIMESTAMP-1 | A Game's `start` is anchored at the earlier of the instant the server received it and the announced Start.                                   |
+| TIMESTAMP-2 | An Event stamped at most 1 second behind its receipt keeps the timestamp its client sent.                                                    |
+| TIMESTAMP-3 | An Event stamped more than 1 second behind its receipt keeps its content and has its timestamp moved up to that bound; it is never dropped.  |
+| TIMESTAMP-4 | A timestamp ahead of its receipt is left alone.                                                                                              |
+| TIMESTAMP-5 | The bound only grows with the receipt, so a moved Event never lands after a later one.                                                       |
+| TIMESTAMP-6 | The final Tick the server applies to a silent Game is stamped 30 seconds after its start, and no earlier than the last Event of its journal. |
 
 ## Word draw
 

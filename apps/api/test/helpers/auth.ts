@@ -1,3 +1,4 @@
+import { expect } from "bun:test";
 import { makeSignature } from "better-auth/crypto";
 import type { Db } from "../../src/db/client.ts";
 import { type Auth, createAuth } from "../../src/modules/auth/service.ts";
@@ -28,4 +29,17 @@ export const signInPlayer = async (
   // Better Auth only accepts a session cookie signed with its secret.
   const cookie = `${authCookies.sessionToken.name}=${token}.${await makeSignature(token, secret)}`;
   return { player, cookie };
+};
+
+// A Player with a Nickname of their own, chosen as a Player does, through the app listening at `origin`.
+export const signInPlayerWithNickname = async (auth: Auth, origin: string) => {
+  const { player, cookie } = await signInPlayer(auth);
+  const nickname = `p_${crypto.randomUUID().slice(0, 8)}`;
+  const response = await fetch(`${origin}/api/me/nickname`, {
+    method: "PUT",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nickname }),
+  });
+  expect(response.status).toBe(200);
+  return { player, cookie, nickname };
 };
