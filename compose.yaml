@@ -18,10 +18,11 @@ services:
       retries: 15
 
   # No volume: a Duel only lives in Redis until it is saved, so nothing there is worth keeping.
+  # Published on 6380 rather than 6379, which other local stacks commonly hold.
   redis:
     image: redis:8.4-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
