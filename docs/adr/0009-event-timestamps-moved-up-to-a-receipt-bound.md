@@ -18,4 +18,5 @@ The server stops taking an Event's timestamp at face value. It compares elapsed 
 - The anchor of a Game's `start` is kept with its Round, so a Participant who reconnects on another instance is bounded against the same anchor.
 - The final Tick the server applies to a silent Game is stamped no earlier than the last Event of its journal, so going silent at the end buys no extra typing.
 - A Game the server starts for an absent Participant is anchored on the server's clock: a Participant who then returns must stamp in server time, or an honestly offset clock would have its Events moved.
-- The "not yet bounded" consequences of ADR 0003, 0006 and 0007 stop being true and are updated with the timestamp work.
+- The "not yet bounded" consequences of ADR 0003, 0006 and 0007 stopped being true and now point here.
+- The rules are listed in `packages/duel-engine/RULES.md` (CONFIG-5, TIMESTAMP-1 to TIMESTAMP-6).

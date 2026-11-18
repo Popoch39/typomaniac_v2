@@ -13,4 +13,4 @@ A Player's ranked standing holds two values, as in League of Legends. A hidden *
 - LP gains and losses are asymmetric on purpose: a Player above their reference wins more than they lose, a Player below loses more than they win. This asymmetry is the mechanism that makes the Rank converge on the MMR.
 - The two updates of a Duel are independent: each Player's update depends on their own standing, the opponent's MMR and the Outcome, so the two MMR deltas do not necessarily sum to zero.
 - The engine reads no clock, no database and no network, and its standing and update are JSON-serializable: the back can run it inside a transaction and the front can preview the LP at stake with the exact server rule.
-- The engine trusts the Outcome it receives. A ranked Outcome is only as reliable as the Results behind it, and ADR 0003 notes that client timestamps are not yet bounded by the back.
+- The engine trusts the Outcome it receives. A ranked Outcome is only as reliable as the Results behind it, which rest on client timestamps the back bounds by their receipt (ADR 0009).

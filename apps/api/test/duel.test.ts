@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { DUEL_GAME_CONFIG, DUEL_WORD_COUNT, START_WINDOW_MS } from "@repo/duel-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
 import { duel, duelGame, user } from "../src/db/schema.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
@@ -1027,3 +1027,204 @@ test("with two API instances on one Redis, a Duel is finalised and saved exactly
     await second.stop(true);
   }
 });
+
+// The Opponent's Event a socket is relayed next, with the timestamp the server gave it.
+const nextOpponentEventAt = async (socket: Awaited<ReturnType<typeof openSocket>>) => {
+  const message = await socket.next();
+  if (message.type !== "opponentEvent" || message.event.type === "addWords")
+    throw new Error(`Expected a stamped Event of the Opponent, got ${message.type}`);
+  return message.event.at;
+};
+
+test("an Event stamped behind its receipt, inside the tolerance, is journaled with the timestamp its client sent", async () => {
+  const { creator, opponent, reopenCreator, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    await opponent.next();
+    // Half a second passes on the server, 10 milliseconds on the client's stamps.
+    await Bun.sleep(500);
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+    const relayed = await opponent.next();
+    creator.close();
+    await opponent.next();
+    const again = await reopenCreator();
+    const state = await again.next();
+    again.close();
+
+    expect(relayed).toEqual({
+      type: "opponentEvent",
+      event: { type: "insert", at: 20, text: "a" },
+    });
+    expect(state).toMatchObject({
+      type: "state",
+      journals: [
+        [
+          { type: "start", at: 10 },
+          { type: "insert", at: 20, text: "a" },
+        ],
+        [],
+      ],
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("an Event stamped more than 1 second behind its receipt is kept, and relayed, journaled and saved with its timestamp moved up", async () => {
+  const { creator, opponent, duelId, startAt, words, reopenCreator, stop } = await startDuel(0);
+  try {
+    const text = `${words[0]} `;
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    await opponent.next();
+    // A second and a half passes on the server, 10 milliseconds on the client's stamps.
+    await Bun.sleep(startAt + 1500 - Date.now());
+    const sentAt = Date.now();
+    creator.send({ type: "event", event: { type: "insert", at: 20, text } });
+    const movedAt = await nextOpponentEventAt(opponent);
+    const relayedAt = Date.now();
+    creator.close();
+    await opponent.next();
+    const again = await reopenCreator();
+    const state = await again.next();
+    again.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "tick", at: 30_011 } });
+    const { results } = await nextEnd(again);
+    again.close();
+    const [saved] = await testDb.db
+      .select()
+      .from(duelGame)
+      .where(and(eq(duelGame.duelId, duelId), eq(duelGame.seat, 0)));
+
+    // 1 second behind the receipt, which the test only knows between its sending and its relay.
+    expect(movedAt).toBeGreaterThanOrEqual(10 + sentAt - startAt - 1000);
+    expect(movedAt).toBeLessThanOrEqual(10 + relayedAt - startAt - 1000);
+    const journal: GameEvent[] = [
+      { type: "start", at: 10 },
+      { type: "insert", at: movedAt, text },
+    ];
+    expect(state).toMatchObject({
+      type: "state",
+      journals: [journal, [{ type: "start", at: 11 }]],
+    });
+    expect(saved?.journal).toEqual([...journal, { type: "tick", at: 30_010 }]);
+    // The word was typed: only its instant moved.
+    expect(results[0]).toMatchObject({ duration: 30, wpm: (text.length / 5) * 2 });
+    const replayed = (saved?.journal ?? []).reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
+    expect(getResult(replayed)).toEqual(results[0]);
+    expect(saved?.result).toEqual(results[0]);
+  } finally {
+    await stop();
+  }
+});
+
+test("Events moved up never land after a later one, and a timestamp ahead of its receipt is left alone", async () => {
+  const { creator, opponent, startAt, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    await opponent.next();
+    await Bun.sleep(startAt + 1500 - Date.now());
+    creator.send({ type: "event", event: { type: "insert", at: 30, text: "a" } });
+    await Bun.sleep(50);
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "b" } });
+    creator.send({ type: "event", event: { type: "tick", at: 40 } });
+    creator.send({ type: "event", event: { type: "insert", at: 20_000, text: "c" } });
+    const relayedAts = [
+      await nextOpponentEventAt(opponent),
+      await nextOpponentEventAt(opponent),
+      await nextOpponentEventAt(opponent),
+      await nextOpponentEventAt(opponent),
+    ];
+
+    expect(relayedAts[0]).toBeGreaterThan(40);
+    expect(relayedAts).toEqual(relayedAts.toSorted((a, b) => a - b));
+    expect(relayedAts[3]).toBe(20_000);
+  } finally {
+    await stop();
+  }
+});
+
+test("a start sent early inside the accepted window gains no typing time: its Events are bounded from its receipt", async () => {
+  const { creator, opponent, startAt, stop } = await startDuel(800);
+  try {
+    const startSentAt = Date.now();
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    await opponent.next();
+    const startRelayedAt = Date.now();
+    await Bun.sleep(startSentAt + 2000 - Date.now());
+    const sentAt = Date.now();
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+    const movedAt = await nextOpponentEventAt(opponent);
+    const relayedAt = Date.now();
+
+    expect(startRelayedAt).toBeLessThan(startAt);
+    // Counted from the receipt of the start: from the announced Start, it would land earlier.
+    expect(movedAt).toBeGreaterThanOrEqual(10 + sentAt - startRelayedAt - 1000);
+    expect(movedAt).toBeLessThanOrEqual(10 + relayedAt - startSentAt - 1000);
+  } finally {
+    await stop();
+  }
+});
+
+test("a Participant who comes back on another API instance is bounded against the same anchor", async () => {
+  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const socketUrl = (port: number | undefined, duelId: string) =>
+    `ws://localhost:${port}/api/duels/${duelId}/socket`;
+  try {
+    const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const creator = await openSocket(socketUrl(first.server?.port, id), creatorCookie);
+    await creator.next();
+    const opponent = await openSocket(socketUrl(second.server?.port, id), opponentCookie);
+    await opponent.next();
+    const countdown = await opponent.next();
+    const startAt = countdown.type === "countdown" ? countdown.startAt : Number.NaN;
+    await creator.next();
+    await creator.next();
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    await opponent.next();
+
+    creator.close();
+    await opponent.next();
+    await Bun.sleep(startAt + 1500 - Date.now());
+    const again = await openSocket(socketUrl(second.server?.port, id), creatorCookie);
+    await again.next();
+    await opponent.next();
+    const sentAt = Date.now();
+    again.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+    const movedAt = await nextOpponentEventAt(opponent);
+    const relayedAt = Date.now();
+    again.close();
+    opponent.close();
+
+    expect(movedAt).toBeGreaterThanOrEqual(10 + sentAt - startAt - 1000);
+    expect(movedAt).toBeLessThanOrEqual(10 + relayedAt - startAt - 1000);
+  } finally {
+    await first.stop(true);
+    await second.stop(true);
+  }
+});
+
+test("the final Tick the server applies to a silent Game is stamped no earlier than the last Event of its journal", async () => {
+  const { creator, opponent, duelId, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "tick", at: 30_010 } });
+    opponent.send({ type: "event", event: { type: "start", at: 500 } });
+    // Stamped past the 30 seconds of the Game, and never followed by a Tick.
+    opponent.send({ type: "event", event: { type: "insert", at: 36_500, text: "a" } });
+
+    const { results } = await nextEnd(creator);
+    const [saved] = await testDb.db
+      .select()
+      .from(duelGame)
+      .where(and(eq(duelGame.duelId, duelId), eq(duelGame.seat, 1)));
+
+    expect(saved?.journal.at(-1)).toEqual({ type: "tick", at: 36_500 });
+    expect(results[1]).toMatchObject({ duration: 36 });
+  } finally {
+    await stop();
+  }
+}, 40_000);
