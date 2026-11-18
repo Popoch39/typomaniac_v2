@@ -1,16 +1,19 @@
 import { Avatar } from "../../auth/components/Avatar.tsx";
+import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
+import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import "./PlayerProfile.css";
 
 interface PlayerProfileProps {
-  nickname: string | null;
-  avatarUrl: string | null;
+  player: SignedInPlayer;
 }
 
-export function PlayerProfile({ nickname, avatarUrl }: PlayerProfileProps) {
+export function PlayerProfile({ player }: PlayerProfileProps) {
   return (
     <div className="player-profile">
-      <Avatar avatarUrl={avatarUrl} nickname={nickname} />
-      <p className="player-profile-nickname">{nickname ?? "No Nickname yet"}</p>
+      <Avatar player={player} />
+      <p className="player-profile-nickname">
+        <PlayerNickname player={player} />
+      </p>
     </div>
   );
 }

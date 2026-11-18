@@ -1,18 +1,21 @@
 import { Link } from "@tanstack/react-router";
 import { Avatar } from "../../auth/components/Avatar.tsx";
+import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import { SignOutButton } from "../../auth/components/SignOutButton.tsx";
+import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 
 interface PlayerIdentityProps {
-  nickname: string | null;
-  avatarUrl: string | null;
+  player: SignedInPlayer;
 }
 
-export function PlayerIdentity({ nickname, avatarUrl }: PlayerIdentityProps) {
+export function PlayerIdentity({ player }: PlayerIdentityProps) {
   return (
     <>
       <Link to="/profile" className="player-identity">
-        <Avatar avatarUrl={avatarUrl} nickname={nickname} />
-        <span className="player-name sidebar-label">{nickname ?? "No Nickname yet"}</span>
+        <Avatar player={player} />
+        <span className="player-name sidebar-label">
+          <PlayerNickname player={player} />
+        </span>
       </Link>
       <SignOutButton />
     </>
