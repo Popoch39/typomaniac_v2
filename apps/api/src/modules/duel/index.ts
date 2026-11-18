@@ -42,6 +42,11 @@ export type DuelOptions = {
   readonly roundPauseMs?: number;
   /** How often this instance sweeps the Duels that have something due. */
   readonly sweepIntervalMs?: number;
+  /**
+   * From the creation of a ranked Duel to the Countdown of its first Round, when its Players are not
+   * both connected by then.
+   */
+  readonly connectMs?: number;
 };
 
 export const createDuelRoutes = (
@@ -194,6 +199,7 @@ export const createDuelRoutes = (
             // Held back until the Countdown, which brings them to both Participants at once.
             words: announced ? words : null,
             participants: duel.participants,
+            ranks: duel.ranks,
             journals,
           });
           await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });

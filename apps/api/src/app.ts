@@ -26,7 +26,11 @@ export const createApp = (
     .use(createStandingRoutes(db, auth))
     .use(createDuelRoutes(db, auth, redis, duelOptions))
     .use(
-      createQueueRoutes(db, auth, redis, { duelExpiryMs: duelOptions?.expiryMs, ...queueOptions }),
+      createQueueRoutes(db, auth, redis, {
+        duelExpiryMs: duelOptions?.expiryMs,
+        duelConnectMs: duelOptions?.connectMs,
+        ...queueOptions,
+      }),
     );
 
 export type App = ReturnType<typeof createApp>;

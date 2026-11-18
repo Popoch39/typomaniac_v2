@@ -69,6 +69,7 @@ test("a Player with a Nickname creates a Duel and takes its first seat, alone an
     startAt: null,
     words: null,
     participants: [{ seat: 0, name: nickname, connected: true }],
+    ranks: null,
     journals: [[], []],
   });
 });

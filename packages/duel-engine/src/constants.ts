@@ -18,3 +18,8 @@ export const ROUNDS_TO_WIN = 2;
 export const MAX_ROUNDS = 3;
 /** Between the end of a Round and the Countdown of the next one, while both Results are shown. */
 export const ROUND_PAUSE_MS = 5000;
+/**
+ * From the creation of a ranked Duel to the Countdown of its first Round when a Player is missing:
+ * one who never arrives cannot hold the other.
+ */
+export const RANKED_CONNECT_MS = 10_000;

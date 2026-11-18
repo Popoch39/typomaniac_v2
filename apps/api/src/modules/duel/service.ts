@@ -15,6 +15,7 @@ import {
   type ServerMessage,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
+import type { Rank } from "@repo/ranked-engine";
 import {
   applyEvent,
   createGame,
@@ -49,8 +50,13 @@ export type Identity = {
 
 export type DuelKind = "custom" | "ranked";
 
-/** A Player a seat of a ranked Duel is held for, shown by their Nickname. */
-export type RankedSeat = { readonly playerId: string; readonly nickname: string };
+/** A Player a seat of a ranked Duel is held for, shown by their Nickname and their Rank. */
+export type RankedSeat = {
+  readonly playerId: string;
+  readonly nickname: string;
+  /** The Rank as the Duel is created, `null` while the Player is Unranked. */
+  readonly rank: Rank | null;
+};
 
 /** What a Duel holds per Round: what both Games of the Round are played on. */
 export type Round = {
@@ -79,6 +85,11 @@ export type Duel = {
   readonly holderIds: readonly (string | undefined)[];
   /** The Player holding each seat, `null` for a Guest or an empty seat. */
   readonly playerIds: readonly (string | null)[];
+  /**
+   * The Rank of each Player of a ranked Duel as it was created, indexed by seat, `null` for an
+   * Unranked Player; `null` for a Custom Duel.
+   */
+  readonly ranks: readonly [Rank | null, Rank | null] | null;
   /** The current Round. */
   readonly round: Round;
   /** What both Participants were told at the end, `null` until the Duel is finalised. */
@@ -99,6 +110,13 @@ const roundKey = (redis: Redis, duelId: string, round: number) =>
  * instance sweeps. The steps that move a Duel forward move its score with it, in their own script.
  */
 const dueKey = (redis: Redis) => redis.name("duels", "due");
+
+/**
+ * The ranked Duel a Player is in, recorded against them from its creation until it is finalised:
+ * what the Queue reads to refuse them. It expires with the Duel, should the Duel never be finalised.
+ */
+const rankedDuelKey = (redis: Redis, playerId: string) =>
+  redis.name("player", playerId, "rankedDuel");
 
 /** From the Start of a Round to the instant the server closes the Games still open. */
 const CLOSE_AFTER_MS = DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS;
@@ -135,20 +153,21 @@ export const createDuel = async (redis: Redis, kind: DuelKind, expiryMs: number)
 /**
  * A ranked Duel as the second acceptance of a Pairing creates it, in that acceptance's own step
  * rather than here: both seats are already held by the two Players, in the order given, so the
- * seat claim gives each of them theirs and refuses anyone else. It is swept like any Duel, due
- * first once it has expired.
+ * seat claim gives each of them theirs and refuses anyone else. It is recorded against both
+ * Players until it is finalised, and first due once they had `connectMs` to connect.
  */
 export const draftRankedDuel = (
   redis: Redis,
   players: readonly [RankedSeat, RankedSeat],
-  expiryMs: number,
+  { expiryMs, connectMs }: { readonly expiryMs: number; readonly connectMs: number },
 ) => {
   const duelId = crypto.randomUUID();
   const seats: Record<string, string> = Object.fromEntries(
-    players.flatMap(({ playerId, nickname }, seat) => [
+    players.flatMap(({ playerId, nickname, rank }, seat) => [
       [`holder${seat}`, playerId],
       [`name${seat}`, nickname],
       [`player${seat}`, playerId],
+      [`rank${seat}`, JSON.stringify(rank)],
     ]),
   );
   const hashes: { key: string; fields: Record<string, string> }[] = [
@@ -157,8 +176,11 @@ export const draftRankedDuel = (
       key: roundKey(redis, duelId, 1),
       fields: { words: JSON.stringify(drawWords(DUEL_WORD_COUNT, Math.random)) },
     },
+    ...players.map(({ playerId }) => ({ key: rankedDuelKey(redis, playerId), fields: { duelId } })),
   ];
-  return { duelId, hashes, expiryMs, due: { key: dueKey(redis), at: Date.now() + expiryMs } };
+  // Due once its Players had the time to connect: the sweep then announces the Countdown of its first
+  // Round, whoever is there.
+  return { duelId, hashes, expiryMs, due: { key: dueKey(redis), at: Date.now() + connectMs } };
 };
 
 // Atomic, so two identities opening the same Duel at once never get the same seat. An identity
@@ -286,11 +308,14 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
   const end = fields.end === undefined ? null : (JSON.parse(fields.end) as DuelEnd);
+  const kind = fields.kind === "ranked" ? "ranked" : "custom";
+  const rankOf = (seat: Seat) => JSON.parse(fields[`rank${seat}`] ?? "null") as Rank | null;
   return {
-    kind: fields.kind === "ranked" ? "ranked" : "custom",
+    kind,
     participants,
     holderIds,
     playerIds,
+    ranks: kind === "ranked" ? [rankOf(0), rankOf(1)] : null,
     round,
     end,
   };
@@ -299,7 +324,8 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
 // Atomic, so that of every instance that could announce the Countdown of a Round, a single one
 // does. Once announced, the Start never moves: a Participant who comes back gets the same instant.
 // A Start fixed when the Round before ended is announced once its Countdown begins, whoever is
-// connected; the Start of a Round without one is fixed here, once both seats are connected.
+// connected; the Start of a Round without one is fixed here, once both seats are connected or
+// when forced, whoever is there.
 // Nothing is announced for a Round that is not the Duel's current one, nor for a Duel that expired.
 // An announced Round is next due when its Games still open are to be closed.
 const ANNOUNCE_START = `
@@ -312,7 +338,7 @@ if startAt then
   redis.call('ZADD', KEYS[3], tonumber(startAt) + tonumber(ARGV[4]), ARGV[5])
   return {startAt, '1'}
 end
-if redis.call('HGET', KEYS[1], 'connected0') ~= '1' or redis.call('HGET', KEYS[1], 'connected1') ~= '1' then return {} end
+if ARGV[6] ~= '1' and (redis.call('HGET', KEYS[1], 'connected0') ~= '1' or redis.call('HGET', KEYS[1], 'connected1') ~= '1') then return {} end
 redis.call('HSET', KEYS[2], 'startAt', ARGV[1], 'announced', '1')
 redis.call('ZADD', KEYS[3], tonumber(ARGV[1]) + tonumber(ARGV[4]), ARGV[5])
 -- Counted again from the Start, so that a Duel joined late does not expire before it is finalised.
@@ -324,14 +350,18 @@ return {ARGV[1], '1'}
 /**
  * Announces the Countdown of `round`, `startAt` being the end of a Countdown that begins now. A
  * Start already fixed is announced once `startAt` has reached it; otherwise the Start is fixed at
- * `startAt` once both seats are connected. Gives the Start instant, and whether this call
- * announced it, or `null` while there is nothing to announce yet.
+ * `startAt` once both seats are connected, or at once when `forced`. Gives the Start instant, and
+ * whether this call announced it, or `null` while there is nothing to announce yet.
  */
 export const announceStart = async (
   redis: Redis,
   duelId: string,
   round: number,
-  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
+  {
+    startAt,
+    expiryMs,
+    forced = false,
+  }: { readonly startAt: number; readonly expiryMs: number; readonly forced?: boolean },
 ): Promise<{ startAt: number; announced: boolean } | null> => {
   const answer: string[] = await redis.client.eval(
     ANNOUNCE_START,
@@ -344,6 +374,7 @@ export const announceStart = async (
     round,
     CLOSE_AFTER_MS,
     duelId,
+    forced ? "1" : "0",
   );
   const [announcedAt, announced] = answer;
   if (announcedAt === undefined) return null;
@@ -502,22 +533,44 @@ if redis.call('SET', KEYS[2], '1', 'NX', 'PX', ARGV[1]) then return 1 end
 return 0
 `;
 
-// Does not recreate a Duel that expired meanwhile. A finalised Duel has nothing due any more.
+// Does not recreate a Duel that expired meanwhile. A finalised Duel has nothing due any more, and
+// is no longer recorded against its Players; a Player recorded against another Duel keeps it.
 const RECORD_END = `
 if redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'end', ARGV[1]) end
 redis.call('ZREM', KEYS[2], ARGV[2])
+for player = 3, #KEYS do
+  if redis.call('HGET', KEYS[player], 'duelId') == ARGV[2] then redis.call('DEL', KEYS[player]) end
+end
 `;
 
-/** Keeps the end of a finalised Duel, for a Participant who comes back after it. */
-export const recordEnd = async (redis: Redis, duelId: string, end: DuelEnd) => {
+/**
+ * Keeps the end of a finalised Duel, for a Participant who comes back after it, and stops
+ * recording it against `playerIds`.
+ */
+export const recordEnd = async (
+  redis: Redis,
+  duelId: string,
+  end: DuelEnd,
+  playerIds: readonly (string | null)[],
+) => {
+  const players = playerIds.filter((playerId) => playerId !== null);
   await redis.client.eval(
     RECORD_END,
-    2,
+    2 + players.length,
     duelKey(redis, duelId),
     dueKey(redis),
+    ...players.map((playerId) => rankedDuelKey(redis, playerId)),
     JSON.stringify(end),
     duelId,
   );
+};
+
+/** The ranked Duel the Player is in and that is not finalised yet, `null` when there is none. */
+export const readUnfinishedRankedDuel = async (redis: Redis, playerId: string) => {
+  const duelId = await redis.client.hget(rankedDuelKey(redis, playerId), "duelId");
+  if (duelId === null) return null;
+  const duel = await readDuel(redis, duelId);
+  return duel === null || duel.end !== null ? null : duelId;
 };
 
 /** Whether this call claimed the finalisation of a Duel that its Rounds have decided. */
@@ -727,7 +780,7 @@ const finaliseDuel = async (
         outcomes: roundOutcomes,
       })),
     } as const;
-    await recordEnd(redis, duelId, end);
+    await recordEnd(redis, duelId, end, playerIds);
     await relay.publish(duelId, null, end);
   } catch (error) {
     await releaseFinalisation(redis, duelId);
@@ -797,23 +850,27 @@ export const endRound = async (
 
 /**
  * Announces the Countdown of `round` to both Participants once it begins, whoever is connected:
- * its Start was fixed when the Round before it ended.
+ * its Start was fixed when the Round before it ended, or is `forced` at `startAt`.
  */
 const announceCountdown = async (
   redis: Redis,
   relay: Pick<Relay, "publish">,
   duelId: string,
   round: number,
-  { startAt, expiryMs }: { readonly startAt: number; readonly expiryMs: number },
+  start: { readonly startAt: number; readonly expiryMs: number; readonly forced?: boolean },
 ) => {
-  const start = await announceStart(redis, duelId, round, { startAt, expiryMs });
-  if (!start?.announced) return;
+  const announced = await announceStart(redis, duelId, round, start);
+  if (!announced?.announced) return;
   const duel = await readDuel(redis, duelId);
   if (duel?.round.number !== round) return;
   const { words } = duel.round;
-  await relay.publish(duelId, null, { type: "countdown", round, startAt: start.startAt, words });
+  await relay.publish(duelId, null, {
+    type: "countdown",
+    round,
+    startAt: announced.startAt,
+    words,
+  });
 };
-
 /**
  * Ends the Games of `round` whose clients went silent, at their start plus 30 seconds, then ends
  * the Round. A Game that never started is started at the Start of the Round.
@@ -871,9 +928,18 @@ const advanceDuel = async (
     await finaliseDuel(db, redis, relay, duelId);
     return;
   }
-  // Still waiting for its first Start: due only once it has expired.
-  if (startAt === null) return;
   const { expiryMs, countdownMs } = delays;
+  // Still waiting for its first Start. A Custom Duel is due only once it has expired; a ranked one
+  // once its Players had the time to connect, when its Countdown begins whoever is there.
+  if (startAt === null) {
+    if (duel.kind === "ranked")
+      await announceCountdown(redis, relay, duelId, number, {
+        startAt: now + countdownMs,
+        expiryMs,
+        forced: true,
+      });
+    return;
+  }
   if (!announced) {
     if (now >= startAt - countdownMs)
       await announceCountdown(redis, relay, duelId, number, {

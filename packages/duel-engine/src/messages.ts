@@ -47,7 +47,8 @@ export type ServerMessage =
    * Round score is counted from them. `startAt` is the Start of the current Round in server time,
    * `null` until it is fixed: the first Round's is fixed with its Countdown, a later Round's when
    * the Round before it ends. `words` are the Round's Target words, `null` until its Countdown is
-   * announced.
+   * announced. `ranks` are the Ranks of both Players as the ranked Duel was created, indexed by seat,
+   * `null` for an Unranked Player; `ranks` itself is `null` for a Custom Duel.
    */
   | {
       readonly type: "state";
@@ -57,6 +58,7 @@ export type ServerMessage =
       readonly startAt: number | null;
       readonly words: readonly string[] | null;
       readonly participants: readonly Participant[];
+      readonly ranks: readonly [Rank | null, Rank | null] | null;
       readonly journals: readonly [readonly GameEvent[], readonly GameEvent[]];
     }
   | { readonly type: "presence"; readonly participant: Participant }

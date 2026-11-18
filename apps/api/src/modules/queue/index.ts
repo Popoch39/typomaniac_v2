@@ -1,3 +1,4 @@
+import { RANKED_CONNECT_MS } from "@repo/duel-engine";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
@@ -5,7 +6,7 @@ import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
-import { draftRankedDuel, DUEL_EXPIRY_MS } from "../duel/service.ts";
+import { draftRankedDuel, DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
 import { readNicknames } from "../player/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
@@ -27,6 +28,8 @@ export type QueueOptions = {
   readonly refreshMs?: number;
   /** How long the ranked Duel of an accepted Pairing can be joined, as any Duel. */
   readonly duelExpiryMs?: number;
+  /** How long the Players of that Duel have to connect before its first Countdown begins anyway. */
+  readonly duelConnectMs?: number;
 };
 
 export const createQueueRoutes = (
@@ -37,6 +40,7 @@ export const createQueueRoutes = (
     entryExpiryMs = QUEUE_ENTRY_EXPIRY_MS,
     refreshMs = entryExpiryMs / 3,
     duelExpiryMs = DUEL_EXPIRY_MS,
+    duelConnectMs = RANKED_CONNECT_MS,
   }: QueueOptions = {},
 ) => {
   const evictions = createEvictions(redis);
@@ -73,14 +77,23 @@ export const createQueueRoutes = (
       .get(
         "/",
         { nicknameChosen: true, response: QueueModel.RootGet.Response },
-        async ({ player }) => ({
-          queuedAt: (await readQueueEntry(redis, player.id))?.queuedAt ?? null,
-        }),
+        async ({ player, status }) => {
+          const duelId = await readUnfinishedRankedDuel(redis, player.id);
+          if (duelId !== null) return status(409, { code: "RANKED_DUEL_UNFINISHED", duelId });
+          return { queuedAt: (await readQueueEntry(redis, player.id))?.queuedAt ?? null };
+        },
       )
       .ws("/socket", {
         nicknameChosen: true,
         body: QueueModel.Socket.Body,
         response: QueueModel.Socket.Response,
+        async beforeHandle({ body, player, status }) {
+          // Also runs before each message, which carries a body: the Duel is checked on the upgrade.
+          if (body !== undefined) return;
+          // One ranked Duel at a time: the Player is sent back to the one they are in.
+          const duelId = await readUnfinishedRankedDuel(redis, player.id);
+          if (duelId !== null) return status(409, { code: "RANKED_DUEL_UNFINISHED", duelId });
+        },
         async open(ws) {
           const send = (message: QueueServerMessage) => ws.send(message);
           const playerId = ws.player.id;
@@ -126,12 +139,16 @@ export const createQueueRoutes = (
         async message(ws, { pairingId }) {
           const pairing = await readPairing(redis, pairingId);
           if (!pairing) return;
-          // Read ahead of the step that may create the Duel, which shows each Player by Nickname.
+          // Read ahead of the step that may create the Duel, which shows each Player by Nickname and
+          // by Rank as they stand now.
           const nicknames = await readNicknames(db, pairing.playerIds);
-          const [first, second] = pairing.playerIds.map((playerId) => ({
-            playerId,
-            nickname: nicknames.get(playerId),
-          }));
+          const [first, second] = await Promise.all(
+            pairing.playerIds.map(async (playerId) => ({
+              playerId,
+              nickname: nicknames.get(playerId),
+              rank: (await readStanding(db, playerId)).rank,
+            })),
+          );
           if (first?.nickname === undefined || second?.nickname === undefined) return;
           // Both Players learn the outcome from the Pairing channel, whichever instance holds them.
           await acceptPairing(redis, pairingId, ws.player.id, {
@@ -139,10 +156,10 @@ export const createQueueRoutes = (
             creation: draftRankedDuel(
               redis,
               [
-                { playerId: first.playerId, nickname: first.nickname },
-                { playerId: second.playerId, nickname: second.nickname },
+                { ...first, nickname: first.nickname },
+                { ...second, nickname: second.nickname },
               ],
-              duelExpiryMs,
+              { expiryMs: duelExpiryMs, connectMs: duelConnectMs },
             ),
           });
         },

@@ -28,6 +28,7 @@ const serverMessages: ServerMessage[] = [
       { seat: 0, name: "ada", connected: true },
       { seat: 1, name: "Guest-4821", connected: true },
     ],
+    ranks: [{ tier: "gold", division: 2, lp: 40 }, null],
     journals: [[{ type: "start", at: 0 }], []],
   },
   { type: "presence", participant: { seat: 0, name: "ada", connected: false } },
