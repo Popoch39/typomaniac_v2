@@ -1,4 +1,10 @@
-import { COUNTDOWN_MS, type Participant, type ServerMessage } from "@repo/duel-engine";
+import {
+  anchorStart,
+  boundEvent,
+  COUNTDOWN_MS,
+  type Participant,
+  type ServerMessage,
+} from "@repo/duel-engine";
 import { applyEvent, type Game } from "@repo/typing-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
@@ -42,6 +48,8 @@ export const createDuelRoutes = (
     delivery: Parameters<typeof relay.join>[1];
     /** The Start this socket was told of, in server time, whichever instance announced it. */
     startAt: number | null;
+    /** The server instant the `start` of the Participant's Game is anchored at, wherever it was received. */
+    anchorAt: number | null;
     /** This instance's copy of the Participant's Game, rebuilt from its journal on opening. */
     game: Game;
   };
@@ -119,7 +127,16 @@ export const createDuelRoutes = (
           };
           const connection = crypto.randomUUID();
           const delivery = { seat: self.seat, connection, send, evict: () => ws.close() };
-          const entry: Seating = { participant: self, connection, delivery, startAt: null, game };
+          // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
+          const anchorAt = lateStart ? duel.startAt : (duel.anchorAts[self.seat] ?? null);
+          const entry: Seating = {
+            participant: self,
+            connection,
+            delivery,
+            startAt: null,
+            anchorAt,
+            game,
+          };
           seated.set(ws.id, entry);
           await holdSeat(redis, ws.params.id, self.seat, connection);
           await relay.join(ws.params.id, delivery);
@@ -154,18 +171,29 @@ export const createDuelRoutes = (
           const seating = seated.get(ws.id);
           const { event } = message;
           if (!seating) return;
-          const { status } = seating.game;
-          if (!isEventAccepted(event, { status, startAt: seating.startAt, now })) return;
-          seating.game = applyEvent(seating.game, event);
+          const { status, startedAt } = seating.game;
+          const { startAt } = seating;
+          if (!isEventAccepted(event, { status, startAt, now })) return;
+          // Only a start is accepted in a Game that has not started.
+          if (startedAt === null && startAt !== null) seating.anchorAt = anchorStart(now, startAt);
+          const { anchorAt } = seating;
+          // The Event as bounded by its receipt is the only one applied, journaled and relayed
+          // (ADR 0009). A start is the reference the later Events are bounded from.
+          const taken =
+            startedAt === null || anchorAt === null
+              ? event
+              : boundEvent(event, { startedAt, anchorAt, receivedAt: now });
+          seating.game = applyEvent(seating.game, taken);
           const ends = seating.game.status === "finished";
           const { seat } = seating.participant;
-          const appended = await appendEvents(redis, ws.params.id, seat, [event], {
+          const appended = await appendEvents(redis, ws.params.id, seat, [taken], {
             ends,
             expiryMs,
+            anchorAt: startedAt === null ? anchorAt : null,
           });
           // Refused when the server already ended this Game, from this instance or another one.
           if (!appended) return;
-          await relay.publish(ws.params.id, seat, { type: "opponentEvent", event });
+          await relay.publish(ws.params.id, seat, { type: "opponentEvent", event: taken });
           // Tried again at the deadline when it fails.
           if (ends)
             await finaliseDuel(db, redis, relay, ws.params.id).catch((error: unknown) =>

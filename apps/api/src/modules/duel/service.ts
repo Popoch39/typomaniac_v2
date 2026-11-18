@@ -4,6 +4,7 @@ import {
   DUEL_WORD_COUNT,
   drawWords,
   END_GRACE_MS,
+  finalTickAt,
   getOutcome,
   type Participant,
   type Seat,
@@ -43,6 +44,8 @@ export type Duel = {
   readonly playerIds: readonly (string | null)[];
   /** The announced Start instant in server time, `null` until the Countdown is announced. */
   readonly startAt: number | null;
+  /** The server instant the `start` of each seat's Game is anchored at, `null` until it starts. */
+  readonly anchorAts: readonly (number | null)[];
   /** What both Participants were told at the end, `null` until the Duel is finalised. */
   readonly end: DuelEnd | null;
 };
@@ -155,6 +158,10 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
   const startAt = fields.startAt === undefined ? null : Number(fields.startAt);
+  const anchorAts = SEATS.map((seat) => {
+    const anchorAt = fields[`anchor${seat}`];
+    return anchorAt === undefined ? null : Number(anchorAt);
+  });
   const end = fields.end === undefined ? null : (JSON.parse(fields.end) as DuelEnd);
   return {
     words: JSON.parse(fields.words) as string[],
@@ -162,6 +169,7 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     holderIds,
     playerIds,
     startAt,
+    anchorAts,
     end,
   };
 };
@@ -220,25 +228,33 @@ const journalKey = (redis: Redis, duelId: string, seat: Seat) =>
   redis.name("duel", duelId, "journal", String(seat));
 
 // One script, so a journal never lives on without its expiry, and nothing is appended to a Game
-// that has ended, whichever instance ended it.
+// that has ended, whichever instance ended it. The anchor is kept with the start it comes with, so
+// that an instance never reads a started Game without it; the first one stands.
 const APPEND = `
 if redis.call('HGET', KEYS[1], 'ended' .. ARGV[1]) == '1' then return 0 end
-for index = 4, #ARGV do redis.call('RPUSH', KEYS[2], ARGV[index]) end
+for index = 5, #ARGV do redis.call('RPUSH', KEYS[2], ARGV[index]) end
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
-if ARGV[3] == '1' and redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'ended' .. ARGV[1], '1') end
+if redis.call('EXISTS', KEYS[1]) == 0 then return 1 end
+if ARGV[3] == '1' then redis.call('HSET', KEYS[1], 'ended' .. ARGV[1], '1') end
+if ARGV[4] ~= '' then redis.call('HSETNX', KEYS[1], 'anchor' .. ARGV[1], ARGV[4]) end
 return 1
 `;
 
 /**
  * Appends accepted Events to the journal of the Game played on `seat`, and marks the Game ended
- * when they end it. Gives whether they were appended: never once the Game has ended.
+ * when they end it. `anchorAt` comes with the Events that start the Game: the server instant its
+ * `start` is anchored at. Gives whether they were appended: never once the Game has ended.
  */
 export const appendEvents = async (
   redis: Redis,
   duelId: string,
   seat: Seat,
   events: readonly GameEvent[],
-  { ends, expiryMs }: { readonly ends: boolean; readonly expiryMs: number },
+  {
+    ends,
+    expiryMs,
+    anchorAt,
+  }: { readonly ends: boolean; readonly expiryMs: number; readonly anchorAt?: number | null },
 ) => {
   const appended: number = await redis.client.eval(
     APPEND,
@@ -248,6 +264,7 @@ export const appendEvents = async (
     seat,
     expiryMs,
     ends ? "1" : "0",
+    anchorAt ?? "",
     ...events.map((event) => JSON.stringify(event)),
   );
   return appended === 1;
@@ -256,7 +273,7 @@ export const appendEvents = async (
 /**
  * Starts at the announced Start the Game of a Participant who comes back past the start window
  * without having started it: their own start would be refused, and their clock ran on meanwhile.
- * Gives the Events appended, `null` when the Game needs none.
+ * That Game is on the server's clock, anchored at the Start. Gives the Events appended, `null` when the Game needs none.
  */
 export const startLateGame = async (
   redis: Redis,
@@ -272,7 +289,11 @@ export const startLateGame = async (
   const { journal, startAt, now, expiryMs } = game;
   if (journal.length > 0 || startAt === null || now - startAt <= START_WINDOW_MS) return null;
   const events: GameEvent[] = [{ type: "start", at: startAt }];
-  const appended = await appendEvents(redis, duelId, seat, events, { ends: false, expiryMs });
+  const appended = await appendEvents(redis, duelId, seat, events, {
+    ends: false,
+    expiryMs,
+    anchorAt: startAt,
+  });
   return appended ? events : null;
 };
 
@@ -281,17 +302,18 @@ export const replayGame = (words: readonly string[], events: readonly GameEvent[
   events.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
 
 /**
- * The Events that end a Game still open after its deadline: its final Tick, 30 seconds after its
- * start. A Game that never started is started at the announced Start, so the time away counts.
+ * The Events that end a Game still open after its deadline, from its `journal`: its final Tick, 30
+ * seconds after its start and no earlier than its last Event. A Game that never started is started
+ * at the announced Start, so the time away counts.
  */
-export const closingEvents = (game: Game, startAt: number): GameEvent[] => {
-  const durationMs = DUEL_GAME_CONFIG.seconds * 1000;
-  if (game.startedAt === null)
+export const closingEvents = (journal: readonly GameEvent[], startAt: number): GameEvent[] => {
+  const [started] = journal;
+  if (started?.type !== "start")
     return [
       { type: "start", at: startAt },
-      { type: "tick", at: startAt + durationMs },
+      { type: "tick", at: finalTickAt(startAt, journal) },
     ];
-  return [{ type: "tick", at: game.startedAt + durationMs }];
+  return [{ type: "tick", at: finalTickAt(started.at, journal) }];
 };
 
 /** How long a claim to finalise a Duel lasts, should its instance stop before releasing it. */
@@ -445,7 +467,7 @@ export const closeOverdueGames = async (
   for (const seat of SEATS) {
     const game = replayGame(duel.words, journals[seat]);
     if (game.status === "finished") continue;
-    const events = closingEvents(game, startAt);
+    const events = closingEvents(journals[seat], startAt);
     await appendEvents(redis, duelId, seat, events, { ends: true, expiryMs });
   }
   await finaliseDuel(db, redis, relay, duelId);

@@ -10,3 +10,5 @@ export const COUNTDOWN_MS = 3000;
 export const END_GRACE_MS = 2000;
 /** How far from the announced Start, either way, the server still accepts a Participant's start. */
 export const START_WINDOW_MS = 1000;
+/** How far behind its receipt an Event may be stamped before its timestamp is moved up. */
+export const TIMESTAMP_TOLERANCE_MS = 1000;

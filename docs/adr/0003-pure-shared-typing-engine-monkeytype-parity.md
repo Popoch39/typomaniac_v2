@@ -4,7 +4,7 @@ The typing rules live in a single package, `@repo/typing-engine`, which both the
 
 ## Considered Options
 
-- **Server clock**: rejected. Timestamping each Event on receipt would add network latency and jitter to the duration and the Consistency, and the back's figure would no longer be the one the Player sees. The engine therefore trusts the client's timestamps; the back will have to bound them by the receipt instant.
+- **Server clock**: rejected. Timestamping each Event on receipt would add network latency and jitter to the duration and the Consistency, and the back's figure would no longer be the one the Player sees. The engine therefore takes the client's timestamps; the back bounds them by the receipt instant before it applies them (ADR 0009).
 - **Replay at end of Game only**: rejected. The back would only know the state of a Game once it is over, while a duel needs both Players' progress live. It therefore runs the engine as Events are received.
 - **Porting Monkeytype's code**: rejected. Monkeytype is under GPL-3.0: copying its code or its tests would put the project under the same license.
 - **Following Monkeytype's main branch**: rejected. "Exactly Monkeytype" would no longer have a verifiable meaning, and a change on their side would alter Results without any decision on our part. The reference is a specific commit.
@@ -15,7 +15,7 @@ The typing rules live in a single package, `@repo/typing-engine`, which both the
 - Replaying the same sequence of Events gives the same Result, on the front as on the back, including later on.
 - The package's typecheck runs without the DOM lib: access to the DOM or to a browser clock does not compile.
 - Events are JSON-serializable, to go through websocket without conversion.
-- A client can tighten its timestamps to inflate its WPM. As long as the back does not bound them, a ranked Result is not reliable.
+- A client can tighten its timestamps to inflate its WPM, but only within the tolerance of the receipt bound the back applies to each Event before the engine sees it (ADR 0009).
 - The front applies the two layout rules itself, by not emitting the Event concerned.
 - Each rule is recorded in `packages/typing-engine/RULES.md` with the Monkeytype function it comes from. Following a change in their rules is an explicit decision: new reference commit, document and tests reviewed.
 - Parity relies on our reading of their code. Their server recomputes nothing: there is no official oracle to verify it.

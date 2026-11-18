@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { eventTime } from "../../game/clock/eventTime.ts";
+import { clientTime } from "../../game/clock/clientTime.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 
 type DuelCountdownState = {
@@ -42,13 +42,13 @@ export const useDuelCountdownStore = create<DuelCountdownState>()((set) => {
         // The announced instant, on this client's clock.
         const localStartAt = startAt - clockOffset;
         const refreshSecondsLeft = () =>
-          set({ secondsLeft: Math.max(0, Math.ceil((localStartAt - eventTime()) / 1000)) });
+          set({ secondsLeft: Math.max(0, Math.ceil((localStartAt - clientTime()) / 1000)) });
         refreshSecondsLeft();
         refreshTimer = setInterval(refreshSecondsLeft, COUNTDOWN_REFRESH_MS);
         startTimer = setTimeout(() => {
           cancel();
           start();
-        }, localStartAt - eventTime());
+        }, localStartAt - clientTime());
       };
       runFrom(useDuelClockStore.getState().clockOffset);
       // Waits for the clock offset when it comes last, and follows a newer estimate of it.
