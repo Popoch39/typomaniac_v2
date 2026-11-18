@@ -2,10 +2,15 @@ import { afterAll, expect, test } from "bun:test";
 import { createApp } from "../src/app.ts";
 import { createTestAuth } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
+import { createTestRedis } from "./helpers/redis.ts";
 
 const testDb = await createTestDb();
-afterAll(() => testDb.drop());
-const app = createApp(testDb.db, createTestAuth(testDb.db));
+const testRedis = await createTestRedis();
+afterAll(async () => {
+  await testRedis.drop();
+  await testDb.drop();
+});
+const app = createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis);
 
 test("health responds ok", async () => {
   const response = await app.handle(new Request("http://localhost/health"));
