@@ -10,6 +10,8 @@
     { "path": "packages/ranked-engine/test" },
     { "path": "apps/frontend" },
     { "path": "apps/frontend/test" },
-    { "path": "apps/api" }
+    { "path": "packages/redis" },
+    { "path": "apps/api" },
+    { "path": "apps/matchmaker" }
   ]
 }

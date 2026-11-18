@@ -1,4 +1,4 @@
-# Local Postgres and Redis for `bun run dev` and `bun test` (the API itself runs on the host).
+# Local Postgres and Redis for `bun run dev` and `bun test` (the API and the matchmaker themselves run on the host).
 services:
   postgres:
     image: postgres:18.7-alpine
