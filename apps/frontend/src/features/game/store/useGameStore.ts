@@ -20,6 +20,8 @@ type GameState = {
   readonly game: Game;
   /** The instant the Live stats are read at, refreshed on each Tick. */
   readonly readAt: number;
+  /** Keys the typing area, so a restart or a config change remounts it and its input takes the focus again. */
+  readonly restartCount: number;
   readonly applyEvent: (event: GameEvent) => void;
   readonly restart: () => void;
   readonly setConfig: (config: GameConfig) => void;
@@ -62,13 +64,19 @@ export const useGameStore = create<GameState>()((set, get) => {
 
   const startNewGame = (config: GameConfig) => {
     stopTicking();
-    set({ config, game: newGame(config), readAt: now() });
+    set((state) => ({
+      config,
+      game: newGame(config),
+      readAt: now(),
+      restartCount: state.restartCount + 1,
+    }));
   };
 
   return {
     config: DEFAULT_CONFIG,
     game: newGame(DEFAULT_CONFIG),
     readAt: now(),
+    restartCount: 0,
     applyEvent: (event) => {
       const before = get().game;
       const game = withEnoughWords(applyEngineEvent(before, event));
