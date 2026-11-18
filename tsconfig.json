@@ -5,6 +5,7 @@
     { "path": "packages/typing-engine" },
     { "path": "packages/typing-engine/test" },
     { "path": "apps/frontend" },
+    { "path": "apps/frontend/test" },
     { "path": "apps/api" }
   ]
 }

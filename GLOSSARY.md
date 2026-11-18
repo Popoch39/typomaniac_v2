@@ -86,3 +86,7 @@ _Avoid_: Keystroke consistency, constance des touches
 **Inactivity**:
 The time in a Game during which the player is not typing.
 _Avoid_: AFK, pause, inactivité
+
+**Live stats** (`LiveStats`):
+The WPM, Raw WPM and Accuracy read while a Game is being played, as opposed to its Result.
+_Avoid_: live result, current stats

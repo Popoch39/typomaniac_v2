@@ -1,0 +1,167 @@
+.game-screen {
+  --letter-incorrect: #ca4754;
+  --letter-extra: #7e2a33;
+
+  padding: 32px;
+  text-align: left;
+}
+
+.typing-area {
+  position: relative;
+}
+
+/* Kept focusable but invisible: the engine, not the input, holds the typed text. */
+.typing-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+
+/* The focus veil covers only the words, leaving the Live stats readable. */
+.typing-words {
+  position: relative;
+}
+
+/* Three lines tall; no row gap, so that a word's height is exactly one line to scroll by. */
+.word-list {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.6em;
+  height: 5.4em;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 24px;
+  line-height: 1.8;
+}
+
+.config-bar {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.config-group {
+  display: flex;
+  gap: 8px;
+}
+
+.config-option {
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.config-option[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.live-stats-bar {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.live-stats-progress {
+  color: var(--accent);
+}
+
+.word-wrong {
+  text-decoration: underline;
+  text-decoration-color: var(--letter-incorrect);
+}
+
+.letter-untyped {
+  color: var(--text);
+}
+
+.letter-correct {
+  color: var(--text-h);
+}
+
+.letter-incorrect {
+  color: var(--letter-incorrect);
+}
+
+.letter-extra {
+  color: var(--letter-extra);
+}
+
+/* Zero-width so the letters never move when the caret does. */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  margin-right: -2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+}
+
+.focus-veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-h);
+  backdrop-filter: blur(4px);
+}
+
+.restart-button {
+  margin-top: 24px;
+}
+
+.result-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.result-headline,
+.result-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+  margin: 0;
+}
+
+.result-panel dt {
+  color: var(--text);
+}
+
+.result-panel dd {
+  margin: 0;
+  color: var(--text-h);
+}
+
+.result-headline dd {
+  font-size: 48px;
+}
+
+.result-details dd {
+  font-size: 24px;
+}
+
+.result-json summary {
+  cursor: pointer;
+  color: var(--text);
+}
+
+.result-json pre {
+  max-height: 480px;
+  overflow: auto;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 14px;
+  background: var(--code-bg);
+}

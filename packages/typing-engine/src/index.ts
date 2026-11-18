@@ -1,3 +1,4 @@
+export { SEPARATOR } from "./chars.ts";
 export type { CharCounts } from "./chars.ts";
 export { applyEvent, createGame } from "./game.ts";
 export type {
