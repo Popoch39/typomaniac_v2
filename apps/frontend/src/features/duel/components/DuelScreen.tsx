@@ -12,7 +12,8 @@ export function DuelScreen() {
   const phase = useDuelPhase();
 
   return (
-    <main>
+    // Full screen outside the shell: a centred column with room around it, like the Game screen's padding.
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-8 py-16 text-left">
       {phase === "connecting" && <p>Joining the Duel…</p>}
       {phase === "refused" && <DuelRefusal />}
       {phase === "waiting" && (
