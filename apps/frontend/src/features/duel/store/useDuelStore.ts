@@ -2,6 +2,7 @@ import {
   type ClientMessage,
   DUEL_GAME_CONFIG,
   type Outcome,
+  opponentSeat,
   type Participant,
   type Seat,
   type ServerMessage,
@@ -134,7 +135,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
   const receive = (message: ServerMessage) => {
     if (message.type === "state") {
       const ownJournal = message.journals[message.seat];
-      const opponentJournal = message.journals[message.seat === 0 ? 1 : 0];
+      const opponentJournal = message.journals[opponentSeat(message.seat)];
       // Only an accepted start opens a journal: a non-empty one means the Participant is back mid-Game.
       const resumed = ownJournal.length > 0;
       if (resumed) {
