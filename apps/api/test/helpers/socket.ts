@@ -1,12 +1,12 @@
 import type { ClientMessage, ServerMessage } from "@repo/duel-engine";
 
 // A real WebSocket client that queues what the server sends, so a test awaits each message in order.
-export const openSocket = async (url: string, cookie: string) => {
+export const openSocketOf = async <Received, Sent>(url: string, cookie: string) => {
   const socket = new WebSocket(url, { headers: { cookie } });
-  const received: ServerMessage[] = [];
-  const waiting: ((message: ServerMessage) => void)[] = [];
+  const received: Received[] = [];
+  const waiting: ((message: Received) => void)[] = [];
   socket.addEventListener("message", (event) => {
-    const message = JSON.parse(String(event.data)) as ServerMessage;
+    const message = JSON.parse(String(event.data)) as Received;
     const resolve = waiting.shift();
     if (resolve) resolve(message);
     else received.push(message);
@@ -23,9 +23,9 @@ export const openSocket = async (url: string, cookie: string) => {
   const next = () => {
     const message = received.shift();
     if (message) return Promise.resolve(message);
-    return new Promise<ServerMessage>((resolve) => waiting.push(resolve));
+    return new Promise<Received>((resolve) => waiting.push(resolve));
   };
-  const send = (message: ClientMessage) => socket.send(JSON.stringify(message));
+  const send = (message: Sent) => socket.send(JSON.stringify(message));
   // Whether nothing arrives for that long: how a test sees that the server dropped a message.
   const staysSilent = async (ms: number) => {
     await Bun.sleep(ms);
@@ -33,6 +33,10 @@ export const openSocket = async (url: string, cookie: string) => {
   };
   return { next, send, staysSilent, closed, close: () => socket.close() };
 };
+
+/** The socket of a Duel. */
+export const openSocket = (url: string, cookie: string) =>
+  openSocketOf<ServerMessage, ClientMessage>(url, cookie);
 
 // Asks for the upgrade over plain HTTP, so that a refused upgrade shows its status and body.
 export const requestUpgrade = (url: string, cookie?: string) =>
