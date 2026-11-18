@@ -23,6 +23,7 @@ import {
   closingEvents,
   createDuel,
   DUEL_EXPIRY_MS,
+  holdSeat,
   isEventAccepted,
   readDuel,
   readJournals,
@@ -43,6 +44,8 @@ export const createDuelRoutes = (
   const relay = createRelay(redis);
   type Seating = {
     participant: Participant;
+    /** Tells this socket from an older or newer one of the same seat. */
+    connection: string;
     delivery: Parameters<typeof relay.join>[1];
     /** The Start this socket was told of, in server time, whichever instance announced it. */
     startAt: number | null;
@@ -137,7 +140,6 @@ export const createDuelRoutes = (
           const claimed = await claimSeat(redis, params.id, identity);
           if (claimed === "unknown") return status(404, { code: "DUEL_NOT_FOUND" });
           if (claimed === "full") return status(409, { code: "DUEL_FULL" });
-          if (claimed === "seated") return status(409, { code: "ALREADY_SEATED" });
         },
         // Hands a new Guest their cookie with the handshake, the only response a socket gets.
         upgrade: ({ set }) => set.headers,
@@ -157,10 +159,14 @@ export const createDuelRoutes = (
             }
             ws.send(JSON.stringify(message));
           };
-          const delivery = { seat: self.seat, send };
-          const entry: Seating = { participant: self, delivery, startAt: null, game };
+          const connection = crypto.randomUUID();
+          const delivery = { seat: self.seat, connection, send, evict: () => ws.close() };
+          const entry: Seating = { participant: self, connection, delivery, startAt: null, game };
           seated.set(ws.id, entry);
+          await holdSeat(redis, ws.params.id, self.seat, connection);
           await relay.join(ws.params.id, delivery);
+          // A reconnection: the socket that held the seat until now stops acting for it.
+          await relay.takeOver(ws.params.id, self.seat, connection);
           send({
             type: "state",
             seat: self.seat,
@@ -208,9 +214,10 @@ export const createDuelRoutes = (
           const seat = seated.get(ws.id);
           if (!seat) return;
           seated.delete(ws.id);
-          const { participant, delivery } = seat;
+          const { participant, connection, delivery } = seat;
           await relay.leave(ws.params.id, delivery);
-          await releaseSeat(redis, ws.params.id, participant.seat);
+          // Replaced by a reconnection: the Participant is not away.
+          if (!(await releaseSeat(redis, ws.params.id, participant.seat, connection))) return;
           await relay.publish(ws.params.id, participant.seat, {
             type: "presence",
             participant: { ...participant, connected: false },

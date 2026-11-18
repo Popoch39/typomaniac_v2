@@ -66,12 +66,12 @@ export const createDuel = async (redis: Redis, expiryMs: number) => {
 };
 
 // Atomic, so two identities opening the same Duel at once never get the same seat. An identity
-// that holds a seat gets it back rather than the other one, unless it is connected there already.
+// that holds a seat gets it back rather than the other one, even while it still looks connected
+// there: its old socket may sit on a crashed instance, or be half-open, and never be closed.
 const CLAIM = `
 if redis.call('EXISTS', KEYS[1]) == 0 then return 'unknown' end
 for seat = 0, 1 do
   if redis.call('HGET', KEYS[1], 'holder' .. seat) == ARGV[1] then
-    if redis.call('HGET', KEYS[1], 'connected' .. seat) == '1' then return 'seated' end
     redis.call('HSET', KEYS[1], 'connected' .. seat, '1')
     return tostring(seat)
   end
@@ -90,7 +90,7 @@ export const claimSeat = async (
   redis: Redis,
   duelId: string,
   identity: Identity,
-): Promise<Seat | "unknown" | "full" | "seated"> => {
+): Promise<Seat | "unknown" | "full"> => {
   const claimed: string = await redis.client.eval(
     CLAIM,
     1,
@@ -101,18 +101,45 @@ export const claimSeat = async (
   );
   if (claimed === "0") return 0;
   if (claimed === "1") return 1;
-  if (claimed === "unknown" || claimed === "full" || claimed === "seated") return claimed;
+  if (claimed === "unknown" || claimed === "full") return claimed;
   throw new Error(`Unexpected seat claim answer: ${claimed}`);
 };
 
 // Does not recreate a Duel that expired meanwhile.
-const RELEASE = `
-if redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'connected' .. ARGV[1], '0') end
+const HOLD = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  redis.call('HSET', KEYS[1], 'connection' .. ARGV[1], ARGV[2], 'connected' .. ARGV[1], '1')
+end
 `;
 
-/** The seat stays held by its identity: only its connection is let go. */
-export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat) => {
-  await redis.client.eval(RELEASE, 1, duelKey(redis, duelId), seat);
+/**
+ * Makes `connection` the one socket that acts for `seat`: a socket that held it before, on
+ * whichever instance, no longer does.
+ */
+export const holdSeat = async (redis: Redis, duelId: string, seat: Seat, connection: string) => {
+  await redis.client.eval(HOLD, 1, duelKey(redis, duelId), seat, connection);
+};
+
+// Only the socket that holds the seat lets it go: one replaced by a reconnection closes later.
+const RELEASE = `
+if redis.call('HGET', KEYS[1], 'connection' .. ARGV[1]) ~= ARGV[2] then return 0 end
+redis.call('HSET', KEYS[1], 'connected' .. ARGV[1], '0')
+return 1
+`;
+
+/**
+ * The seat stays held by its identity: only its connection is let go. Gives whether `connection`
+ * was still the one holding the seat.
+ */
+export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat, connection: string) => {
+  const released: number = await redis.client.eval(
+    RELEASE,
+    1,
+    duelKey(redis, duelId),
+    seat,
+    connection,
+  );
+  return released === 1;
 };
 
 export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | null> => {

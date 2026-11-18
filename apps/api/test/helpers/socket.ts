@@ -15,6 +15,10 @@ export const openSocket = async (url: string, cookie: string) => {
     socket.addEventListener("open", resolve, { once: true });
     socket.addEventListener("error", reject, { once: true });
   });
+  // Settles once the socket is closed, from either side: how a test sees the server close it.
+  const closed = new Promise<void>((resolve) =>
+    socket.addEventListener("close", () => resolve(), { once: true }),
+  );
 
   const next = () => {
     const message = received.shift();
@@ -27,7 +31,7 @@ export const openSocket = async (url: string, cookie: string) => {
     await Bun.sleep(ms);
     return received.length === 0;
   };
-  return { next, send, staysSilent, close: () => socket.close() };
+  return { next, send, staysSilent, closed, close: () => socket.close() };
 };
 
 // Asks for the upgrade over plain HTTP, so that a refused upgrade shows its status and body.

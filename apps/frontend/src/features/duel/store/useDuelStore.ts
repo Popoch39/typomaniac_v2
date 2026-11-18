@@ -13,12 +13,7 @@ import { useGameStore } from "../../game/store/useGameStore.ts";
 import { type ClockSample, estimateClockOffset } from "../clock/estimateClockOffset.ts";
 
 /** Why this Participant could not take a seat in the Duel. */
-export type DuelRefusal =
-  | "notFound"
-  | "full"
-  | "alreadySeated"
-  | "nicknameRequired"
-  | "unreachable";
+export type DuelRefusal = "notFound" | "full" | "nicknameRequired" | "unreachable";
 
 type DuelState = {
   readonly phase: "connecting" | "waiting" | "countdown" | "running" | "finished" | "refused";
@@ -57,7 +52,7 @@ async function findRefusal(duelId: string): Promise<DuelRefusal> {
   if (response.status === 404) return "notFound";
   if (!response.ok) return "unreachable";
   const { participants } = (await response.json()) as { participants: Participant[] };
-  return participants.length === 2 ? "full" : "alreadySeated";
+  return participants.length === 2 ? "full" : "unreachable";
 }
 
 const withParticipant = (participants: readonly Participant[], participant: Participant) =>

@@ -120,16 +120,23 @@ test("the upgrade is refused for a full Duel", async () => {
   expect(await response.json()).toEqual({ code: "DUEL_FULL" });
 });
 
-test("a Player already seated in a Duel is refused its other seat", async () => {
-  const cookie = await signInPlayerWithNickname(uniqueNickname());
+test("a Player opening a Duel twice gets their own seat back, never its other seat", async () => {
+  const nickname = uniqueNickname();
+  const cookie = await signInPlayerWithNickname(nickname);
   const { id } = (await (await createDuel(cookie)).json()) as { id: string };
   const seated = await openSocket(duelSocketUrl(id), cookie);
+  await seated.next();
 
-  const response = await requestUpgrade(duelSocketUrl(id), cookie);
-  seated.close();
+  const twice = await openSocket(duelSocketUrl(id), cookie);
+  const state = await twice.next();
+  await seated.closed;
+  twice.close();
 
-  expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({ code: "ALREADY_SEATED" });
+  expect(state).toMatchObject({
+    type: "state",
+    seat: 0,
+    participants: [{ seat: 0, name: nickname, connected: true }],
+  });
 });
 
 // The name/value pair a browser would send back from the Guest cookie the API set.
@@ -186,7 +193,7 @@ test("a Guest without a cookie joins by the link and is handed their cookie with
   expect(guestCookie).toStartWith("guest=");
 });
 
-test("the same Guest opening a Duel twice is refused its other seat, and gets their own back", async () => {
+test("the same Guest opening a full Duel again gets their own seat back", async () => {
   const created = await createDuel();
   const guestCookie = guestCookieOf(created);
   const { id } = (await created.json()) as { id: string };
@@ -198,17 +205,50 @@ test("the same Guest opening a Duel twice is refused its other seat, and gets th
   );
   await opponent.next();
 
-  const twice = await requestUpgrade(duelSocketUrl(id), guestCookie);
-  seated.close();
-  await opponent.next();
   const again = await openSocket(duelSocketUrl(id), guestCookie);
   const state = await again.next();
+  await seated.closed;
   again.close();
   opponent.close();
 
-  expect(twice.status).toBe(409);
-  expect(await twice.json()).toEqual({ code: "ALREADY_SEATED" });
   expect(state).toMatchObject({ type: "state", seat: 0 });
+});
+
+test("a Participant whose old socket still holds their seat takes it back from another instance, and the old socket is closed", async () => {
+  const other = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  try {
+    const creatorName = uniqueNickname();
+    const creatorCookie = await signInPlayerWithNickname(creatorName);
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const stale = await openSocket(
+      `ws://localhost:${other.server?.port}/api/duels/${id}/socket`,
+      creatorCookie,
+    );
+    await stale.next();
+    const opponent = await openSocket(duelSocketUrl(id), opponentCookie);
+    // State and Countdown.
+    await opponent.next();
+    await opponent.next();
+
+    const again = await openSocket(duelSocketUrl(id), creatorCookie);
+    const state = await again.next();
+    await stale.closed;
+    const back = await opponent.next();
+    // The old socket closing does not show the Participant away: their seat is held by the new one.
+    const silent = await opponent.staysSilent(300);
+    again.close();
+    opponent.close();
+
+    expect(state).toMatchObject({ type: "state", seat: 0 });
+    expect(back).toEqual({
+      type: "presence",
+      participant: { seat: 0, name: creatorName, connected: true },
+    });
+    expect(silent).toBe(true);
+  } finally {
+    await other.stop(true);
+  }
 });
 
 const forgedGuestCookies = {
