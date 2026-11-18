@@ -1,6 +1,6 @@
 # Typomaniac
 
-Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured.
+Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured, then of ranked play: how a Duel moves a Player's level and Rank.
 
 ## Language
 
@@ -90,3 +90,41 @@ _Avoid_: AFK, pause, inactivité
 **Live stats** (`LiveStats`):
 The WPM, Raw WPM and Accuracy read while a Game is being played, as opposed to its Result.
 _Avoid_: live result, current stats
+
+### Ranked
+
+**Duel**:
+A ranked 1v1 between two Players, each playing their own Game on the same words; it ends with an Outcome for each of them.
+_Avoid_: match, game (reserved for one player's Game), versus, partie
+
+**Outcome** (`Outcome`):
+What a Duel means for one Player: `win`, `loss` or `draw`. It is decided from the Results, outside the ranked engine.
+_Avoid_: score, result (reserved for a Game's Result), issue
+
+**MMR**:
+A Player's hidden level estimate, an integer moved by Elo after each Duel, which matchmaking reads.
+_Avoid_: Elo, rating, score, cote
+
+**LP**:
+The points a ranked Player wins or loses in a Duel within their Division; 100 LP promote to the next Division.
+_Avoid_: points, score, league points
+
+**Tier** (`Tier`):
+A band of the ladder: `bronze`, `silver`, `gold`, `platinum`, `diamond`, then `master`, the highest.
+_Avoid_: league, level, rank (reserved for the full Rank), palier
+
+**Division** (`Division`):
+A step inside a Tier, from IV, the lowest, to I, the highest. Master has no Division.
+_Avoid_: sub-tier, step, league
+
+**Rank** (`Rank`):
+A ranked Player's visible standing on the ladder: their Tier, their Division (except in Master) and their LP.
+_Avoid_: rating, league, level, classement
+
+**Unranked**:
+A Player who has no Rank yet, while their Placement is not over.
+_Avoid_: unrated, provisional, non classé
+
+**Placement**:
+A Player's first ranked Duels, during which they are Unranked and their MMR moves faster; the last one gives them their first Rank.
+_Avoid_: qualifiers, calibration, placement matches
