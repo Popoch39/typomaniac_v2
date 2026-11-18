@@ -1,13 +1,20 @@
-import type { ClientMessage, Participant, ServerMessage } from "@repo/duel-engine";
+import type { ClientMessage, ServerMessage } from "@repo/duel-engine";
+import { describeApiError } from "../../../shared/api/describeApiError.ts";
+import { queryClient } from "../../../shared/api/queryClient.ts";
+import { duelQueryOptions } from "../api/duelQueryOptions.ts";
 import { parseServerMessage } from "../message/parseServerMessage.ts";
-
-/** Why this Participant could not take a seat in the Duel. */
-export type DuelRefusal = "notFound" | "full" | "nicknameRequired" | "unreachable";
 
 type DuelSocketHandlers = {
   readonly receive: (message: ServerMessage) => void;
-  readonly refuse: (refusal: DuelRefusal) => void;
+  /** Told, in words for the user, why this Participant could not take a seat in the Duel. */
+  readonly refuse: (refusal: string) => void;
+  /** The socket closed after the Participant was seated. */
+  readonly disconnect: () => void;
 };
+
+const REFUSALS = { NICKNAME_REQUIRED: "Choose a Nickname to join this Duel." };
+const FULL = "This Duel is full: two Participants are already in it.";
+const UNREACHABLE = "The Duel could not be reached. Try again in a moment.";
 
 const socketUrl = (duelId: string) => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -15,20 +22,23 @@ const socketUrl = (duelId: string) => {
 };
 
 // A browser never shows why an upgrade was refused: the Duel is read over HTTP to tell the reason.
-async function findRefusal(duelId: string): Promise<DuelRefusal> {
-  const response = await fetch(`/api/duels/${duelId}`);
-  if (response.status === 403) return "nicknameRequired";
-  if (response.status === 404) return "notFound";
-  if (!response.ok) return "unreachable";
-  const { participants } = (await response.json()) as { participants: Participant[] };
-  return participants.length === 2 ? "full" : "unreachable";
+async function findRefusal(duelId: string) {
+  try {
+    const { participants } = await queryClient.fetchQuery(duelQueryOptions(duelId));
+    return participants.length === 2 ? FULL : UNREACHABLE;
+  } catch (error) {
+    return describeApiError(error, REFUSALS);
+  }
 }
 
 // Owned by the Duel stores because components may not run effects; one Duel is open at a time.
 let socket: WebSocket | null = null;
 
 /** Opens the socket of a Duel in place of any other, and hands over each message it reads. */
-export function openDuelSocket(duelId: string, { receive, refuse }: DuelSocketHandlers) {
+export function openDuelSocket(
+  duelId: string,
+  { receive, refuse, disconnect }: DuelSocketHandlers,
+) {
   closeDuelSocket();
   const opened = new WebSocket(socketUrl(duelId));
   socket = opened;
@@ -39,8 +49,9 @@ export function openDuelSocket(duelId: string, { receive, refuse }: DuelSocketHa
     if (message !== null) receive(message);
   });
   opened.addEventListener("close", async () => {
-    if (seated || socket !== opened) return;
-    const refusal = await findRefusal(duelId).catch((): DuelRefusal => "unreachable");
+    if (socket !== opened) return;
+    if (seated) return disconnect();
+    const refusal = await findRefusal(duelId);
     if (socket === opened) refuse(refusal);
   });
 }

@@ -12,23 +12,26 @@ import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretSto
 import { eventTime } from "../../game/clock/eventTime.ts";
 import { useGameStore } from "../../game/store/useGameStore.ts";
 import { opponentCaretPosition } from "../caret/opponentCaretPosition.ts";
-import {
-  closeDuelSocket,
-  type DuelRefusal,
-  openDuelSocket,
-  sendToDuel,
-} from "../socket/duelSocket.ts";
+import { closeDuelSocket, openDuelSocket, sendToDuel } from "../socket/duelSocket.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 import { useDuelCountdownStore } from "./useDuelCountdownStore.ts";
 
 type DuelState = {
-  readonly phase: "connecting" | "waiting" | "countdown" | "running" | "finished" | "refused";
+  readonly phase:
+    | "connecting"
+    | "waiting"
+    | "countdown"
+    | "running"
+    | "finished"
+    | "refused"
+    | "disconnected";
   readonly seat: Seat | null;
   readonly participants: readonly Participant[];
   readonly words: readonly string[];
   /** The Opponent's Game, replayed from their Events to place their caret and read their WPM. */
   readonly opponentGame: Game | null;
-  readonly refusal: DuelRefusal | null;
+  /** Why the Participant could not take a seat, in words for the user. */
+  readonly refusal: string | null;
   /** The server's Results and Outcomes, indexed by seat, once both Games are finished. */
   readonly end: {
     readonly results: readonly [Result, Result];
@@ -122,6 +125,14 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     }
   };
 
+  const disconnect = () => {
+    // The server closes nothing a finished Duel still needs.
+    if (get().phase === "finished") return;
+    useDuelCountdownStore.getState().cancel();
+    stopForwardingEvents();
+    set({ phase: "disconnected" });
+  };
+
   const leave = () => {
     closeDuelSocket();
     useDuelClockStore.getState().reset();
@@ -134,7 +145,11 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     ...initialState,
     join: (duelId) => {
       leave();
-      openDuelSocket(duelId, { receive, refuse: (refusal) => set({ phase: "refused", refusal }) });
+      openDuelSocket(duelId, {
+        receive,
+        refuse: (refusal) => set({ phase: "refused", refusal }),
+        disconnect,
+      });
     },
     leave,
   };

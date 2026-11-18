@@ -1,15 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { apiClient } from "../../../shared/api/apiClient.ts";
+import { describeApiError } from "../../../shared/api/describeApiError.ts";
 
-const FAILURES: Record<number, string> = {
-  403: "Choose a Nickname to create a Duel.",
-};
+const FAILURES = { NICKNAME_REQUIRED: "Choose a Nickname to create a Duel." };
 
 async function createDuel() {
-  const response = await fetch("/api/duels", { method: "POST" });
-  if (!response.ok)
-    throw new Error(FAILURES[response.status] ?? "The Duel could not be created. Try again.");
-  return ((await response.json()) as { id: string }).id;
+  const { data, error } = await apiClient.api.duels.post();
+  if (error) throw error;
+  return data.id;
 }
 
 export function useCreateDuel() {
@@ -18,5 +17,9 @@ export function useCreateDuel() {
     mutationFn: createDuel,
     onSuccess: (duelId) => navigate({ to: "/duel/$duelId", params: { duelId } }),
   });
-  return { create: () => mutate(), isPending, failure: error?.message ?? null };
+  return {
+    create: () => mutate(),
+    isPending,
+    failure: error === null ? null : describeApiError(error, FAILURES),
+  };
 }

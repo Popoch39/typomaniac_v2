@@ -6,7 +6,7 @@ export function CreateDuelButton() {
   return (
     <div className="create-duel">
       <button type="button" onClick={create} disabled={isPending}>
-        Create a Duel
+        {isPending ? "Creating…" : "Create a Duel"}
       </button>
       {failure && <p role="alert">{failure}</p>}
     </div>
