@@ -36,6 +36,13 @@
       "when": 1795008691841,
       "tag": "0004_duel",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795019951866,
+      "tag": "0005_standing",
+      "breakpoints": true
     }
   ]
 }
