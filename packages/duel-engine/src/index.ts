@@ -5,6 +5,7 @@ export {
   DUEL_WORD_COUNT,
   END_GRACE_MS,
   MAX_ROUNDS,
+  POINTS_FACTOR,
   RANKED_CONNECT_MS,
   ROUND_PAUSE_MS,
   ROUNDS_TO_WIN,
@@ -20,6 +21,7 @@ export type {
   ServerMessage,
 } from "./messages.ts";
 export { getOutcome } from "./outcome.ts";
+export { getPoints } from "./points.ts";
 export { getDuelOutcomes, getRoundScore } from "./rounds.ts";
 export type { RoundOutcomes } from "./rounds.ts";
 export { opponentSeat } from "./seat.ts";

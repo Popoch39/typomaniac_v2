@@ -1,9 +1,9 @@
-import type { Result } from "@repo/typing-engine";
+import type { RoundSummarySide } from "../round/summariseRound.ts";
 import { DuelResult } from "./DuelResult.tsx";
 
 type DuelRoundResultsProps = {
   title: string;
-  sides: readonly { seat: number; name: string; result: Result }[];
+  sides: readonly RoundSummarySide[];
 };
 
 export function DuelRoundResults({ title, sides }: DuelRoundResultsProps) {
@@ -12,8 +12,8 @@ export function DuelRoundResults({ title, sides }: DuelRoundResultsProps) {
       <h2>{title}</h2>
       {/* Both Results side by side, the Participant's own first. */}
       <div className="grid grid-cols-2 gap-8">
-        {sides.map(({ seat, name, result }) => (
-          <DuelResult key={seat} name={name} result={result} />
+        {sides.map(({ seat, name, result, points }) => (
+          <DuelResult key={seat} name={name} result={result} points={points} />
         ))}
       </div>
     </section>

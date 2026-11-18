@@ -19,23 +19,28 @@ function result(wpm: number, accuracy: number): Result {
   };
 }
 
-test("OUTCOME-1: the higher WPM wins, whatever the Accuracy", () => {
-  expect(getOutcome(result(80.5, 90), result(80.49, 100))).toBe("win");
-  expect(getOutcome(result(80.49, 100), result(80.5, 90))).toBe("loss");
+test("OUTCOME-1: at equal Accuracy, the Participant with the higher WPM has more Points and wins the Round", () => {
+  expect(getOutcome(result(81, 95), result(80, 95))).toBe("win");
+  expect(getOutcome(result(80, 95), result(81, 95))).toBe("loss");
 });
 
-test("OUTCOME-2: at equal WPM, the higher Accuracy wins", () => {
-  expect(getOutcome(result(80, 97.5), result(80, 97.49))).toBe("win");
-  expect(getOutcome(result(80, 97.49), result(80, 97.5))).toBe("loss");
+test("OUTCOME-2: a slower Participant with enough extra Accuracy has more Points and wins the Round", () => {
+  // 882 Points against 865.
+  expect(getOutcome(result(90, 99), result(100, 93))).toBe("win");
+  expect(getOutcome(result(100, 93), result(90, 99))).toBe("loss");
 });
 
-test("OUTCOME-3: at equal WPM and equal Accuracy, the Round is a draw", () => {
-  expect(getOutcome(result(80, 97.5), result(80, 97.5))).toBe("draw");
+test("OUTCOME-3: at equal Points, the Round is a draw, with no tie-break on WPM or Accuracy", () => {
+  // 810 Points each.
+  expect(getOutcome(result(100, 90), result(81, 100))).toBe("draw");
+  // 652 Points each once rounded.
+  expect(getOutcome(result(80.5, 90), result(80.49, 90))).toBe("draw");
   expect(getOutcome(result(0, 0), result(0, 0))).toBe("draw");
 });
 
 test("OUTCOME-4: the two Outcomes of a Round are always win and loss, or draw and draw", () => {
-  const results = [result(60, 90), result(60, 95), result(70, 90), result(70, 95)];
+  // 486, 600, 567 and 700 Points.
+  const results = [result(60, 90), result(60, 100), result(70, 90), result(70, 100)];
   const pairs = results.flatMap((first) => results.map((second) => [first, second] as const));
 
   const outcomes = pairs.map(([first, second]) => [
@@ -50,10 +55,10 @@ test("OUTCOME-4: the two Outcomes of a Round are always win and loss, or draw an
     ["loss", "win"],
     ["win", "loss"],
     ["draw", "draw"],
-    ["loss", "win"],
+    ["win", "loss"],
     ["loss", "win"],
     ["win", "loss"],
-    ["win", "loss"],
+    ["loss", "win"],
     ["draw", "draw"],
     ["loss", "win"],
     ["win", "loss"],

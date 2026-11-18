@@ -1,6 +1,6 @@
 # A Duel is the best of three Rounds
 
-A single 30-second Game used to decide a whole Duel, which left a lot to one bad start. Every Duel, ranked or Custom, is now the best of three Rounds. In a Round, each Participant plays one Game on the same Target words and the same Start, and the Round has an Outcome by the rule a Duel had: the higher WPM, then the higher Accuracy, otherwise a draw. Each Round has fresh Target words. The first Participant to win two Rounds wins the Duel; a drawn Round counts for neither; after three Rounds the Duel goes to whoever won more of them, and is a draw otherwise. The rule that turns Round Outcomes into the Duel's Outcome is a pure function of the Duel engine, shared by the front and the back.
+A single 30-second Game used to decide a whole Duel, which left a lot to one bad start. Every Duel, ranked or Custom, is now the best of three Rounds. In a Round, each Participant plays one Game on the same Target words and the same Start, and the Round has an Outcome by the rule a Duel had: the higher WPM, then the higher Accuracy, otherwise a draw. That rule of a Round has since been replaced by Points, see ADR 0012. Each Round has fresh Target words. The first Participant to win two Rounds wins the Duel; a drawn Round counts for neither; after three Rounds the Duel goes to whoever won more of them, and is a draw otherwise. The rule that turns Round Outcomes into the Duel's Outcome is a pure function of the Duel engine, shared by the front and the back.
 
 ## Considered Options
 

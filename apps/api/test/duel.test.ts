@@ -889,6 +889,30 @@ test("once both Games of a Round are finished, both Participants receive both Re
   }
 });
 
+test("a slower but cleaner Participant has more Points and both Participants receive their win of the Round", async () => {
+  const { creator, opponent, words, stop } = await startDuel(0);
+  try {
+    // About 10 % faster, against a clean Opponent: the reference case of ADR 0012.
+    const faster = `${words.slice(0, 10).join(" ")} `;
+    const slower = `${words.slice(0, 9).join(" ")} `;
+    // An Accuracy between the speed ratio, where WPM × Accuracy would tie, and its square root,
+    // where WPM × Accuracy² would: only Accuracy counting twice hands the Round to the cleaner.
+    const accuracy = (slower.length / faster.length) ** 0.75;
+    const mistakes = Math.round(faster.length * (1 / accuracy - 1));
+    playGame(creator, 1, `${faster}${"#".repeat(mistakes)}`);
+    playGame(opponent, 1, slower);
+    const ends = [await nextRoundEnd(creator), await nextRoundEnd(opponent)] as const;
+
+    expect(ends[0]).toEqual(ends[1]);
+    const [sloppy, clean] = ends[0].results;
+    expect(sloppy.wpm).toBeGreaterThan(clean.wpm);
+    expect(sloppy.wpm * sloppy.accuracy).toBeGreaterThan(clean.wpm * clean.accuracy);
+    expect(ends[0].outcomes).toEqual(["loss", "win"]);
+  } finally {
+    await stop();
+  }
+});
+
 test("the pause between two Rounds lasts 5 seconds unless the app is given another", async () => {
   const cookies = [
     await signInPlayerWithNickname(uniqueNickname()),

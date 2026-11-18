@@ -40,15 +40,34 @@ const participants = [
   { seat: 1, name: "Guest 4821", connected: false },
 ] as const;
 
-test("a finished Round is shown with the Participant's own Outcome, and both Results, their own first", () => {
+test("a finished Round is shown with the Participant's own Outcome, and both Results with their Points, their own first", () => {
   expect(summariseRound(wonBySeat0, { number: 2, seat: 1, participants })).toEqual({
     number: 2,
     outcome: "loss",
     sides: [
-      { seat: 1, name: "Guest 4821", result: idle },
-      { seat: 0, name: "ada", result: typed },
+      { seat: 1, name: "Guest 4821", result: idle, points: 0 },
+      { seat: 0, name: "ada", result: typed, points: 360 },
     ],
   });
+});
+
+test("each side shows the Points that decided the Round, the winner's the higher", () => {
+  const fasterButSloppier = { ...typed, wpm: 100, accuracy: 93 };
+  const slowerButCleaner = { ...typed, wpm: 90, accuracy: 99 };
+  const round: FinishedRound = {
+    results: [fasterButSloppier, slowerButCleaner],
+    outcomes: ["loss", "win"],
+  };
+
+  const summary = summariseRound(round, { number: 1, seat: 0, participants });
+
+  expect(summary.sides.map((side) => side.points)).toEqual([865, 882]);
+});
+
+test("a drawn Round shows equal Points on both sides", () => {
+  const summary = summariseRound(drawn, { number: 1, seat: 0, participants });
+
+  expect(summary.sides.map((side) => side.points)).toEqual([0, 0]);
 });
 
 test("a Participant whose name is unknown is shown without one", () => {

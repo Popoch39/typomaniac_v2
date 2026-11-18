@@ -14,13 +14,26 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 | CONFIG-6 | A Duel is won with 2 Rounds and has 3 Rounds at most. The pause between two Rounds lasts 5 seconds.                      |
 | CONFIG-7 | A ranked Duel whose Players are not both connected has its first Countdown announced 10 seconds after its creation.      |
 
+## Points
+
+What a Game of a Duel is worth (ADR 0012). Points are computed from WPM and Accuracy alone, so a Result and Live stats give them alike.
+
+| Id       | Rule                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------- |
+| POINTS-1 | Points are WPM × (Accuracy / 100)² × 10: 100 WPM at 93 % Accuracy is worth 865 Points, 90 WPM at 99 % is worth 882. |
+| POINTS-2 | Points are rounded to the nearest integer.                                                                          |
+| POINTS-3 | Nothing typed is worth 0 Points.                                                                                    |
+| POINTS-4 | Live stats give Points by the same rule as a Result.                                                                |
+
 ## Outcome of a Round
+
+A Round is decided by the Points of both Results, computed by the server (ADR 0012).
 
 | Id        | Rule                                                                                                          |
 | --------- | ------------------------------------------------------------------------------------------------------------- |
-| OUTCOME-1 | The Participant with the higher WPM wins the Round, whatever the Accuracy.                                    |
-| OUTCOME-2 | At equal WPM, the Participant with the higher Accuracy wins the Round.                                        |
-| OUTCOME-3 | At equal WPM and equal Accuracy, the Round is a draw.                                                         |
+| OUTCOME-1 | The Participant with more Points wins the Round: at equal Accuracy, the higher WPM wins.                      |
+| OUTCOME-2 | A slower Participant with enough extra Accuracy has more Points and wins the Round.                           |
+| OUTCOME-3 | At equal Points, the Round is a draw, whatever the WPM and Accuracy: there is no tie-break.                   |
 | OUTCOME-4 | The Outcome is computed once per Participant; the two Outcomes of a Round are win and loss, or draw and draw. |
 
 ## Rounds
