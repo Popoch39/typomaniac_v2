@@ -381,6 +381,30 @@ test("a Player who accepted, then closed the socket, is not queued again", async
   expect(await queue.queuedAtOf(ada)).toBeNull();
 });
 
+test("a Player who accepted, then closed the socket, is not paired by the other's acceptance", async () => {
+  const queue = await openQueue();
+  const ada = await queue.signIn();
+  const bob = await queue.signIn();
+  const adaSocket = await queue.enter(ada);
+  const bobSocket = await queue.enter(bob);
+  const proposedAt = Date.now();
+  await queue.tick(proposedAt);
+  await accept(adaSocket);
+  const { pairingId } = await nextProposal(bobSocket);
+  // Ada's acceptance is recorded before she leaves: a close taken first would turn it down.
+  await Bun.sleep(100);
+  adaSocket.close();
+  expect(await queue.hasLeft(ada)).toBe(true);
+
+  bobSocket.send({ type: "accept", pairingId });
+
+  expect(await bobSocket.staysSilent(100)).toBe(true);
+  await queue.tick(proposedAt + 10_000);
+  expect(await bobSocket.next()).toMatchObject({ type: "requeued", queuedAt: bobSocket.queuedAt });
+  expect(await queue.queuedAtOf(ada)).toBeNull();
+  bobSocket.close();
+});
+
 test("the time to accept is an option of the tick: past it, an acceptance comes too late", async () => {
   const queue = await openQueue();
   const adaSocket = await queue.enter(await queue.signIn());
