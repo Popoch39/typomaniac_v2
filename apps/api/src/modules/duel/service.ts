@@ -6,6 +6,7 @@ import {
   type Seat,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
+import type { GameEvent } from "@repo/typing-engine";
 import type { Redis } from "../../redis/client.ts";
 
 /** How long a Duel can be joined after its creation. */
@@ -136,12 +137,52 @@ export const announceStart = async (
 /**
  * Whether the server takes an Event of a Participant's Game. Nothing counts before the Start, and
  * the `start` itself only near the announced instant, so that neither Participant gets a head start.
+ * No client adds words: both Games are played on the words drawn with the Duel.
  */
 export const isEventAccepted = (
   event: Extract<ClientMessage, { type: "event" }>["event"],
   game: { readonly started: boolean; readonly startAt: number | null; readonly now: number },
 ) => {
+  if (event.type === "addWords") return false;
   if (event.type !== "start") return game.started;
   if (game.started || game.startAt === null) return false;
   return Math.abs(game.now - game.startAt) <= START_WINDOW_MS;
+};
+
+const journalKey = (redis: Redis, duelId: string, seat: Seat) =>
+  redis.name("duel", duelId, "journal", String(seat));
+
+// One script, so a journal never lives on without its expiry.
+const APPEND = `
+redis.call('RPUSH', KEYS[1], ARGV[1])
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
+`;
+
+/** Appends an accepted Event to the journal of the Game played on `seat`. */
+export const appendEvent = async (
+  redis: Redis,
+  duelId: string,
+  seat: Seat,
+  event: GameEvent,
+  expiryMs: number,
+) => {
+  await redis.client.eval(
+    APPEND,
+    1,
+    journalKey(redis, duelId, seat),
+    JSON.stringify(event),
+    expiryMs,
+  );
+};
+
+/** The journals of both Games so far, indexed by seat. */
+export const readJournals = async (
+  redis: Redis,
+  duelId: string,
+): Promise<[GameEvent[], GameEvent[]]> => {
+  const read = async (seat: Seat) => {
+    const events: string[] = await redis.client.lrange(journalKey(redis, duelId, seat), 0, -1);
+    return events.map((event) => JSON.parse(event) as GameEvent);
+  };
+  return [await read(0), await read(1)];
 };

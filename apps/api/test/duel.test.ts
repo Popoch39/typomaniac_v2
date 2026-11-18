@@ -420,10 +420,14 @@ const startDuel = async (countdownMs: number) => {
   const countdown = await opponent.next();
   if (countdown.type !== "countdown")
     throw new Error(`Expected the Countdown, got ${countdown.type}`);
+  // The creator learns of the Start through the relay: until then, its start would be refused.
+  await creator.next();
+  await creator.next();
   return {
     creator,
     opponent,
     startAt: countdown.startAt,
+    reopenCreator: () => openSocket(socketUrl(id), creatorCookie),
     stop: async () => {
       creator.close();
       opponent.close();
@@ -465,5 +469,93 @@ test("a start sent too long after the announced instant is refused", async () =>
     expect(await opponent.staysSilent(300)).toBe(true);
   } finally {
     await stop();
+  }
+});
+
+test("the Events a Participant sends are kept in their Game's journal, handed back when they return", async () => {
+  const { creator, opponent, reopenCreator, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+    await opponent.next();
+    await opponent.next();
+
+    creator.close();
+    await opponent.next();
+    const again = await reopenCreator();
+    const state = await again.next();
+    again.close();
+
+    expect(state).toMatchObject({
+      type: "state",
+      seat: 0,
+      journals: [
+        [
+          { type: "start", at: 10 },
+          { type: "insert", at: 20, text: "a" },
+        ],
+        [],
+      ],
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("the server refuses addWords from a client: no word is added during a Duel", async () => {
+  const { creator, opponent, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    creator.send({ type: "event", event: { type: "addWords", words: ["extra"] } });
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+
+    expect(await opponent.next()).toEqual({
+      type: "opponentEvent",
+      event: { type: "start", at: 10 },
+    });
+    expect(await opponent.next()).toEqual({
+      type: "opponentEvent",
+      event: { type: "insert", at: 20, text: "a" },
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("two Participants on two API instances sharing Redis receive each other's Events", async () => {
+  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const socketUrl = (port: number | undefined, duelId: string) =>
+    `ws://localhost:${port}/api/duels/${duelId}/socket`;
+  try {
+    const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const creator = await openSocket(socketUrl(first.server?.port, id), creatorCookie);
+    await creator.next();
+    const opponent = await openSocket(socketUrl(second.server?.port, id), opponentCookie);
+    // State and Countdown for the opponent; presence and Countdown for the creator.
+    for (const socket of [opponent, opponent, creator, creator]) await socket.next();
+
+    creator.send({ type: "event", event: { type: "start", at: 10 } });
+    opponent.send({ type: "event", event: { type: "start", at: 11 } });
+    creator.send({ type: "event", event: { type: "insert", at: 20, text: "a" } });
+    opponent.send({ type: "event", event: { type: "insert", at: 21, text: "b" } });
+    const toOpponent = [await opponent.next(), await opponent.next()];
+    const toCreator = [await creator.next(), await creator.next()];
+    creator.close();
+    opponent.close();
+
+    expect(toOpponent).toEqual([
+      { type: "opponentEvent", event: { type: "start", at: 10 } },
+      { type: "opponentEvent", event: { type: "insert", at: 20, text: "a" } },
+    ]);
+    expect(toCreator).toEqual([
+      { type: "opponentEvent", event: { type: "start", at: 11 } },
+      { type: "opponentEvent", event: { type: "insert", at: 21, text: "b" } },
+    ]);
+  } finally {
+    await first.stop(true);
+    await second.stop(true);
   }
 });
