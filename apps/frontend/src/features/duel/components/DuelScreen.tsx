@@ -4,11 +4,11 @@ import { DuelCountdown } from "./DuelCountdown.tsx";
 import { DuelDisconnected } from "./DuelDisconnected.tsx";
 import { DuelEnd } from "./DuelEnd.tsx";
 import { DuelInviteLink } from "./DuelInviteLink.tsx";
+import { DuelLivePoints } from "./DuelLivePoints.tsx";
 import { DuelParticipants } from "./DuelParticipants.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
 import { DuelRoundEnd } from "./DuelRoundEnd.tsx";
 import { DuelRoundScore } from "./DuelRoundScore.tsx";
-import { OpponentLiveStats } from "./OpponentLiveStats.tsx";
 
 export function DuelScreen() {
   const phase = useDuelPhase();
@@ -36,7 +36,7 @@ export function DuelScreen() {
         <>
           <DuelParticipants />
           <DuelRoundScore />
-          <OpponentLiveStats />
+          <DuelLivePoints />
           <TypingArea />
         </>
       )}
