@@ -4,10 +4,8 @@ import { PlayerIdentity } from "./PlayerIdentity.tsx";
 
 export function PlayerBlock() {
   return (
-    <div className="player-block">
-      <SignedInPlayerGate guest={<GuestIdentity />}>
-        {(player) => <PlayerIdentity player={player} />}
-      </SignedInPlayerGate>
-    </div>
+    <SignedInPlayerGate guest={<GuestIdentity />}>
+      {(player) => <PlayerIdentity player={player} />}
+    </SignedInPlayerGate>
   );
 }

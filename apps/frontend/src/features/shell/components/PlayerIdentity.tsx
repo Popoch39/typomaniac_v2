@@ -1,8 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Avatar } from "../../auth/components/Avatar.tsx";
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "../../../shared/components/ui/sidebar.tsx";
+import { PlayerAvatar } from "../../auth/components/PlayerAvatar.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
-import { SignOutButton } from "../../auth/components/SignOutButton.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import { SidebarSignOutButton } from "./SidebarSignOutButton.tsx";
 
 interface PlayerIdentityProps {
   player: SignedInPlayer;
@@ -10,14 +15,24 @@ interface PlayerIdentityProps {
 
 export function PlayerIdentity({ player }: PlayerIdentityProps) {
   return (
-    <>
-      <Link to="/profile" className="player-identity">
-        <Avatar player={player} />
-        <span className="player-name sidebar-label">
-          <PlayerNickname player={player} />
-        </span>
-      </Link>
-      <SignOutButton />
-    </>
+    <SidebarMenu className="gap-1">
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          size="lg"
+          tooltip={{ children: <PlayerNickname player={player} /> }}
+        >
+          <Link to="/profile">
+            <PlayerAvatar player={player} />
+            <span className="text-foreground">
+              <PlayerNickname player={player} />
+            </span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarSignOutButton />
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }

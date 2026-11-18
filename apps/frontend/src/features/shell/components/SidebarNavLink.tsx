@@ -1,18 +1,31 @@
 import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import { SidebarMenuButton, SidebarMenuItem } from "../../../shared/components/ui/sidebar.tsx";
+import { type Section, useIsCurrentSection } from "../hooks/useIsCurrentSection.ts";
 
 interface SidebarNavLinkProps {
-  to: "/ranked" | "/custom" | "/profile";
+  to: Section;
   icon: LucideIcon;
   label: string;
 }
 
-// The router marks the current section with aria-current="page", which the stylesheet highlights.
+// The label stays in the link on the icon rail, clipped, so it still names the link for assistive technologies.
 export function SidebarNavLink({ to, icon: Icon, label }: SidebarNavLinkProps) {
+  const isCurrent = useIsCurrentSection(to);
+
   return (
-    <Link to={to} className="sidebar-nav-link">
-      <Icon aria-hidden="true" size={20} />
-      <span className="sidebar-label">{label}</span>
-    </Link>
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={isCurrent}
+        tooltip={label}
+        className="data-active:text-sidebar-primary"
+      >
+        <Link to={to}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }

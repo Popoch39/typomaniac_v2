@@ -1,5 +1,5 @@
+import { Card, CardContent, CardHeader } from "../../../shared/components/ui/card.tsx";
 import { SignInWithDiscordButton } from "./SignInWithDiscordButton.tsx";
-import "./SignInPrompt.css";
 
 interface SignInPromptProps {
   explanation: string;
@@ -7,9 +7,13 @@ interface SignInPromptProps {
 
 export function SignInPrompt({ explanation }: SignInPromptProps) {
   return (
-    <div className="sign-in-prompt">
-      <p>{explanation}</p>
-      <SignInWithDiscordButton />
-    </div>
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <p className="text-base">{explanation}</p>
+      </CardHeader>
+      <CardContent>
+        <SignInWithDiscordButton />
+      </CardContent>
+    </Card>
   );
 }

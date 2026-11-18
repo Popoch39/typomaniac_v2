@@ -1,20 +1,17 @@
 import { Swords, Trophy, User } from "lucide-react";
+import { SidebarGroup, SidebarMenu } from "../../../shared/components/ui/sidebar.tsx";
 import { SidebarNavLink } from "./SidebarNavLink.tsx";
 
 export function SidebarNav() {
   return (
-    <nav className="sidebar-nav" aria-label="Sections">
-      <ul>
-        <li>
+    <SidebarGroup>
+      <nav aria-label="Sections">
+        <SidebarMenu className="gap-1">
           <SidebarNavLink to="/ranked" icon={Trophy} label="Ranked" />
-        </li>
-        <li>
           <SidebarNavLink to="/custom" icon={Swords} label="Custom" />
-        </li>
-        <li>
           <SidebarNavLink to="/profile" icon={User} label="Profile" />
-        </li>
-      </ul>
-    </nav>
+        </SidebarMenu>
+      </nav>
+    </SidebarGroup>
   );
 }

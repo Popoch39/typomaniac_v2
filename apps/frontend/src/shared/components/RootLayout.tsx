@@ -6,7 +6,8 @@ import { PhoneUnavailableScreen } from "./PhoneUnavailableScreen.tsx";
 export function RootLayout() {
   return (
     <>
-      <div className="app-content">
+      {/* A typing game cannot be played on a phone, so a message replaces every route, Duels included. */}
+      <div className="max-md:hidden">
         <Outlet />
       </div>
       <PhoneUnavailableScreen />

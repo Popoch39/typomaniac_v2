@@ -1,7 +1,7 @@
-import { Avatar } from "../../auth/components/Avatar.tsx";
+import { Card, CardContent } from "../../../shared/components/ui/card.tsx";
+import { PlayerAvatar } from "../../auth/components/PlayerAvatar.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
-import "./PlayerProfile.css";
 
 interface PlayerProfileProps {
   player: SignedInPlayer;
@@ -9,11 +9,13 @@ interface PlayerProfileProps {
 
 export function PlayerProfile({ player }: PlayerProfileProps) {
   return (
-    <div className="player-profile">
-      <Avatar player={player} />
-      <p className="player-profile-nickname">
-        <PlayerNickname player={player} />
-      </p>
-    </div>
+    <Card className="w-full max-w-md">
+      <CardContent className="flex items-center gap-6">
+        <PlayerAvatar player={player} className="size-24 text-4xl" />
+        <p className="font-heading text-2xl wrap-anywhere text-foreground">
+          <PlayerNickname player={player} />
+        </p>
+      </CardContent>
+    </Card>
   );
 }
