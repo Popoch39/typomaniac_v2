@@ -4,11 +4,16 @@ import { createApp } from "../src/app.ts";
 import { createProtection } from "../src/modules/auth/index.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
+import { createTestRedis } from "./helpers/redis.ts";
 
 const testDb = await createTestDb();
-afterAll(() => testDb.drop());
+const testRedis = await createTestRedis();
+afterAll(async () => {
+  await testRedis.drop();
+  await testDb.drop();
+});
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth);
+const app = createApp(testDb.db, auth, testRedis.redis);
 
 const chooseNickname = (nickname: unknown, cookie?: string) =>
   app.handle(

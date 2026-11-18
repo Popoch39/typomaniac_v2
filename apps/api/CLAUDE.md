@@ -17,6 +17,8 @@ src/
   db/
     client.ts       Ouverture et migration de la base
     schema.ts       Toutes les tables Drizzle
+  redis/
+    client.ts       Ouverture de Redis (client de commandes + connexion d'abonnement), sous un namespace
   modules/
     <module>/
       index.ts      Routes et comportement HTTP du module (instance ou plugin Elysia)
@@ -27,7 +29,7 @@ test/
   helpers/          Base et auth de test
 ```
 
-- Tout code métier vit dans un module de `src/modules/`, un dossier par domaine (`auth`, `player`), nommé au singulier avec le terme du glossaire. Rien d'autre à la racine de `src/` que `index.ts`, `app.ts` et `db/`.
+- Tout code métier vit dans un module de `src/modules/`, un dossier par domaine (`auth`, `player`), nommé au singulier avec le terme du glossaire. Rien d'autre à la racine de `src/` que `index.ts`, `app.ts`, `db/` et `redis/`.
 - Un module a les trois mêmes fichiers, `index.ts`, `model.ts`, `service.ts`. Un fichier qui serait vide n'est pas créé (`auth` n'a pas de `model.ts`). Un quatrième fichier n'est ajouté que pour une responsabilité distincte, nommée par ce qu'il contient (`auth/config.ts` : variables d'environnement).
 - `index.ts` exporte une fabrique `create<Module>Routes(db, auth)` qui rend une instance Elysia préfixée. Les handlers y restent en ligne : ils possèdent validation, statuts et cookies, et passent des valeurs simples au service, jamais le contexte.
 - `model.ts` décrit le contrat d'API, pas les tables. Un groupe par route, nommé `[Chemin][Méthode]` relatif au préfixe (`PUT /nickname` donne `NicknamePut`), avec ses schémas sous `Body`, `Params`, `Query`, `Response`. Il s'importe en `import * as PlayerModel from "./model.ts"`. Un type n'est dérivé (`UnwrapModels`) que lorsqu'un service en a besoin.
@@ -37,7 +39,7 @@ test/
 - `src/app.ts` compose l'app et exporte `App` (type partagé avec le client Eden) sans écouter de port. Il ne déclare aucune route métier : une nouvelle route va dans son module.
 - `src/index.ts` est le seul endroit qui appelle `.listen()`.
 - `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse.
-- Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet.
+- Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet. Exception : une route WebSocket ne s'upgrade pas par `app.handle()`, ses tests font `.listen(0)` et passent par de vrais clients HTTP et WebSocket (`test/helpers/socket.ts`).
 
 ## Base de données
 
@@ -46,8 +48,17 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
 - Le schéma vit dans `src/db/schema.ts` (`drizzle-orm/pg-core`). Après chaque changement : `bun run db:generate`, puis commit du dossier `drizzle/` généré.
 - Schémas d'API : TypeBox 1.x (`t` d'Elysia) écrits à la main. `drizzle-orm/typebox`, cité par `.agents/skills/elysiajs/references/drizzle.md`, n'existe qu'en Drizzle 1.0 ; ne pas installer `drizzle-typebox` (TypeBox 0.x, incompatible avec Elysia 2).
-- `src/app.ts` exporte `createApp(db, auth)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
-- Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db))`.
+- `src/app.ts` exporte `createApp(db, auth, redis)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
+- Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis)`.
+
+## Redis
+
+Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en cours (`src/modules/duel/`), voir `docs/adr/0006-live-duel-in-memory-engine-redis-journal.md`.
+
+- Redis local : lancé par le même `docker compose up -d` que Postgres ; `REDIS_URL` dans `apps/api/.env`. `src/index.ts` refuse de démarrer sans lui, avant d'ouvrir Postgres.
+- `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.
+- Redis est injecté comme la base : `createApp(db, auth, redis)`.
+- Dans les tests : `const testRedis = await createTestRedis()` (`test/helpers/redis.ts`) ouvre Redis sous un namespace propre au fichier ; `afterAll` appelle `testRedis.drop()`, qui efface ses clés et ferme les connexions.
 
 ## Auth
 
