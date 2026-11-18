@@ -13,15 +13,15 @@ export const createTestAuth = (db: Db) =>
 
 // Goes through Better Auth's internal adapter rather than its test-utils plugin: 1.7.25 only exports that plugin
 // from the global "better-auth/plugins" entry, and it would have to sit in the production configuration.
-export const signInJoueur = async (auth: Auth, { email }: { email?: string } = {}) => {
+export const signInPlayer = async (auth: Auth, { email }: { email?: string } = {}) => {
   const { internalAdapter, authCookies, secret } = await auth.$context;
   // createUser runs the address check, which Better Auth only allows inside a request.
-  const { user: joueur } = await internalAdapter.createOAuthUser(
+  const { user: player } = await internalAdapter.createOAuthUser(
     { name: "Ada", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true },
     { providerId: "github", accountId: crypto.randomUUID() },
   );
-  const { token } = await internalAdapter.createSession(joueur.id);
+  const { token } = await internalAdapter.createSession(player.id);
   // Better Auth only accepts a session cookie signed with its secret.
   const cookie = `${authCookies.sessionToken.name}=${token}.${await makeSignature(token, secret)}`;
-  return { joueur, cookie };
+  return { player, cookie };
 };

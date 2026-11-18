@@ -84,7 +84,7 @@ const currentSession = async (cookie: string) => {
   } | null;
 };
 
-test("an Invité who signs in with GitHub becomes a Joueur with an open session", async () => {
+test("a Guest who signs in with GitHub becomes a Player with an open session", async () => {
   const signIn = await signInWith("github", {
     id: "1001",
     email: "ada@example.com",
@@ -97,7 +97,7 @@ test("an Invité who signs in with GitHub becomes a Joueur with an open session"
   expect(session?.user.email).toBe("ada@example.com");
 });
 
-test("GitHub and Discord presenting the same verified address open the same Joueur", async () => {
+test("GitHub and Discord presenting the same verified address open the same Player", async () => {
   const viaGithub = await signInWith("github", {
     id: "2001",
     email: "linus@example.com",
@@ -109,9 +109,9 @@ test("GitHub and Discord presenting the same verified address open the same Joue
     verified: true,
   });
 
-  const joueur = (await currentSession(viaGithub.cookie))?.user.id;
-  expect(joueur).toBeString();
-  expect((await currentSession(viaDiscord.cookie))?.user.id).toBe(joueur);
+  const player = (await currentSession(viaGithub.cookie))?.user.id;
+  expect(player).toBeString();
+  expect((await currentSession(viaDiscord.cookie))?.user.id).toBe(player);
 });
 
 test("signing in is refused, saying why, when the provider has not verified the address", async () => {
@@ -126,7 +126,7 @@ test("signing in is refused, saying why, when the provider has not verified the 
   expect(await currentSession(signIn.cookie)).toBeNull();
 });
 
-test("an unverified address cannot be attached to the Joueur who owns it", async () => {
+test("an unverified address cannot be attached to the Player who owns it", async () => {
   const owner = await signInWith("github", {
     id: "4001",
     email: "victim@example.com",
@@ -153,7 +153,7 @@ const post = (path: string, body: unknown, cookie = "") =>
     }),
   );
 
-test("a Joueur whose address is no longer verified at the provider cannot sign in again", async () => {
+test("a Player whose address is no longer verified at the provider cannot sign in again", async () => {
   await signInWith("discord", { id: "6001", email: "alan@example.com", verified: true });
   const later = await signInWith("discord", {
     id: "6001",
@@ -165,7 +165,7 @@ test("a Joueur whose address is no longer verified at the provider cannot sign i
   expect(await currentSession(later.cookie)).toBeNull();
 });
 
-test("a Joueur who signs out no longer has a session", async () => {
+test("a Player who signs out no longer has a session", async () => {
   const { cookie } = await signInWith("github", {
     id: "7001",
     email: "barbara@example.com",

@@ -27,12 +27,12 @@ test/
   helpers/          Base et auth de test
 ```
 
-- Tout code métier vit dans un module de `src/modules/`, un dossier par domaine (`auth`, `joueur`), nommé au singulier avec le terme du glossaire. Rien d'autre à la racine de `src/` que `index.ts`, `app.ts` et `db/`.
+- Tout code métier vit dans un module de `src/modules/`, un dossier par domaine (`auth`, `player`), nommé au singulier avec le terme du glossaire. Rien d'autre à la racine de `src/` que `index.ts`, `app.ts` et `db/`.
 - Un module a les trois mêmes fichiers, `index.ts`, `model.ts`, `service.ts`. Un fichier qui serait vide n'est pas créé (`auth` n'a pas de `model.ts`). Un quatrième fichier n'est ajouté que pour une responsabilité distincte, nommée par ce qu'il contient (`auth/config.ts` : variables d'environnement).
 - `index.ts` exporte une fabrique `create<Module>Routes(db, auth)` qui rend une instance Elysia préfixée. Les handlers y restent en ligne : ils possèdent validation, statuts et cookies, et passent des valeurs simples au service, jamais le contexte.
-- `model.ts` décrit le contrat d'API, pas les tables. Un groupe par route, nommé `[Chemin][Méthode]` relatif au préfixe (`PUT /pseudo` donne `PseudoPut`), avec ses schémas sous `Body`, `Params`, `Query`, `Response`. Il s'importe en `import * as JoueurModel from "./model.ts"`. Un type n'est dérivé (`UnwrapModels`) que lorsqu'un service en a besoin.
+- `model.ts` décrit le contrat d'API, pas les tables. Un groupe par route, nommé `[Chemin][Méthode]` relatif au préfixe (`PUT /nickname` donne `NicknamePut`), avec ses schémas sous `Body`, `Params`, `Query`, `Response`. Il s'importe en `import * as PlayerModel from "./model.ts"`. Un type n'est dérivé (`UnwrapModels`) que lorsqu'un service en a besoin.
 - `service.ts` ne connaît ni `status()` ni le contexte : il rend un résultat (`"saved" | "taken"`) que la route traduit en réponse HTTP.
-- Un module n'importe d'un autre que son `index.ts` ou son `service.ts`, jamais l'inverse en cycle. `joueur` dépend de `auth`, pas le contraire.
+- Un module n'importe d'un autre que son `index.ts` ou son `service.ts`, jamais l'inverse en cycle. `player` dépend de `auth`, pas le contraire.
 - Les tables restent toutes dans `src/db/schema.ts` : l'adaptateur Better Auth et drizzle-kit lisent ce seul fichier.
 - `src/app.ts` compose l'app et exporte `App` (type partagé avec le client Eden) sans écouter de port. Il ne déclare aucune route métier : une nouvelle route va dans son module.
 - `src/index.ts` est le seul endroit qui appelle `.listen()`.
@@ -41,7 +41,7 @@ test/
 
 ## Base de données
 
-PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / drizzle-kit `0.31`, voir `docs/adr/0002-postgres-drizzle-migrations-au-demarrage.md`.
+PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / drizzle-kit `0.31`, voir `docs/adr/0002-postgres-drizzle-migrations-at-startup.md`.
 
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
 - Le schéma vit dans `src/db/schema.ts` (`drizzle-orm/pg-core`). Après chaque changement : `bun run db:generate`, puis commit du dossier `drizzle/` généré.
@@ -57,14 +57,14 @@ Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-
 - Dans les tests : `createTestAuth(testDb.db)` (`test/helpers/auth.ts`) fabrique une instance sur la base du fichier de test.
 - L'adaptateur retrouve ses tables dans le schéma passé à Drizzle par `openDatabase`, sous les noms d'export `user`, `session`, `account`, `verification` de `src/db/schema.ts`. Ne pas les renommer.
 - L'intégration à Elysia suit `.agents/skills/elysiajs/references/better-auth.md` (`.mount(auth.handler)`, macro pour les routes protégées), pas la doc de Better Auth, écrite pour Elysia 1.
-- Deux niveaux de protection, en option de route (`createProtection(auth)`, `src/modules/auth/index.ts`), qui donnent `joueur` et `session` au handler. En mettre une seule par route.
-  - `signedIn: true`, « connecté » : 401 `{ code: "UNAUTHORIZED" }` sans session valide. `joueur.pseudo` peut être `null`.
-  - `pseudoChosen: true`, « Pseudo choisi » : même 401 pour un Invité, 403 `{ code: "PSEUDO_REQUIRED" }` pour un Joueur sans Pseudo. `joueur.pseudo` est une chaîne. C'est le niveau des routes qui enregistrent ou affichent publiquement quelque chose.
+- Deux niveaux de protection, en option de route (`createProtection(auth)`, `src/modules/auth/index.ts`), qui donnent `player` et `session` au handler. En mettre une seule par route.
+  - `signedIn: true`, « connecté » : 401 `{ code: "UNAUTHORIZED" }` sans session valide. `player.nickname` peut être `null`.
+  - `nicknameChosen: true`, « Nickname choisi » : même 401 pour un Guest, 403 `{ code: "NICKNAME_REQUIRED" }` pour un Player sans Nickname. `player.nickname` est une chaîne. C'est le niveau des routes qui enregistrent ou affichent publiquement quelque chose.
   - Chaque module de routes doit `.use(createProtection(auth))` pour avoir les options et leurs types.
-- Le Pseudo est une colonne maison de la table `user` (`pseudo`, `null` tant qu'il n'est pas choisi), déclarée à Better Auth comme champ supplémentaire avec `input: false` : il sort dans la session, mais seule `PUT /api/me/pseudo` l'écrit. Ses règles vivent dans `src/modules/joueur/` (format dans `model.ts`, réservés et enregistrement dans `service.ts`). Un Pseudo mal formé reçoit 422 `{ code: "PSEUDO_INVALID" }`, posé par l'option `error` du schéma `pseudo` : sans elle, Elysia répond par son document par défaut (`code: "validation"`), vidé de son détail en production. L'unicité à la casse près est tenue par l'index unique sur `lower(pseudo)` : le 409 vient de sa violation, ne pas ajouter de lecture préalable.
-- Dans les tests : `signInJoueur(auth)` (`test/helpers/auth.ts`) crée un Joueur sans Pseudo et rend `{ joueur, cookie }`, le cookie étant à passer dans l'en-tête `cookie` de la requête. Pour lui donner un Pseudo, passer par `PUT /api/me/pseudo`.
-- Connexion par GitHub et Discord seulement, voir `docs/adr/0004-connexion-oauth-seul-fusion-par-email-verifie.md`. `refuseUnverifiedEmail` (`user.validateUserInfo`) refuse toute adresse que le fournisseur ne marque pas vérifiée. `trustedProviders` et la désactivation de `/link-social` n'ont de sens qu'avec lui : ne pas toucher à l'un sans relire l'ADR.
-- À cause de `validateUserInfo`, `internalAdapter.createUser` échoue hors d'une requête (`validation_context_missing`) : dans un test, passer par `signInJoueur` ou par le faux fournisseur de `test/oauth.test.ts`, qui remplace les API HTTP de GitHub et Discord et joue le vrai flux.
+- Le Nickname est une colonne maison de la table `user` (`nickname`, `null` tant qu'il n'est pas choisi), déclarée à Better Auth comme champ supplémentaire avec `input: false` : il sort dans la session, mais seule `PUT /api/me/nickname` l'écrit. Ses règles vivent dans `src/modules/player/` (format dans `model.ts`, réservés et enregistrement dans `service.ts`). Un Nickname mal formé reçoit 422 `{ code: "NICKNAME_INVALID" }`, posé par l'option `error` du schéma `nickname` : sans elle, Elysia répond par son document par défaut (`code: "validation"`), vidé de son détail en production. L'unicité à la casse près est tenue par l'index unique sur `lower(nickname)` : le 409 vient de sa violation, ne pas ajouter de lecture préalable.
+- Dans les tests : `signInPlayer(auth)` (`test/helpers/auth.ts`) crée un Player sans Nickname et rend `{ player, cookie }`, le cookie étant à passer dans l'en-tête `cookie` de la requête. Pour lui donner un Nickname, passer par `PUT /api/me/nickname`.
+- Connexion par GitHub et Discord seulement, voir `docs/adr/0004-oauth-only-sign-in-merge-by-verified-email.md`. `refuseUnverifiedEmail` (`user.validateUserInfo`) refuse toute adresse que le fournisseur ne marque pas vérifiée. `trustedProviders` et la désactivation de `/link-social` n'ont de sens qu'avec lui : ne pas toucher à l'un sans relire l'ADR.
+- À cause de `validateUserInfo`, `internalAdapter.createUser` échoue hors d'une requête (`validation_context_missing`) : dans un test, passer par `signInPlayer` ou par le faux fournisseur de `test/oauth.test.ts`, qui remplace les API HTTP de GitHub et Discord et joue le vrai flux.
 - Importer un plugin par son sous-chemin (`better-auth/plugins/<nom>`), pas par `better-auth/plugins`, qui tire des modules gênants pour la compilation en binaire.
 
 ### Régénérer le schéma

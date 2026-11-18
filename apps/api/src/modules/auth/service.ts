@@ -3,8 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Db } from "../../db/client.ts";
 import type { AuthConfig } from "./config.ts";
 
-// A Joueur is one email address: whoever gets a provider to present an address they do not own
-// must never be created under it nor attached to the Joueur who owns it.
+// A Player is one email address: whoever gets a provider to present an address they do not own
+// must never be created under it nor attached to the Player who owns it.
 export const refuseUnverifiedEmail = ({
   user,
 }: {
@@ -38,8 +38,8 @@ export const createAuth = (db: Db, config: AuthConfig) =>
     user: {
       validateUserInfo: refuseUnverifiedEmail,
       additionalFields: {
-        // input: false keeps Better Auth's own routes from setting it: only PUT /api/me/pseudo applies the Pseudo rules.
-        pseudo: { type: "string", required: false, input: false },
+        // input: false keeps Better Auth's own routes from setting it: only PUT /api/me/nickname applies the Nickname rules.
+        nickname: { type: "string", required: false, input: false },
       },
     },
     account: {

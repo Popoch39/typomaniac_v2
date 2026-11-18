@@ -1,88 +1,88 @@
 # Typomaniac
 
-Typomaniac est un jeu de frappe en duel 1v1 classé. On peut y jouer sans s'identifier ; s'identifier permet de garder ses résultats. Ce glossaire fixe le vocabulaire de l'identité, puis celui de la frappe : ce qu'un joueur tape, comment c'est jugé et ce qu'on en mesure.
+Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured.
 
 ## Language
 
-### Identité
+### Identity
 
-**Joueur** :
-Personne identifiée, dont les résultats sont conservés et lui restent rattachés d'une visite à l'autre. Un Joueur sans **Pseudo** est identifié mais ne peut encore rien enregistrer ni apparaître publiquement.
-_Avoid_ : Utilisateur, compte, membre
+**Player**:
+A signed-in person, whose results are kept and stay attached to them from one visit to the next. A Player without a **Nickname** is signed in but cannot yet save anything or appear publicly.
+_Avoid_: User, account, member, joueur
 
-**Pseudo** :
-Nom public d'un **Joueur**, qu'il choisit lui-même et peut changer quand il veut. Deux Joueurs ne peuvent pas porter le même, même en changeant la casse.
-_Avoid_ : Username, nom d'utilisateur, identifiant, surnom
+**Nickname**:
+A **Player**'s public name, which they choose themselves and can change whenever they want. Two Players cannot hold the same one, even with different casing.
+_Avoid_: Username, user name, handle, identifier, pseudo
 
-**Invité** :
-Personne qui joue sans s'être identifiée ; rien n'est conservé pour elle.
-_Avoid_ : Anonyme, visiteur, utilisateur non connecté
+**Guest**:
+A person who plays without having signed in; nothing is kept for them.
+_Avoid_: Anonymous, visitor, signed-out user, invité
 
-### Partie
+### Game
 
-**Partie** (`Game`) :
-Session de frappe d'un seul joueur, de sa première lettre à son Résultat.
-_Avoid_ : test (réservé aux tests automatisés), manche, run
+**Game** (`Game`):
+A single player's typing session, from their first letter to their Result.
+_Avoid_: test (reserved for automated tests), round, run, partie
 
-**Résultat** (`Result`) :
-Ce qu'une Partie terminée produit : sa durée et les mesures de la frappe du joueur.
-_Avoid_ : score, points
+**Result** (`Result`):
+What a finished Game produces: its duration and the measures of the player's typing.
+_Avoid_: score, points, résultat
 
-**Mode** :
-Ce qui décide de la fin d'une Partie : `time` pour une durée fixe, `words` pour un nombre fixe de mots.
+**Mode**:
+What decides the end of a Game: `time` for a fixed duration, `words` for a fixed number of words.
 
-**Mot cible** :
-Mot que le joueur doit taper, Séparateur compris.
-_Avoid_ : mot attendu, mot à taper
+**Target word**:
+A word the player must type, Separator included.
+_Avoid_: expected word, word to type, mot cible
 
-**Séparateur** :
-Espace qui termine un Mot cible et qui se tape comme une lettre.
-_Avoid_ : espace de fin, délimiteur
+**Separator**:
+The space that ends a Target word and is typed like a letter.
+_Avoid_: trailing space, delimiter, séparateur
 
-### Événements
+### Events
 
-**Événement** (`GameEvent`) :
-Ce qu'on applique à une Partie pour la faire avancer : une action du joueur ou un signal de temps.
-_Avoid_ : action, message
+**Event** (`GameEvent`):
+What is applied to a Game to make it advance: a player action or a time signal.
+_Avoid_: action, message, événement
 
-**Frappe** (`Keystroke`) :
-Insertion d'un caractère par le joueur, jugée correcte ou incorrecte.
-_Avoid_ : saisie, keystroke
+**Keystroke** (`Keystroke`):
+A character inserted by the player, judged correct or incorrect.
+_Avoid_: input, entry, frappe
 
-**Appui** (`KeyPress`) :
-Geste physique du joueur sur une touche du clavier, du moment où il l'enfonce à celui où il la relâche. À la différence d'une Frappe, il n'écrit rien et n'est pas jugé : il décrit le rythme de la frappe, pas son contenu.
-_Avoid_ : pression, keypress, Frappe
+**KeyPress** (`KeyPress`):
+The player's physical gesture on a keyboard key, from the moment it goes down to the moment it is released. Unlike a Keystroke, it writes nothing and is not judged: it describes the rhythm of the typing, not its content.
+_Avoid_: press, key stroke, appui
 
-**Départ** :
-Événement qui fait partir l'horloge d'une Partie à un signal commun, au lieu de la première Frappe du joueur.
-_Avoid_ : top, go, lancement
+**Start** (`start`):
+The Event that starts a Game's clock at a shared signal, instead of at the player's first Keystroke.
+_Avoid_: go, launch, départ
 
-**Tic** :
-Événement de minuterie qui indique à une Partie que le temps a passé.
-_Avoid_ : tick, battement
+**Tick** (`tick`):
+A timer Event that tells a Game that time has passed.
+_Avoid_: beat, tic
 
-### Mesures
+### Measures
 
-**WPM** :
-Vitesse du joueur en mots par minute, comptée sur les seuls mots tapés exactement ; un mot vaut 5 caractères.
-_Avoid_ : vitesse nette, mots/min
+**WPM**:
+The player's speed in words per minute, counted on exactly typed words only; a word is 5 characters.
+_Avoid_: net speed, words/min
 
-**WPM brut** :
-Vitesse du joueur en mots par minute, comptée sur tout ce qu'il a tapé, fautes comprises.
-_Avoid_ : raw, vitesse brute
+**Raw WPM**:
+The player's speed in words per minute, counted on everything typed, mistakes included.
+_Avoid_: raw, gross speed, WPM brut
 
-**Précision** :
-Part des Frappes correctes sur l'ensemble des Frappes, en pourcentage ; une faute corrigée reste une faute.
-_Avoid_ : exactitude, accuracy
+**Accuracy**:
+The share of correct Keystrokes among all Keystrokes, as a percentage; a corrected mistake remains a mistake.
+_Avoid_: precision, exactness, précision
 
-**Constance** :
-Régularité de la vitesse du joueur au fil de la Partie, en pourcentage.
-_Avoid_ : consistance, régularité, consistency
+**Consistency**:
+How steady the player's speed is over the course of the Game, as a percentage.
+_Avoid_: regularity, constance
 
-**Constance des touches** :
-Régularité du temps qui sépare les Appuis successifs du joueur, en pourcentage.
-_Avoid_ : constance des Frappes, key consistency
+**Key consistency**:
+How steady the time between the player's successive KeyPresses is, as a percentage.
+_Avoid_: Keystroke consistency, constance des touches
 
-**Inactivité** :
-Temps d'une Partie pendant lequel le joueur ne tape pas.
-_Avoid_ : AFK, pause
+**Inactivity**:
+The time in a Game during which the player is not typing.
+_Avoid_: AFK, pause, inactivité

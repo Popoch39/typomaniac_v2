@@ -1,21 +1,21 @@
 # typomaniac_v2
 
-Monorepo Turborepo sous Bun.
+Turborepo monorepo on Bun.
 
-## Paquets
+## Packages
 
-- `@repo/ui` : bibliothèque de composants React
-- `@repo/typescript-config` : `tsconfig` partagés
+- `@repo/ui`: React component library
+- `@repo/typescript-config`: shared `tsconfig`s
 
-## Qualité
+## Quality
 
-Toutes les commandes se lancent depuis la racine :
+All commands run from the root:
 
 ```sh
 bun run lint       # oxlint
-bun run fmt        # oxfmt (écrit les fichiers)
-bun run fmt:check  # oxfmt, sans écrire
+bun run fmt        # oxfmt (writes files)
+bun run fmt:check  # oxfmt, without writing
 bun run typecheck  # bun check -b
 ```
 
-Les raisons de ces choix sont dans [docs/adr/0001](docs/adr/0001-oxc-and-bun-check-quality-toolchain.md).
+The reasons for these choices are in [docs/adr/0001](docs/adr/0001-oxc-and-bun-check-quality-toolchain.md).
