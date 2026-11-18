@@ -3,8 +3,8 @@ import type { Redis } from "../../redis/client.ts";
 
 type Delivery = { readonly seat: Seat; readonly send: (message: ServerMessage) => void };
 
-/** What travels on a Duel's channel: a message for the Participants other than `from`. */
-type Published = { readonly from: Seat; readonly message: ServerMessage };
+/** What travels on a Duel's channel: a message for the Participants other than `from`, or for all when `null`. */
+type Published = { readonly from: Seat | null; readonly message: ServerMessage };
 
 /**
  * Carries messages between the Participants of a Duel through its Redis channel, so that two
@@ -44,7 +44,7 @@ export const createRelay = (redis: Redis) => {
       // Only this relay's listener: another relay on the same connection may still follow the Duel.
       if (listener) await redis.subscriber.unsubscribe(channel(duelId), listener);
     },
-    publish: async (duelId: string, from: Seat, message: ServerMessage) => {
+    publish: async (duelId: string, from: Seat | null, message: ServerMessage) => {
       const published: Published = { from, message };
       await redis.client.publish(channel(duelId), JSON.stringify(published));
     },

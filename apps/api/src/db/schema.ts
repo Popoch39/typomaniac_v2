@@ -1,6 +1,19 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
+import type { Outcome, Seat } from "@repo/duel-engine";
+import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  uniqueIndex,
+  uuid,
+  jsonb,
+  smallint,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 
 // Named so the route can tell a Nickname already taken from any other unique violation.
 export const nicknameUniqueIndex = "user_nickname_lower_idx";
@@ -106,3 +119,31 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// A finished Duel, written once in the transaction that saves its two Games.
+export const duel = pgTable("duel", {
+  id: uuid("id").primaryKey(),
+  config: jsonb("config").$type<GameConfig>().notNull(),
+  words: jsonb("words").$type<string[]>().notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  endedAt: timestamp("ended_at").notNull(),
+});
+
+// One row per seat of a Duel, with the full journal so that the Game can be replayed and audited.
+export const duelGame = pgTable(
+  "duel_game",
+  {
+    duelId: uuid("duel_id")
+      .notNull()
+      .references(() => duel.id, { onDelete: "cascade" }),
+    seat: smallint("seat").$type<Seat>().notNull(),
+    // Null for a Guest, who leaves no trace: the Game stays as the one of an unnamed Opponent.
+    playerId: text("player_id").references(() => user.id, { onDelete: "set null" }),
+    result: jsonb("result").$type<Result>().notNull(),
+    journal: jsonb("journal").$type<GameEvent[]>().notNull(),
+    outcome: text("outcome", { enum: ["win", "loss", "draw"] })
+      .$type<Outcome>()
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.duelId, table.seat] })],
+);

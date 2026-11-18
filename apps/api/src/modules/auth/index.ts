@@ -2,6 +2,12 @@ import { Elysia, ElysiaStatus, status } from "elysia";
 import { createGuestCookies } from "./guest.ts";
 import type { Auth } from "./service.ts";
 
+/** A Participant as the routes see them: `playerId` is `null` for a Guest. */
+type Identity = { readonly id: string; readonly name: string; readonly playerId: string | null };
+
+// One type for both branches, so that a route sees a single identity rather than their intersection.
+const withIdentity = (identity: Identity) => ({ identity });
+
 // Route options that guard a route. A separately defined route module must .use() this to get the options and their types.
 export const createProtection = (auth: Auth) => {
   // Shared as a function rather than by nicknameChosen enabling signedIn: a macro's hooks do not see what another macro derived.
@@ -37,13 +43,14 @@ export const createProtection = (auth: Auth) => {
           const { id, nickname } = found.user;
           // A Player without a Nickname is refused rather than seated as a Guest under a name they did not choose.
           if (!nickname) return status(403, { code: "NICKNAME_REQUIRED" });
-          return { identity: { id, name: nickname } };
+          return withIdentity({ id, name: nickname, playerId: id });
         }
+        // A Guest has no Player id: nothing they play is attached to anyone.
         const guest = await guestCookies.read(headers);
-        if (guest) return { identity: guest };
+        if (guest) return withIdentity({ ...guest, playerId: null });
         const issued = await guestCookies.issue();
         set.headers["set-cookie"] = issued.setCookie;
-        return { identity: issued.guest };
+        return withIdentity({ ...issued.guest, playerId: null });
       },
     },
   });

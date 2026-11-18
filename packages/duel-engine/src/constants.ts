@@ -1,6 +1,7 @@
 import type { GameConfig } from "@repo/typing-engine";
 
-export const DUEL_GAME_CONFIG: GameConfig = { mode: "time", seconds: 30 };
+// Narrowed to its time Mode, so the server can read the duration its deadline is set from.
+export const DUEL_GAME_CONFIG = { mode: "time", seconds: 30 } as const satisfies GameConfig;
 // More than anyone types in 30 seconds: no word is added during a Duel.
 export const DUEL_WORD_COUNT = 250;
 /** Between both Participants being connected and the Start. */
