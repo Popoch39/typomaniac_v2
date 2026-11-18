@@ -50,6 +50,15 @@ The ladder runs from Bronze IV up to Diamond I: each Tier from Bronze to Diamond
 
 Each of these rules leaves the rank change at `none`, unless a promotion or demotion follows.
 
+## Ladder index
+
+The Division's index of LP-1, exported so that a stored Rank can be ordered without knowing the Tier names. It changes no rule above.
+
+| Id       | Rule                                                                                                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LADDER-1 | A Rank's ladder index is the number of Divisions below its own: 0 for Bronze IV, 1 for Bronze III, up to 19 for Diamond I. Master is 20, whatever the LP held.                  |
+| LADDER-2 | A ladder index and the LP held give back the Rank: the Tier and Division at that index, or Master, without a Division, at 20. An index off the ladder is refused with an error. |
+
 ## Promotion and demotion
 
 | Id      | Rule                                                                                                                                                                                                                                                                                                                                                                                                            |
