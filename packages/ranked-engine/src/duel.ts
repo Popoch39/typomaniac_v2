@@ -28,7 +28,8 @@ export function applyDuel(
   const kFactor = inPlacement ? config.placementKFactor : config.kFactor;
   const mmr = nextMmr(standing.mmr, opponentMmr, SCORE[outcome], kFactor);
   const duelsPlayed = standing.duelsPlayed + 1;
-  const placed = inPlacement && duelsPlayed === config.placementDuels;
+  // Past Placement too, so a Player left Unranked (0 Placement Duels, a shorter Placement) gets placed.
+  const placed = standing.rank === null && duelsPlayed >= config.placementDuels;
   // Read from the floored MMR, so it is the change applied and never −0.
   const mmrDelta = mmr - standing.mmr;
   if (placed) {

@@ -103,6 +103,19 @@ test("PLACE-2: the Placement length, MMR per Division and Placement ceiling come
   });
 });
 
+test("PLACE-2: with no Placement Duel, the first Duel places the Player", () => {
+  const config = { ...DEFAULT_RANKED_CONFIG, placementDuels: 0 };
+
+  expect(applyDuel(createStanding(config), 1200, "win", config)).toEqual({
+    // No Placement, so K is the regular K-factor: 32 × (1 − 0.5) = 16 → 1216;
+    // (1216 − 900) / 50 = 6.32 → Silver II
+    standing: { mmr: 1216, duelsPlayed: 1, rank: { tier: "silver", division: 2, lp: 0 } },
+    mmrDelta: 16,
+    lpDelta: 0,
+    rankChange: "placed",
+  });
+});
+
 test("PLACE-2: a loss on the last Placement Duel still places, and moves no LP", () => {
   expect(applyDuel({ mmr: 1000, ...LAST_PLACEMENT }, 1000, "loss")).toEqual({
     // 64 × (0 − 0.5) = −32 → 968; (968 − 900) / 50 = 1.36 → Bronze III

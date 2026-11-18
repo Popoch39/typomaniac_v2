@@ -35,10 +35,11 @@ test("MMR-3: the K-factors and the Placement length come from the configuration 
     rankChange: "placed",
   });
   expect(applyDuel({ mmr: 1200, duelsPlayed: 3, rank: null }, 1200, "loss", config)).toEqual({
-    // 3 Duels played, not fewer than 3: 20 × (0 − 0.5) = −10
-    standing: { mmr: 1190, duelsPlayed: 4, rank: null },
+    // 3 Duels played, not fewer than 3: 20 × (0 − 0.5) = −10;
+    // still Unranked past Placement, so placed: (1190 − 900) / 50 = 5.8 → Silver III
+    standing: { mmr: 1190, duelsPlayed: 4, rank: { tier: "silver", division: 3, lp: 0 } },
     mmrDelta: -10,
     lpDelta: 0,
-    rankChange: "none",
+    rankChange: "placed",
   });
 });

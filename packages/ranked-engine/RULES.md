@@ -33,10 +33,10 @@ Each update increments the number of Duels played by one. The update of a Player
 
 ## Placement
 
-| Id      | Rule                                                                                                                                                                                                                                 |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PLACE-1 | During Placement the Rank stays `null`, the LP delta is 0 and the rank change is `none`.                                                                                                                                             |
-| PLACE-2 | On the last Placement Duel, the Rank is the highest Division whose reference MMR (LP-1) is at or below the new MMR, at 0 LP, bounded between Bronze IV and the Placement ceiling. The LP delta is 0 and the rank change is `placed`. |
+| Id      | Rule                                                                                                                                                                                                                                                                                                                            |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PLACE-1 | During Placement the Rank stays `null`, the LP delta is 0 and the rank change is `none`.                                                                                                                                                                                                                                        |
+| PLACE-2 | On the last Placement Duel, or on any Duel of a Player still Unranked past Placement (such as with 0 Placement Duels), the Rank is the highest Division whose reference MMR (LP-1) is at or below the new MMR, at 0 LP, bounded between Bronze IV and the Placement ceiling. The LP delta is 0 and the rank change is `placed`. |
 
 ## LP
 
