@@ -53,7 +53,7 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 
 ## Redis
 
-Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en cours (`src/modules/duel/`), voir `docs/adr/0006-live-duel-in-memory-engine-redis-journal.md`.
+Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en cours (`src/modules/duel/`), voir `docs/adr/0007-live-duel-in-memory-engine-redis-journal.md`.
 
 - Redis local : lancé par le même `docker compose up -d` que Postgres ; `REDIS_URL` dans `apps/api/.env`. `src/index.ts` refuse de démarrer sans lui, avant d'ouvrir Postgres.
 - `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.

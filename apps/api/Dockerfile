@@ -10,6 +10,7 @@ COPY apps/frontend/package.json ./apps/frontend/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/typing-engine/package.json ./packages/typing-engine/
 COPY packages/duel-engine/package.json ./packages/duel-engine/
+COPY packages/ranked-engine/package.json ./packages/ranked-engine/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 RUN bun install --frozen-lockfile --filter api
 

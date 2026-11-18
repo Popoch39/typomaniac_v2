@@ -74,6 +74,15 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/ranked-engine": {
+      "name": "@repo/ranked-engine",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@repo/typescript-config": "*",
+        "@types/bun": "^1.4.4",
+        "typescript": "7.0.2",
+      },
+    },
     "packages/typescript-config": {
       "name": "@repo/typescript-config",
       "version": "0.0.0",
@@ -365,6 +374,8 @@
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.94.0", "", { "os": "win32", "cpu": "x64" }, "sha512-I3eZdd4bemIJQDNv9XDV/FEofDxIoN32tzCv98wIgLdW05EqxZb5hF4AwPrRzHD/dQhl0n7KgPy5AQPfM0HWrA=="],
 
     "@repo/duel-engine": ["@repo/duel-engine@workspace:packages/duel-engine"],
+
+    "@repo/ranked-engine": ["@repo/ranked-engine@workspace:packages/ranked-engine"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:packages/typescript-config"],
 

@@ -6,6 +6,8 @@
     { "path": "packages/typing-engine/test" },
     { "path": "packages/duel-engine" },
     { "path": "packages/duel-engine/test" },
+    { "path": "packages/ranked-engine" },
+    { "path": "packages/ranked-engine/test" },
     { "path": "apps/frontend" },
     { "path": "apps/frontend/test" },
     { "path": "apps/api" }
