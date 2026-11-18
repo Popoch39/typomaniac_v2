@@ -20,6 +20,10 @@
   text-decoration: none;
 }
 
+.sidebar-title-icon {
+  display: none;
+}
+
 /* Pushes the Player block to the bottom of the sidebar. */
 .sidebar-nav {
   flex-grow: 1;
@@ -82,6 +86,73 @@
 
 .shell-content {
   min-width: 0;
+}
+
+/*
+ * On a tablet the sidebar shrinks to an icon rail. Each label turns into a tooltip rather than
+ * disappearing, so it still names its link or button for assistive technologies.
+ */
+@media (width <= 1024px) {
+  .shell {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    align-items: center;
+    padding: 24px 12px;
+  }
+
+  .sidebar-title-icon {
+    display: block;
+  }
+
+  .sidebar-nav-link {
+    padding: 10px;
+  }
+
+  .sidebar :is(a, button) {
+    position: relative;
+  }
+
+  .sidebar :is(.sidebar-label, .button-label) {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 12px);
+    z-index: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--text-h);
+    background: var(--bg);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+
+  .sidebar :is(a, button):is(:hover, :focus-visible) :is(.sidebar-label, .button-label) {
+    opacity: 1;
+  }
+
+  .player-block {
+    align-items: center;
+  }
+
+  /* "Guest" has no icon to sit next to: it stays readable to screen readers only. */
+  .player-block > .player-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The rail keeps only the Avatar at the bottom. */
+  .sidebar .sign-out {
+    display: none;
+  }
 }
 
 .page {

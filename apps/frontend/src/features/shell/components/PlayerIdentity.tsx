@@ -10,12 +10,10 @@ interface PlayerIdentityProps {
 export function PlayerIdentity({ nickname, avatarUrl }: PlayerIdentityProps) {
   return (
     <>
-      <div className="player-identity">
+      <Link to="/profile" className="player-identity">
         <Avatar avatarUrl={avatarUrl} nickname={nickname} />
-        <Link to="/profile" className="player-name">
-          {nickname ?? "No Nickname yet"}
-        </Link>
-      </div>
+        <span className="player-name sidebar-label">{nickname ?? "No Nickname yet"}</span>
+      </Link>
       <SignOutButton />
     </>
   );

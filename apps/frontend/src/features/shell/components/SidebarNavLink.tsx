@@ -12,7 +12,7 @@ export function SidebarNavLink({ to, icon: Icon, label }: SidebarNavLinkProps) {
   return (
     <Link to={to} className="sidebar-nav-link">
       <Icon aria-hidden="true" size={20} />
-      <span>{label}</span>
+      <span className="sidebar-label">{label}</span>
     </Link>
   );
 }
