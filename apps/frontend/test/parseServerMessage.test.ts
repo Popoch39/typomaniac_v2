@@ -79,6 +79,41 @@ const messages: ServerMessage[] = [
       { results: [getResult(finished), getResult(finished)], outcomes: ["draw", "draw"] },
       { results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] },
     ],
+    ranked: null,
+  },
+  // A ranked Duel: what it did to each Player's Standing, a Master and a Player still Unranked.
+  {
+    type: "end",
+    outcomes: ["win", "loss"],
+    rounds: [],
+    ranked: [
+      {
+        lpDelta: 23,
+        rankChange: "promoted",
+        rank: { tier: "master", lp: 3 },
+        placement: { played: 5, total: 5 },
+      },
+      { lpDelta: 0, rankChange: "none", rank: null, placement: { played: 2, total: 5 } },
+    ],
+  },
+  {
+    type: "end",
+    outcomes: ["loss", "win"],
+    rounds: [],
+    ranked: [
+      {
+        lpDelta: -23,
+        rankChange: "demoted",
+        rank: { tier: "gold", division: 3, lp: 75 },
+        placement: { played: 5, total: 5 },
+      },
+      {
+        lpDelta: 0,
+        rankChange: "placed",
+        rank: { tier: "silver", division: 2, lp: 0 },
+        placement: { played: 5, total: 5 },
+      },
+    ],
   },
 ];
 
@@ -111,9 +146,22 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     outcomes: ["win", "loss"],
     nextStartAt: null,
   };
+  const rankedEnd = {
+    lpDelta: 18,
+    rankChange: "none",
+    rank: { tier: "gold", division: 2, lp: 63 },
+    placement: { played: 5, total: 5 },
+  };
+  const end = {
+    type: "end",
+    outcomes: ["win", "loss"],
+    rounds: [],
+    ranked: [rankedEnd, rankedEnd],
+  };
   // Each is a message as long as nothing is taken from it.
   expect(parseServerMessage(JSON.stringify(state))).not.toBeNull();
   expect(parseServerMessage(JSON.stringify(roundEnd))).not.toBeNull();
+  expect(parseServerMessage(JSON.stringify(end))).not.toBeNull();
   const malformed = [
     null,
     [],
@@ -144,9 +192,24 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     { ...roundEnd, results: [getResult(finished), { ...getResult(finished), history: null }] },
     { ...roundEnd, outcomes: ["win", "tie"] },
     { ...roundEnd, nextStartAt: undefined },
-    { type: "end", outcomes: ["win", "loss"] },
-    { type: "end", outcomes: ["win"], rounds: [] },
-    { type: "end", outcomes: ["win", "loss"], rounds: [{ outcomes: ["win", "loss"] }] },
+    { type: "end", outcomes: ["win", "loss"], ranked: null },
+    { type: "end", outcomes: ["win"], rounds: [], ranked: null },
+    {
+      type: "end",
+      outcomes: ["win", "loss"],
+      rounds: [{ outcomes: ["win", "loss"] }],
+      ranked: null,
+    },
+    { ...end, ranked: undefined },
+    { ...end, ranked: [rankedEnd] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, lpDelta: "many" }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, rankChange: "relegated" }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, rank: undefined }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, rank: { tier: "wood", division: 2, lp: 0 } }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, rank: { tier: "gold", division: 5, lp: 0 } }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, rank: { tier: "gold", lp: 0 } }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, rank: { tier: "master" } }] },
+    { ...end, ranked: [rankedEnd, { ...rankedEnd, placement: { played: 5 } }] },
     // The shape the end had when a Duel was a single Game each.
     { type: "end", results: bothResults, outcomes: ["win", "loss"] },
   ];

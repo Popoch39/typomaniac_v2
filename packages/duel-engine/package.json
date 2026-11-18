@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@repo/ranked-engine": "*",
     "@repo/typing-engine": "*"
   },
   "devDependencies": {

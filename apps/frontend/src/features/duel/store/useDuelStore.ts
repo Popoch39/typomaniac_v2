@@ -3,15 +3,18 @@ import {
   type FinishedRound,
   opponentSeat,
   type Participant,
+  type RankedEnd,
   type RoundOutcomes,
   type Seat,
   type ServerMessage,
 } from "@repo/duel-engine";
 import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
 import { create } from "zustand";
+import { queryClient } from "../../../shared/api/queryClient.ts";
 import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretStore.ts";
 import { eventTime, shiftEventTime } from "../../game/clock/eventTime.ts";
 import { useGameStore } from "../../game/store/useGameStore.ts";
+import { standingQueryKey } from "../../ranked/api/standingQueryOptions.ts";
 import { opponentCaretPosition } from "../caret/opponentCaretPosition.ts";
 import { eventClockShift } from "../clock/eventClockShift.ts";
 import { closeDuelSocket, openDuelSocket, sendToDuel } from "../socket/duelSocket.ts";
@@ -44,8 +47,14 @@ type DuelState = {
   readonly opponentGame: Game | null;
   /** Why the Participant could not take a seat, in words for the user. */
   readonly refusal: string | null;
-  /** The Outcomes of the Duel, indexed by seat, once the server has ended it. */
-  readonly end: { readonly outcomes: RoundOutcomes } | null;
+  /**
+   * The Outcomes of the Duel and, for a ranked Duel, what it did to each Player's Standing, both
+   * indexed by seat, once the server has ended it.
+   */
+  readonly end: {
+    readonly outcomes: RoundOutcomes;
+    readonly ranked: readonly [RankedEnd, RankedEnd] | null;
+  } | null;
   readonly join: (duelId: string) => void;
   readonly leave: () => void;
 };
@@ -198,7 +207,10 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       useDuelCountdownStore.getState().cancel();
       stopResumingGame();
       stopForwardingEvents();
-      set({ phase: "finished", rounds: message.rounds, end: { outcomes: message.outcomes } });
+      const { outcomes, ranked } = message;
+      set({ phase: "finished", rounds: message.rounds, end: { outcomes, ranked } });
+      // The Standing moved: the Ranked page and the profile read the new one.
+      if (ranked !== null) void queryClient.invalidateQueries({ queryKey: standingQueryKey });
     }
   };
 
