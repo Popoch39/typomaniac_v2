@@ -30,6 +30,11 @@
   line-height: 1.4;
 }
 
+.word-wrong {
+  text-decoration: underline;
+  text-decoration-color: var(--letter-incorrect);
+}
+
 .letter-untyped {
   color: var(--text);
 }

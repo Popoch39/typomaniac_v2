@@ -8,10 +8,10 @@ type WordProps = {
 };
 
 export function Word({ index }: WordProps) {
-  const { letters, caretIndex } = useWord(index);
+  const { letters, caretIndex, isWrong } = useWord(index);
 
   return (
-    <span className="word">
+    <span className={isWrong ? "word word-wrong" : "word"}>
       {letters.map((letter, letterIndex) => (
         <Fragment key={letterIndex}>
           {letterIndex === caretIndex && <Caret />}

@@ -32,6 +32,8 @@ export function useWord(index: number) {
 
   return {
     letters: [...expected, ...extra],
+    // A validated word keeps its separator; one that still differs from its target is wrong.
+    isWrong: input.endsWith(" ") && input !== target,
     caretIndex: isActive ? typed.length : null,
   };
 }
