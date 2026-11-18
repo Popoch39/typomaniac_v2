@@ -4,7 +4,7 @@ import type { Redis } from "../../redis/client.ts";
 /** How long a Duel can be joined after its creation. */
 export const DUEL_EXPIRY_MS = 10 * 60 * 1000;
 
-/** Who sits on a seat: a Player is identified by their id and shown by their Nickname. */
+/** Who sits on a seat: a Player shown by their Nickname, or a Guest by their generated display name. */
 export type Identity = { readonly id: string; readonly name: string };
 
 export type Duel = {
