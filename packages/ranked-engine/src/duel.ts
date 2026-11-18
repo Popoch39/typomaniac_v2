@@ -1,14 +1,10 @@
 import { DEFAULT_RANKED_CONFIG, type RankedConfig } from "./config.ts";
 import { placedRank } from "./ladder.ts";
-import { lpChange, rankAfter } from "./lp.ts";
+import { lpDelta, rankAfter } from "./lp.ts";
 import { nextMmr } from "./mmr.ts";
-import type { Standing } from "./standing.ts";
-
-export type Outcome = "win" | "loss" | "draw";
+import type { Outcome, RankChange, Standing } from "./types.ts";
 
 const SCORE: Record<Outcome, number> = { win: 1, draw: 0.5, loss: 0 };
-
-export type RankChange = "placed" | "promoted" | "demoted" | "none";
 
 export type DuelUpdate = {
   standing: Standing;
@@ -39,10 +35,7 @@ export function applyDuel(
   if (standing.rank === null) {
     return { standing: { mmr, duelsPlayed, rank: null }, mmrDelta, lpDelta: 0, rankChange: "none" };
   }
-  const { rank, lpDelta, rankChange } = rankAfter(
-    standing.rank,
-    lpChange(standing.rank, mmr, outcome, config),
-    config,
-  );
-  return { standing: { mmr, duelsPlayed, rank }, mmrDelta, lpDelta, rankChange };
+  const delta = lpDelta(standing.rank, mmr, outcome, config);
+  const { rank, ...change } = rankAfter(standing.rank, delta, config);
+  return { standing: { mmr, duelsPlayed, rank }, mmrDelta, ...change };
 }

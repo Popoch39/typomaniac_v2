@@ -1,4 +1,4 @@
-import type { Division, Tier } from "./standing.ts";
+import type { LadderDivision } from "./types.ts";
 
 export type RankedConfig = {
   initialMmr: number;
@@ -18,7 +18,7 @@ export type RankedConfig = {
   /** LP held right after a demotion. */
   demotionLp: number;
   /** Highest Division a Placement can give. */
-  placementCeiling: { tier: Exclude<Tier, "master">; division: Division };
+  placementCeiling: LadderDivision;
 };
 
 export const DEFAULT_RANKED_CONFIG: RankedConfig = {

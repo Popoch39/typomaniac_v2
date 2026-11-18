@@ -1,10 +1,9 @@
 import type { RankedConfig } from "./config.ts";
-import type { Outcome, RankChange } from "./duel.ts";
 import { adjacentDivision, rankReferenceMmr } from "./ladder.ts";
-import type { Rank } from "./standing.ts";
+import type { Outcome, Rank, RankChange } from "./types.ts";
 
-/** The signed LP won or lost, pulled by the gap between the new MMR and the reference of the Division. */
-export function lpChange(rank: Rank, mmr: number, outcome: Outcome, config: RankedConfig): number {
+/** The signed LP won or lost (LP-2), pulled by the gap between the new MMR and the reference of the Division. */
+export function lpDelta(rank: Rank, mmr: number, outcome: Outcome, config: RankedConfig): number {
   if (outcome === "draw") return 0;
   const gap = Math.trunc((mmr - rankReferenceMmr(rank, config)) / config.mmrPerLp);
   const amount = outcome === "win" ? config.baseLp + gap : config.baseLp - gap;
