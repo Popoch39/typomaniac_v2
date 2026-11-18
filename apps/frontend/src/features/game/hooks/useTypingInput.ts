@@ -1,9 +1,10 @@
+import { eventTime } from "../clock/eventTime.ts";
 import { translateInput } from "../input/translateInput.ts";
 import { useGameStore } from "../store/useGameStore.ts";
 
 /**
- * Browsers fire no `beforeinput` for Backspace on an empty input, so the input always holds
- * this character, before the caret, for a deletion to have something to delete.
+ * The input always holds this character, before the caret, so that a deletion has a target
+ * whether or not the browser fires `beforeinput` on an empty input.
  */
 const SENTINEL = " ";
 
@@ -23,19 +24,24 @@ export function useTypingInput() {
     if (input === null) return;
     placeCaretAfterSentinel(input);
     const onFocus = () => placeCaretAfterSentinel(input);
+    // Composition cannot be cancelled, so its text lands in the input and must be cleared after it.
+    const onCompositionEnd = () => placeCaretAfterSentinel(input);
     const onBeforeInput = (event: InputEvent) => {
       // The engine holds the typed text, so the input itself must stay empty.
       event.preventDefault();
-      // Monotonic and sub-millisecond, in epoch milliseconds so a server can bound it against receipt.
-      const at = performance.timeOrigin + performance.now();
-      const gameEvent = translateInput({ inputType: event.inputType, data: event.data }, at);
+      const gameEvent = translateInput(
+        { inputType: event.inputType, data: event.data },
+        eventTime(),
+      );
       if (gameEvent !== null) applyEvent(gameEvent);
     };
     input.addEventListener("beforeinput", onBeforeInput);
     input.addEventListener("focus", onFocus);
+    input.addEventListener("compositionend", onCompositionEnd);
     return () => {
       input.removeEventListener("beforeinput", onBeforeInput);
       input.removeEventListener("focus", onFocus);
+      input.removeEventListener("compositionend", onCompositionEnd);
     };
   };
 }

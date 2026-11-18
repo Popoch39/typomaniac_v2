@@ -21,6 +21,11 @@
   pointer-events: none;
 }
 
+/* The focus veil covers only the words, leaving the Live stats readable. */
+.typing-words {
+  position: relative;
+}
+
 /* Three lines tall; no row gap, so that a word's height is exactly one line to scroll by. */
 .word-list {
   position: relative;

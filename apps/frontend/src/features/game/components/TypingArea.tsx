@@ -28,8 +28,10 @@ export function TypingArea() {
         onBlur={onBlur}
       />
       <LiveStatsBar />
-      <WordList />
-      {!isFocused && <FocusVeil inputId={inputId} />}
+      <div className="typing-words">
+        <WordList />
+        {!isFocused && <FocusVeil inputId={inputId} />}
+      </div>
     </div>
   );
 }
