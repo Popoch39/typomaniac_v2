@@ -29,6 +29,10 @@
   color: var(--opponent);
 }
 
+.opponent-away {
+  opacity: 0.6;
+}
+
 /* Both Results side by side, the Participant's own first. */
 .duel-results {
   display: grid;

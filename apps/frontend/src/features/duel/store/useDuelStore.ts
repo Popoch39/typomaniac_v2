@@ -138,9 +138,16 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   const receive = (message: ServerMessage) => {
     if (message.type === "state") {
+      const ownJournal = message.journals[message.seat];
       const opponentJournal = message.journals[message.seat === 0 ? 1 : 0];
+      // Only an accepted start opens a journal: a non-empty one means the Participant is back mid-Game.
+      const resumed = ownJournal.length > 0;
+      if (resumed) {
+        forwardEvents();
+        useGameStore.getState().loadGame(DUEL_GAME_CONFIG, message.words, ownJournal);
+      }
       set({
-        phase: "waiting",
+        phase: resumed ? "running" : "waiting",
         seat: message.seat,
         participants: message.participants,
         words: message.words,
