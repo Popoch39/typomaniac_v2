@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { RankedComingSoonPage } from "../../features/ranked/components/RankedComingSoonPage.tsx";
+import { RankedPage } from "../../features/ranked/components/RankedPage.tsx";
 
 export const Route = createFileRoute("/_shell/ranked")({
-  component: RankedComingSoonPage,
+  component: RankedPage,
 });

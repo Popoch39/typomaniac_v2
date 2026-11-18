@@ -18,10 +18,12 @@
     "../src/features/duel/clock",
     "../src/features/duel/caret",
     "../src/features/duel/message",
+    "../src/features/ranked/standing",
     "../src/shared/api/describeApiError.ts"
   ],
   "references": [
     { "path": "../../../packages/typing-engine" },
-    { "path": "../../../packages/duel-engine" }
+    { "path": "../../../packages/duel-engine" },
+    { "path": "../../../packages/ranked-engine" }
   ]
 }
