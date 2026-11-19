@@ -1,11 +1,5 @@
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-} from "../../../shared/components/ui/sidebar.tsx";
-import { PlayerBlock } from "./PlayerBlock.tsx";
-import { SidebarDevSignIn } from "./SidebarDevSignIn.tsx";
+import { Sidebar, SidebarContent, SidebarHeader } from "../../../shared/components/ui/sidebar.tsx";
+import { ShellSidebarFooter } from "./ShellSidebarFooter.tsx";
 import { SidebarNav } from "./SidebarNav.tsx";
 import { SidebarTitle } from "./SidebarTitle.tsx";
 
@@ -18,10 +12,7 @@ export function ShellSidebar() {
       <SidebarContent className="px-5 pt-8 pb-2">
         <SidebarNav />
       </SidebarContent>
-      <SidebarFooter className="gap-3 px-5 pt-2 pb-7">
-        <PlayerBlock />
-        {import.meta.env.DEV && <SidebarDevSignIn />}
-      </SidebarFooter>
+      <ShellSidebarFooter />
     </Sidebar>
   );
 }

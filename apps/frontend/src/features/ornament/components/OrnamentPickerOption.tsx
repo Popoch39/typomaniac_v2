@@ -29,9 +29,7 @@ export function OrnamentPickerOption({
       onClick={() => onChoose(choice)}
       className="h-auto w-full flex-col gap-2 py-3 whitespace-normal"
     >
-      <span className="flex h-19 items-center">
-        <OrnamentedAvatar player={player} ornament={preview} size="sm" isOwn />
-      </span>
+      <OrnamentedAvatar player={player} ornament={preview} size="sm" isOwn />
       <span className="font-extrabold">{label}</span>
       {lockedHint && <span className="type-mono-sm text-center normal-case">{lockedHint}</span>}
     </Keycap>

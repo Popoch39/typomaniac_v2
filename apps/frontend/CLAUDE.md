@@ -26,6 +26,17 @@
 - Les fichiers générés par shadcn sont du code vendored : on ne les modifie pas, on les habille depuis nos composants (`className`, props). Un composant à nous qui s'en sert garde son nom de domaine (`PlayerAvatar` autour d'`Avatar`, `ShellSidebar` autour de `Sidebar`).
 - Le breakpoint `md` (768px) sépare le téléphone (message plein écran, `max-md:`) du reste ; la rail d'icônes de la sidebar couvre 768–1024px.
 
+## Layout shifts
+
+Aucun layout shift n'est toléré : ni au chargement, ni après une action, ni quand une requête revient. Un élément déjà affiché ne bouge et ne change de taille que si l'utilisateur l'a demandé.
+
+- Un composant qui change d'état garde la même boîte dans tous ses états : réserver la taille du plus grand. Ex. : `OrnamentedAvatar` garde la boîte du cadre même sans Ornament ; un tag de `Panel` qui va et vient reste rendu avec `isTagHidden` au lieu d'être retiré.
+- Une page attend toutes les lectures dont dépend sa mise en page derrière une seule gate (`ProfileGate` pour Profile, `StandingGate` autour de toute la grille de Ranked), lectures lancées en parallèle et non en cascade, plutôt que d'insérer ses panneaux un à un à mesure que les requêtes reviennent. Rien ne s'insère jamais au-dessus ou entre des éléments déjà affichés.
+- Une ligne de texte qui arrive après le reste réserve sa hauteur (`min-h-lh`, contenu vide en attendant) au lieu d'apparaître.
+- Un bloc ancré en bas (pied de la sidebar) n'est rendu qu'une fois son contenu connu, sinon il grandit vers le haut.
+- `scrollbar-gutter: stable` sur `html` (`src/index.css`) empêche la barre de défilement de rétrécir la page quand elle apparaît : ne pas l'enlever.
+- Vérifier dans Chrome avec un `PerformanceObserver` de type `layout-shift` (`buffered: true`), en comptant aussi les entrées `hadRecentInput: true` : l'utilisateur les voit même si le CLS les ignore. Simuler de la latence réseau, car les sauts arrivent souvent quand une requête revient.
+
 ## Effets
 
 `useEffect` est interdit sauf exception validée par l'utilisateur : demander avant d'en écrire un. À la place :

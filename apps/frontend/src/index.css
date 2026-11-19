@@ -418,6 +418,9 @@
 
   html {
     @apply font-sans;
+    /* Reserved, so that a page growing past the window does not narrow its content when the scrollbar
+       appears. */
+    scrollbar-gutter: stable;
   }
 
   /* On body rather than the root, so that rem-based sizes keep their usual 16px scale. */

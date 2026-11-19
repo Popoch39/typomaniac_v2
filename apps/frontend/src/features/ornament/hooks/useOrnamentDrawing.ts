@@ -17,18 +17,23 @@ const AVATAR_SIZES = {
   lg: "top-[66px] left-12 size-24 rounded-[9px] text-4xl",
 } as const;
 
-const BARE_AVATAR_SIZES = { sm: "", lg: "size-24 text-4xl" } as const;
+// The size of the window, so that the Avatar's face keeps its size whether it wears an Ornament or not.
+const BARE_AVATAR_SIZES = { sm: "size-8 text-sm", lg: "size-24 text-4xl" } as const;
+
+// A bare Avatar keeps the frame's box, centred where the window would be, so that putting on or taking
+// off an Ornament moves nothing around the Avatar.
+const BARE_FRAME = "relative inline-flex shrink-0 items-center justify-center";
 
 /**
  * What an Ornamented Avatar draws at a size: the Ornament, `null` for a bare Avatar, and where the
- * frame and the Avatar sit. `className` goes on the outermost element, the Avatar when it is bare.
+ * frame and the Avatar sit. `className` goes on the frame.
  */
 export function useOrnamentDrawing(ornament: Ornament, size: OrnamentSize, className?: string) {
   if (ornament === null)
     return {
       drawing: null,
-      frameClassName: undefined,
-      avatarClassName: cn(BARE_AVATAR_SIZES[size], className),
+      frameClassName: cn(BARE_FRAME, FRAME_SIZES[size], className),
+      avatarClassName: BARE_AVATAR_SIZES[size],
     };
   return {
     drawing: ornamentDrawing(ornament, size === "lg" ? "full" : "chip"),

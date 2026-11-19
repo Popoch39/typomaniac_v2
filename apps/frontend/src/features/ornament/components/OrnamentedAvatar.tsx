@@ -25,13 +25,10 @@ export function OrnamentedAvatar({
     size,
     className,
   );
-  const avatar = <PlayerAvatar player={player} isOwn={isOwn} className={avatarClassName} />;
-  if (drawing === null) return avatar;
-
   return (
     <span className={frameClassName}>
-      <OrnamentArt drawing={drawing} />
-      {avatar}
+      {drawing && <OrnamentArt drawing={drawing} />}
+      <PlayerAvatar player={player} isOwn={isOwn} className={avatarClassName} />
     </span>
   );
 }

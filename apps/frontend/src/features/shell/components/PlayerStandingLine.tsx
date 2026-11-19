@@ -5,10 +5,10 @@ interface PlayerStandingLineProps {
   player: SignedInPlayer;
 }
 
-// Left out until the Standing is read: the Ranked page says why when it cannot be.
+// Left empty until the Standing is read, its height kept so that the chip does not grow when it is: the
+// Ranked page says why when it cannot be.
 export function PlayerStandingLine({ player }: PlayerStandingLineProps) {
   const line = usePlayerStandingLine(player);
 
-  if (line === null) return null;
-  return <span className="truncate type-mono-sm font-normal text-ink-subtle">{line}</span>;
+  return <span className="min-h-lh truncate type-mono-sm font-normal text-ink-subtle">{line}</span>;
 }

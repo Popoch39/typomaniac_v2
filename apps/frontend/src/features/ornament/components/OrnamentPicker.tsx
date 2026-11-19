@@ -14,7 +14,7 @@ export function OrnamentPicker({ player }: OrnamentPickerProps) {
     useOrnamentPicker(player);
 
   return (
-    <Panel title="Ornament" tag={isSaving ? "Saving…" : undefined}>
+    <Panel title="Ornament" tag="Saving…" isTagHidden={!isSaving}>
       {isPending ? (
         <StatusMessage role="status" icon={LoaderCircle} message="Reading your Ornaments…" />
       ) : readFailure ? (

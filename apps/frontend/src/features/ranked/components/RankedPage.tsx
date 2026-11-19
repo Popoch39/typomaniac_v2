@@ -19,18 +19,20 @@ export function RankedPage() {
           <SignInPrompt explanation="Ranked play is for signed-in Players. Sign in to get access." />
         }
       >
+        {/* The page waits for the Standing as a whole, so that the Rank card is never pushed in next to
+            a Queue already drawn. */}
         {(player) => (
-          <>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
-              <StandingGate player={player}>
-                {(standing) => <RankCard standing={standing} />}
-              </StandingGate>
-              <RankedQueue player={player} />
-            </div>
-            <StandingGate player={player}>
-              {(standing) => <TierLadder rank={standing.rank} />}
-            </StandingGate>
-          </>
+          <StandingGate player={player}>
+            {(standing) => (
+              <>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
+                  <RankCard standing={standing} />
+                  <RankedQueue player={player} />
+                </div>
+                <TierLadder rank={standing.rank} />
+              </>
+            )}
+          </StandingGate>
         )}
       </SignedInPlayerGate>
     </Page>
