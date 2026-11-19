@@ -4,6 +4,7 @@ import { migrateDatabase, openDatabase, requireDatabaseUrl } from "./db/client.t
 import { requireAuthConfig } from "./modules/auth/config.ts";
 import { createAuth } from "./modules/auth/service.ts";
 import { readDevOptions } from "./modules/dev/config.ts";
+import { readTrustProxy } from "./modules/rate-limit/config.ts";
 import { openRedis, requireRedisUrl } from "./redis/client.ts";
 
 await setupLogger();
@@ -31,6 +32,7 @@ export const app = createApp(
   undefined,
   undefined,
   devOptions,
+  { trustProxy: readTrustProxy() },
 );
 
 app.listen(Number(process.env.PORT ?? 3000));

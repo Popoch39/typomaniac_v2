@@ -7,6 +7,7 @@ import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
+import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
@@ -35,6 +36,7 @@ export type QueueOptions = {
 export const createQueueRoutes = (
   db: Db,
   auth: Auth,
+  rateLimiter: RateLimiter,
   redis: Redis,
   logger: Logger,
   {
@@ -66,7 +68,7 @@ export const createQueueRoutes = (
 
   return (
     new Elysia({ prefix: "/api/queue" })
-      .use(createProtection(auth))
+      .use(createProtection(auth, rateLimiter))
       .use(websocket())
       // A stopped instance refreshes no entry any more, as if it had crashed.
       .onStop(refreshes.stop)
