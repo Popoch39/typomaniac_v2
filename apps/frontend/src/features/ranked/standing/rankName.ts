@@ -16,8 +16,16 @@ const DIVISION_NUMERALS: Readonly<Record<Division, string>> = {
   4: "IV",
 };
 
+export function tierName(tier: Tier) {
+  return TIER_NAMES[tier];
+}
+
+export function divisionNumeral(division: Division) {
+  return DIVISION_NUMERALS[division];
+}
+
 /** The name a Rank is shown by: its Tier and its Division in Roman numerals, Master having none. */
 export function rankName(rank: Rank) {
-  const tier = TIER_NAMES[rank.tier];
-  return rank.tier === "master" ? tier : `${tier} ${DIVISION_NUMERALS[rank.division]}`;
+  const tier = tierName(rank.tier);
+  return rank.tier === "master" ? tier : `${tier} ${divisionNumeral(rank.division)}`;
 }

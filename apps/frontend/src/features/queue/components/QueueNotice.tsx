@@ -5,7 +5,7 @@ export function QueueNotice() {
 
   if (notice === null) return null;
   return (
-    <p role={notice.role} className="text-base">
+    <p role={notice.role} className="m-0 text-ink">
       {notice.message}
     </p>
   );

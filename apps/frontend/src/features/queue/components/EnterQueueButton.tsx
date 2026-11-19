@@ -1,4 +1,5 @@
-import { Button } from "../../../shared/components/ui/button.tsx";
+import { Keycap } from "../../../shared/components/Keycap.tsx";
+import { FindDuelIcon } from "./FindDuelIcon.tsx";
 
 interface EnterQueueButtonProps {
   enter: () => void;
@@ -7,8 +8,18 @@ interface EnterQueueButtonProps {
 
 export function EnterQueueButton({ enter, isEntering }: EnterQueueButtonProps) {
   return (
-    <Button type="button" onClick={enter} disabled={isEntering}>
-      {isEntering ? "Entering the Queue…" : "Enter the Queue"}
-    </Button>
+    <div className="pb-2">
+      <Keycap
+        type="button"
+        variant="brand"
+        size="xl"
+        onClick={enter}
+        disabled={isEntering}
+        className="w-full"
+      >
+        <FindDuelIcon />
+        {isEntering ? "Entering the Queue…" : "Find a Duel"}
+      </Keycap>
+    </div>
   );
 }

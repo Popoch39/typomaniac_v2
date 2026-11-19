@@ -8,6 +8,8 @@ type PairingState = {
   readonly pairingId: string | null;
   /** Whole seconds left to accept, refreshed while the Pairing is proposed. */
   readonly secondsLeft: number;
+  /** Whole seconds there were to accept when the Pairing was proposed, what the countdown drains from. */
+  readonly acceptSeconds: number;
   /** Whether the Player accepted and now waits for the Opponent. */
   readonly isAccepted: boolean;
   readonly propose: (pairingId: string, window: AcceptWindow) => void;
@@ -25,14 +27,23 @@ function stopCountdownTimer() {
   countdownTimer = null;
 }
 
-const initialState = { pairingId: null, secondsLeft: 0, isAccepted: false } as const;
+const initialState = {
+  pairingId: null,
+  secondsLeft: 0,
+  acceptSeconds: 0,
+  isAccepted: false,
+} as const;
 
 export const usePairingStore = create<PairingState>()((set, get) => ({
   ...initialState,
   propose: (pairingId, window) => {
     stopCountdownTimer();
     const refresh = () => set({ secondsLeft: acceptSecondsLeft(window, eventTime()) });
-    set({ pairingId, isAccepted: false });
+    set({
+      pairingId,
+      isAccepted: false,
+      acceptSeconds: acceptSecondsLeft(window, window.receivedAt),
+    });
     refresh();
     countdownTimer = setInterval(refresh, COUNTDOWN_REFRESH_MS);
   },

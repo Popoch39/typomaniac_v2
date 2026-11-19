@@ -1,22 +1,36 @@
-import { Button } from "../../../shared/components/ui/button.tsx";
+import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { usePairingPrompt } from "../hooks/usePairingPrompt.ts";
-import { PairingCountdown } from "./PairingCountdown.tsx";
+import { AcceptCountdown } from "./AcceptCountdown.tsx";
+import { QueueStatusLine } from "./QueueStatusLine.tsx";
 
 // The Opponent stays hidden until the Duel: nothing here says who they are.
 export function PairingPrompt() {
-  const { secondsLeft, isAccepted, accept } = usePairingPrompt();
+  const { timeLeft, drainedShare, isAccepted, accept } = usePairingPrompt();
 
   return (
-    <>
-      <p role="status" className="text-base">
-        {isAccepted
-          ? "Accepted. Waiting for your Opponent…"
-          : "A Duel was found. Accept it to play."}
-      </p>
-      <PairingCountdown secondsLeft={secondsLeft} />
-      <Button type="button" onClick={accept} disabled={isAccepted}>
-        {isAccepted ? "Waiting for your Opponent…" : "Accept the Duel"}
-      </Button>
-    </>
+    <div className="flex flex-1 flex-col gap-5">
+      <p className="m-0 type-card-title text-action">Opponent found</p>
+      {isAccepted ? (
+        <QueueStatusLine message="Accepted. Waiting for your Opponent…" />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <p role="status" className="sr-only">
+            A Duel was found. Accept it to play.
+          </p>
+          <AcceptCountdown timeLeft={timeLeft} drainedShare={drainedShare} />
+          <div className="pb-2">
+            <Keycap
+              type="button"
+              variant="action"
+              size="lg"
+              onClick={accept}
+              className="w-full text-2xl"
+            >
+              Accept
+            </Keycap>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

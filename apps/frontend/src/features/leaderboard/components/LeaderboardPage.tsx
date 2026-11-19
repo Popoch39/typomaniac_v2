@@ -1,10 +1,11 @@
 import { Page } from "../../../shared/components/Page.tsx";
+import { PageHeader } from "../../../shared/components/PageHeader.tsx";
 import { LeaderboardContent } from "./LeaderboardContent.tsx";
 
 export function LeaderboardPage() {
   return (
     <Page>
-      <h1>Leaderboard</h1>
+      <PageHeader title="Leaderboard" lead="Every ranked Player, ordered by Rank." />
       <LeaderboardContent />
     </Page>
   );

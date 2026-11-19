@@ -1,5 +1,6 @@
 import { Navigate } from "@tanstack/react-router";
 import { usePairedDuel } from "../hooks/usePairedDuel.ts";
+import { QueueStatusLine } from "./QueueStatusLine.tsx";
 
 // Both accepted: the Player is taken to the ranked Duel, where their seat is held.
 export function PairedDuelRedirect() {
@@ -8,9 +9,7 @@ export function PairedDuelRedirect() {
   if (duelId === null) return null;
   return (
     <>
-      <p role="status" className="text-base">
-        Both accepted. Taking you to the Duel…
-      </p>
+      <QueueStatusLine message="Both accepted. Taking you to the Duel…" />
       <Navigate to="/duel/$duelId" params={{ duelId }} />
     </>
   );

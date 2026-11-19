@@ -2,82 +2,116 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* The theme follows the system setting, so dark: utilities do too rather than waiting for a .dark class. */
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/*
+ * Typomaniac Arcade, the design system (https://claude.ai/artifact/TaZWdRxRbQPo9PpRJVE1X7): a dark keyboard
+ * plate where everything pressable is a keycap. It has a single theme, the dark one, so dark: utilities
+ * always apply.
+ */
+@custom-variant dark (&:where(*));
 
-/* The app's palette, mapped onto the shadcn/ui tokens: the brand purple is the primary colour. */
 :root {
-  --background: #fff;
-  --foreground: #08060d;
-  --card: #fff;
-  --card-foreground: #08060d;
-  --popover: #fff;
-  --popover-foreground: #08060d;
-  --primary: #aa3bff;
-  --primary-foreground: #fff;
-  --secondary: #f4f3ec;
-  --secondary-foreground: #08060d;
-  --muted: #f4f3ec;
-  --muted-foreground: #6b6375;
-  --accent: rgba(170, 59, 255, 0.1);
-  --accent-foreground: #08060d;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #e5e4e7;
-  --input: #e5e4e7;
-  --ring: #aa3bff;
-  --radius: 0.625rem;
-  --sidebar: #fff;
-  --sidebar-foreground: #6b6375;
-  --sidebar-primary: #aa3bff;
-  --sidebar-primary-foreground: #fff;
-  --sidebar-accent: rgba(170, 59, 255, 0.1);
-  --sidebar-accent-foreground: #08060d;
-  --sidebar-border: #e5e4e7;
-  --sidebar-ring: #aa3bff;
+  /* Grounds */
+  --surface-plate: #16171d;
+  --surface-sidebar: #121318;
+  --surface-card: #1f2029;
+  --surface-raised: #1c1d25;
+  --plate-dot: #22232c;
 
-  /* Typing colours, the same in both themes. The Opponent's blue stays apart from the brand purple of the Participant's own caret. */
+  /* Keycaps: a face over an edge, framed by the outline */
+  --key-face: #2a2b36;
+  --key-edge: #0e0f13;
+  --key-outline: #0b0c10;
+  --brand: #c084fc;
+  --brand-edge: #7e3fb8;
+  --brand-soft: #d8b4fe;
+  /* The design system's "accent" (the action and the Win), renamed because shadcn/ui owns --accent. */
+  --action: #c6f432;
+  --action-edge: #6d861c;
+  --loss: #ff8a4c;
+  --loss-edge: #a44a1c;
+  --on-key: #16171d;
+
+  /* Text */
+  --ink: #f4f1fa;
+  --ink-muted: #d6d3e2;
+  --ink-subtle: #a9a6b8;
+  --focus-ring: var(--ink);
+
+  /* Tier colours only ever paint a Tier. */
+  --tier-bronze: #c98a5b;
+  --tier-silver: #b9c2cf;
+  --tier-gold: #f2c14e;
+  --tier-platinum: #5fd4c4;
+  --tier-diamond: #7fb2ff;
+  --tier-master: var(--brand);
+
+  /* The design system mapped onto the shadcn/ui tokens. */
+  --background: var(--surface-plate);
+  --foreground: var(--ink);
+  --card: var(--surface-card);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-key);
+  --secondary: var(--key-face);
+  --secondary-foreground: var(--ink);
+  --muted: var(--key-face);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--key-face);
+  --accent-foreground: var(--ink);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: var(--key-outline);
+  --input: var(--key-outline);
+  --ring: var(--focus-ring);
+  --radius: 12px;
+  --sidebar: var(--surface-sidebar);
+  --sidebar-foreground: var(--ink-muted);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-key);
+  --sidebar-accent: var(--key-face);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--key-outline);
+  --sidebar-ring: var(--focus-ring);
+
+  /* Typing colours. The Opponent's blue stays apart from the brand purple of the Participant's own caret. */
   --letter-incorrect: #ca4754;
   --letter-extra: #7e2a33;
   --opponent: #4f9dde;
 
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #16171d;
-    --foreground: #f3f4f6;
-    --card: #16171d;
-    --card-foreground: #f3f4f6;
-    --popover: #1f2028;
-    --popover-foreground: #f3f4f6;
-    --primary: #c084fc;
-    --primary-foreground: #16171d;
-    --secondary: #1f2028;
-    --secondary-foreground: #f3f4f6;
-    --muted: #1f2028;
-    --muted-foreground: #9ca3af;
-    --accent: rgba(192, 132, 252, 0.15);
-    --accent-foreground: #f3f4f6;
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: #2e303a;
-    --input: #2e303a;
-    --ring: #c084fc;
-    --sidebar: #16171d;
-    --sidebar-foreground: #9ca3af;
-    --sidebar-primary: #c084fc;
-    --sidebar-primary-foreground: #16171d;
-    --sidebar-accent: rgba(192, 132, 252, 0.15);
-    --sidebar-accent-foreground: #f3f4f6;
-    --sidebar-border: #2e303a;
-    --sidebar-ring: #c084fc;
-  }
+  color-scheme: dark;
 }
 
 @theme inline {
-  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-heading: var(--font-sans);
-  --font-mono: ui-monospace, Consolas, monospace;
+  --font-sans: Rubik, "Segoe UI", system-ui, sans-serif;
+  --font-heading: var(--font-display);
+  --font-display: Bungee, Impact, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+  --color-surface-plate: var(--surface-plate);
+  --color-surface-sidebar: var(--surface-sidebar);
+  --color-surface-card: var(--surface-card);
+  --color-surface-raised: var(--surface-raised);
+  --color-key-face: var(--key-face);
+  --color-key-edge: var(--key-edge);
+  --color-key-outline: var(--key-outline);
+  --color-brand: var(--brand);
+  --color-brand-edge: var(--brand-edge);
+  --color-brand-soft: var(--brand-soft);
+  --color-action: var(--action);
+  --color-action-edge: var(--action-edge);
+  --color-loss: var(--loss);
+  --color-loss-edge: var(--loss-edge);
+  --color-on-key: var(--on-key);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-focus-ring: var(--focus-ring);
+  --color-tier-bronze: var(--tier-bronze);
+  --color-tier-silver: var(--tier-silver);
+  --color-tier-gold: var(--tier-gold);
+  --color-tier-platinum: var(--tier-platinum);
+  --color-tier-diamond: var(--tier-diamond);
+  --color-tier-master: var(--tier-master);
   --color-letter-incorrect: var(--letter-incorrect);
   --color-letter-extra: var(--letter-extra);
   --color-opponent: var(--opponent);
@@ -107,19 +141,175 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Radii grow with size, and nothing is a pill. */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+  --animate-pixel-blink: pixel-blink 1.2s steps(1) infinite;
+
+  @keyframes pixel-blink {
+    0%,
+    100% {
+      background-color: var(--key-face);
+    }
+    50% {
+      background-color: var(--action);
+    }
+  }
+}
+
+/* The plate's pins: the only radial gradient of the system. */
+@utility plate-dots {
+  background-image: radial-gradient(var(--plate-dot) 1.5px, transparent 1.7px);
+  background-size: 22px 22px;
+}
+
+/*
+ * A keycap: a face framed by the outline, over a hard edge shadow offset straight down. Set
+ * --keycap-depth (5px), --keycap-border (2px) and --keycap-edge (the key edge) to size and colour it;
+ * the defaults are fallbacks rather than declarations, so that a class setting them always wins.
+ */
+@utility keycap {
+  border: var(--keycap-border, 2px) solid var(--key-outline);
+  box-shadow:
+    0 var(--keycap-depth, 5px) 0 0 var(--keycap-edge, var(--key-edge)),
+    0 var(--keycap-depth, 5px) 0 var(--keycap-border, 2px) var(--key-outline);
+}
+
+/* Pressing a key sinks its face and collapses its edge to 1px; it never scales or glows. */
+@utility keycap-pressed {
+  translate: 0 calc(var(--keycap-depth, 5px) - 1px);
+  box-shadow:
+    0 1px 0 0 var(--keycap-edge, var(--key-edge)),
+    0 1px 0 var(--keycap-border, 2px) var(--key-outline);
+}
+
+/* Key travel: 70ms, turned off for reduced motion. */
+@utility key-travel {
+  transition:
+    translate 70ms ease,
+    box-shadow 70ms ease,
+    background-color 70ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* Type styles of the design system: Bungee for keys and titles, Rubik for reading, Space Mono for numbers. */
+@utility type-key-title {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1;
+}
+
+@utility type-rank-title {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4vw, 48px);
+  line-height: 1;
+}
+
+@utility type-headline {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: 1.05;
+}
+
+@utility type-section-title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+}
+
+@utility type-card-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1;
+}
+
+@utility type-wordmark {
+  font-family: var(--font-display);
+  font-size: 21px;
+  letter-spacing: 0.02em;
+}
+
+@utility type-tier-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+@utility type-lead {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+@utility type-label {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@utility type-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@utility type-table-head {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@utility type-metric-xl {
+  font-family: var(--font-mono);
+  font-size: clamp(64px, 8vw, 96px);
+  font-weight: 700;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-metric-lg {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@utility type-status {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@utility type-mono-sm {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 /* In the base layer, so that Tailwind utilities can still override these element defaults. */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+  }
+
+  /* Focus is always visible: a 3px ring at a 4px offset, on every key and link. */
+  :focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 4px;
   }
 
   html {
@@ -128,41 +318,36 @@
 
   /* On body rather than the root, so that rem-based sizes keep their usual 16px scale. */
   body {
-    @apply bg-background text-muted-foreground;
-    font-size: 18px;
-    line-height: 145%;
-    letter-spacing: 0.18px;
+    @apply plate-dots bg-background text-muted-foreground;
+    font-size: 16px;
+    line-height: 1.5;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-
-    @media (max-width: 1024px) {
-      font-size: 16px;
-    }
   }
 
+  /* Bungee is caps by nature: titles are written in normal case, so screen readers read words. */
   h1,
   h2 {
     font-family: var(--font-heading);
-    font-weight: 500;
+    font-weight: 400;
     color: var(--foreground);
   }
 
   h1 {
-    font-size: 56px;
-    letter-spacing: -1.68px;
+    font-size: 44px;
+    line-height: 1.05;
     margin: 32px 0;
     @media (max-width: 1024px) {
-      font-size: 36px;
+      font-size: 32px;
       margin: 20px 0;
     }
   }
 
   h2 {
-    font-size: 24px;
-    line-height: 118%;
-    letter-spacing: -0.24px;
+    font-size: 26px;
+    line-height: 1;
     margin: 0 0 8px;
     @media (max-width: 1024px) {
       font-size: 20px;

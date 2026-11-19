@@ -16,7 +16,7 @@ export function LeaderboardContent() {
     <>
       <OwnPlace own={leaderboard.own} />
       {leaderboard.players.length === 0 ? (
-        <p className="text-base text-muted-foreground">No Player is ranked yet.</p>
+        <p className="m-0 text-ink-muted">No Player is ranked yet.</p>
       ) : (
         <LeaderboardTable players={leaderboard.players} own={leaderboard.own} />
       )}
