@@ -1,18 +1,22 @@
 import { cn } from "../../../shared/lib/utils.ts";
 import { useTierPromotionEffects } from "../hooks/useTierPromotionEffects.ts";
 import type { PromotedTier } from "../rank/tierPromotion.ts";
+import { TierPromotionGrid } from "./TierPromotionGrid.tsx";
+import { TierPromotionRays } from "./TierPromotionRays.tsx";
 
 interface TierPromotionEffectsProps {
   tier: PromotedTier;
 }
 
-// Centred on the Ornament, at (520, 260) of the stage.
+// Centred on the Ornament, at (520, 260) of the stage; the grid and the rays sit behind the rings.
 export function TierPromotionEffects({ tier }: TierPromotionEffectsProps) {
   const effects = useTierPromotionEffects(tier);
   if (effects === null) return null;
 
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 motion-reduce:hidden">
+      <TierPromotionGrid squareStyles={effects.gridSquareStyles} />
+      {effects.rays !== null && <TierPromotionRays {...effects.rays} />}
       {effects.ringStyles.map((style, index) => (
         <span
           key={index}

@@ -1,6 +1,9 @@
 import type { CSSProperties } from "react";
 import type { PromotedTier } from "../rank/tierPromotion.ts";
 import { GOLD_BURST_AT, GOLD_BURSTS, GOLD_RINGS } from "../scene/goldBursts.ts";
+import { type GridSquare, PLATINUM_GRID } from "../scene/platinumGrid.ts";
+import { PLATINUM_BURST_AT, PLATINUM_BURSTS, PLATINUM_RINGS } from "../scene/platinumBursts.ts";
+import { PLATINUM_RAYS, PLATINUM_RAYS_SPIN, type Ray } from "../scene/platinumRays.ts";
 import {
   type Burst,
   type BurstFill,
@@ -8,7 +11,7 @@ import {
   SILVER_BURSTS,
 } from "../scene/silverBursts.ts";
 
-type BurstStyle = CSSProperties & Record<`--${string}`, string>;
+type CustomStyle = CSSProperties & Record<`--${string}`, string>;
 
 const BURST_FILLS: Readonly<Record<BurstFill, string>> = {
   tier: "bg-(--rank-up-tier)",
@@ -22,22 +25,52 @@ type TierEffects = {
   /** Each ring, after `at`, in seconds. */
   readonly rings: readonly number[];
   readonly bursts: readonly Burst[];
+  /** Rays that fade in at `at` and turn once every `spin` seconds. */
+  readonly rays?: { readonly spin: number; readonly rays: readonly Ray[] };
+  readonly grid?: readonly GridSquare[];
 };
 
 const TIER_EFFECTS: Readonly<Partial<Record<PromotedTier, TierEffects>>> = {
   silver: { at: SILVER_BURST_AT, rings: [0], bursts: SILVER_BURSTS },
   gold: { at: GOLD_BURST_AT, rings: GOLD_RINGS, bursts: GOLD_BURSTS },
+  platinum: {
+    at: PLATINUM_BURST_AT,
+    rings: PLATINUM_RINGS,
+    bursts: PLATINUM_BURSTS,
+    rays: { spin: PLATINUM_RAYS_SPIN, rays: PLATINUM_RAYS },
+    grid: PLATINUM_GRID,
+  },
 };
 
-/** The rings and the burst particles a Tier's scene throws out of the Ornament; none yet above Gold. */
+const raysStyle = (at: number, spin: number): CustomStyle => ({
+  "--rays-at": `${at}s`,
+  "--rays-spin": `${spin}s`,
+});
+
+/**
+ * The rings and the burst particles a Tier's scene throws out of the Ornament, with the rays and the
+ * grid behind them; none yet above Platinum.
+ */
 export function useTierPromotionEffects(tier: PromotedTier) {
   const effects = TIER_EFFECTS[tier];
   if (effects === undefined) return null;
-  const { at, rings, bursts } = effects;
+  const { at, rings, bursts, rays, grid } = effects;
   return {
+    rays:
+      rays === undefined
+        ? null
+        : {
+            style: raysStyle(at, rays.spin),
+            rays: rays.rays,
+          },
+    gridSquareStyles: (grid ?? []).map(({ x, y, delay }): CSSProperties => ({
+      left: `${x}px`,
+      top: `${y}px`,
+      animationDelay: `${delay}s`,
+    })),
     ringStyles: rings.map((delay): CSSProperties => ({ animationDelay: `${at + delay}s` })),
     bursts: bursts.map(({ x, y, delay, duration, size, fill }) => {
-      const style: BurstStyle = {
+      const style: CustomStyle = {
         width: `${size}px`,
         height: `${size}px`,
         "--burst-x": `${x}px`,

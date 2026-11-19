@@ -36,7 +36,12 @@ const HERO_MOTIONS: Readonly<Record<PromotedTier, HeroMotion>> = {
     new: "rank-up-flip-in",
     newInner: "rank-up-float",
   },
-  platinum: SILVER,
+  platinum: {
+    old: "rank-up-platinum-old",
+    oldInner: "rank-up-platinum-jitter",
+    new: "rank-up-slam",
+    newInner: "rank-up-float [--rank-up-float-at:2.6s]",
+  },
   diamond: SILVER,
   master: SILVER,
 };

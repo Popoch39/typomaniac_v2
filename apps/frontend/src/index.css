@@ -517,9 +517,9 @@
   }
 }
 
-/* Once landed, the new Ornament floats for as long as the scene stays open. */
+/* Once landed, the new Ornament floats for as long as the scene stays open; Gold lands earliest. */
 @utility rank-up-float {
-  animation: rank-up-float 3.2s ease-in-out 2.2s infinite;
+  animation: rank-up-float 3.2s ease-in-out var(--rank-up-float-at, 2.2s) infinite;
 
   /* Under reduced motion the scene shows its final state directly. */
   @media (prefers-reduced-motion: reduce) {
@@ -599,6 +599,118 @@
   100% {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+/* Platinum: the old Ornament jitters as it lifts out. */
+@utility rank-up-platinum-old {
+  animation: rank-up-lift-out 1s cubic-bezier(0.5, 0, 0.9, 0.5) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-lift-out {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  99% {
+    opacity: 1;
+    transform: translateY(-26px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+@utility rank-up-platinum-jitter {
+  animation: rank-up-jitter 0.08s steps(1) 0.2s 10;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The new Ornament slams down from above. */
+@utility rank-up-slam {
+  animation: rank-up-slam 0.34s cubic-bezier(0.6, 0, 0.9, 0.4) 1s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-slam {
+  0% {
+    transform: translateY(-200px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Rays fade in by steps, then turn for as long as the scene stays open, around their centre. */
+@utility rank-up-rays {
+  transform-origin: center;
+  animation:
+    rank-up-rays-in 0.5s steps(5) both,
+    rank-up-spin var(--rays-spin) linear infinite;
+  animation-delay: var(--rays-at);
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-rays-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rank-up-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A square of the grid blinks on, then fades out by steps. */
+@utility rank-up-blink {
+  animation: rank-up-blink 0.9s steps(6) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-blink {
+  0% {
+    opacity: 0;
+  }
+  1% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
   }
 }
 

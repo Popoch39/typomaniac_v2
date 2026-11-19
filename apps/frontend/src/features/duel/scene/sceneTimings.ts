@@ -29,10 +29,18 @@ const GOLD: SceneTimings = {
   shake: { at: 1.05, duration: 0.38 },
 };
 
+const PLATINUM: SceneTimings = {
+  titleAt: 1.6,
+  letterStep: 0.07,
+  lineAt: 2.3,
+  continueAt: 3.15,
+  shake: { at: 1.32, duration: 0.45 },
+};
+
 export const SCENE_TIMINGS: Readonly<Record<PromotedTier, SceneTimings>> = {
   silver: SILVER,
   gold: GOLD,
-  platinum: SILVER,
+  platinum: PLATINUM,
   diamond: SILVER,
   master: SILVER,
 };
