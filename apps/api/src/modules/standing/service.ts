@@ -184,20 +184,44 @@ const countRanked = async (db: Db) => {
   return row?.total ?? 0;
 };
 
-// The ranked Players ahead of this one in the Leaderboard's order.
-const countAhead = async (db: Db, { playerId, ladderIndex, lp, mmr }: LeaderboardRow) => {
+// The ranked Players ahead of this one in the Leaderboard's order, or behind it.
+const comparedTo = (
+  side: "ahead" | "behind",
+  { playerId, ladderIndex, lp, mmr }: LeaderboardRow,
+) => {
   const own = sql`(${ladderIndex}::smallint, ${lp}::integer, ${mmr}::integer)`;
   const columns = sql`(${standingTable.ladderIndex}, ${standingTable.lp}, ${standingTable.mmr})`;
-  const [row] = await db
+  return side === "ahead"
+    ? sql`(${columns} > ${own} or (${columns} = ${own} and ${standingTable.playerId} < ${playerId}))`
+    : sql`(${columns} < ${own} or (${columns} = ${own} and ${standingTable.playerId} > ${playerId}))`;
+};
+
+const countAhead = async (db: Db, row: LeaderboardRow) => {
+  const [counted] = await db
     .select({ ahead: count() })
     .from(standingTable)
-    .where(
-      and(
-        isRanked,
-        sql`(${columns} > ${own} or (${columns} = ${own} and ${standingTable.playerId} < ${playerId}))`,
-      ),
-    );
-  return row?.ahead ?? 0;
+    .where(and(isRanked, comparedTo("ahead", row)));
+  return counted?.ahead ?? 0;
+};
+
+// The Leaderboard's order turned around, to walk up from a Player to the one just ahead.
+const reversedLeaderboardOrder = [
+  asc(standingTable.ladderIndex),
+  asc(standingTable.lp),
+  asc(standingTable.mmr),
+  desc(standingTable.playerId),
+];
+
+// The ranked Player just ahead of this one, or just behind, if any.
+const readNeighbour = async (db: Db, side: "ahead" | "behind", row: LeaderboardRow) => {
+  const [neighbour] = await db
+    .select(leaderboardColumns)
+    .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
+    .where(and(isRanked, comparedTo(side, row)))
+    .orderBy(...(side === "ahead" ? reversedLeaderboardOrder : leaderboardOrder))
+    .limit(1);
+  return neighbour ?? null;
 };
 
 const leaderboardPlayer = (
@@ -209,25 +233,40 @@ const leaderboardPlayer = (
   return { position, nickname, avatarUrl, rank, ornament: wornOrnament(ornament, rank) };
 };
 
-// The signed-in Player's own place, found among the rows already read before it is looked up.
+// The signed-in Player's own place, found among the rows already read before it is looked up. Off
+// the Podium and the page, it comes with the Players just ahead and behind, as nothing else shows them.
 const readOwn = async (
   db: Db,
   playerId: string,
   read: { position: number; row: LeaderboardRow }[],
 ) => {
   const known = read.find(({ row }) => row.playerId === playerId);
-  if (known) return leaderboardPlayer(known.position, known.row);
+  if (known) return { own: leaderboardPlayer(known.position, known.row), around: null };
   const [row] = await db
     .select(leaderboardColumns)
     .from(standingTable)
     .innerJoin(user, eq(user.id, standingTable.playerId))
     .where(and(isRanked, eq(standingTable.playerId, playerId)));
-  return row ? leaderboardPlayer((await countAhead(db, row)) + 1, row) : null;
+  if (!row) return { own: null, around: null };
+  const [ahead, position, behind] = await Promise.all([
+    readNeighbour(db, "ahead", row),
+    countAhead(db, row).then((count) => count + 1),
+    readNeighbour(db, "behind", row),
+  ]);
+  const own = leaderboardPlayer(position, row);
+  return {
+    own,
+    around: [
+      ...(ahead ? [leaderboardPlayer(position - 1, ahead)] : []),
+      own,
+      ...(behind ? [leaderboardPlayer(position + 1, behind)] : []),
+    ],
+  };
 };
 
 /**
  * The Podium, one page of the ranked Players after it and, for a signed-in ranked Player, their own
- * place, wherever it is. A page past the last one is served as the last page; with no more ranked
+ * place, wherever it is, with the Players around it when it is neither on the Podium nor on the page. A page past the last one is served as the last page; with no more ranked
  * Players than the Podium holds there is one page, and it is empty. A Guest (`playerId` null) and an
  * Unranked Player have no place of their own.
  */
@@ -246,12 +285,15 @@ export const readLeaderboard = async (db: Db, playerId: string | null, requested
   ];
   const listed = (rows: typeof read) =>
     rows.map(({ position, row }) => leaderboardPlayer(position, row));
+  const { own, around } =
+    playerId === null ? { own: null, around: null } : await readOwn(db, playerId, read);
   return {
     podium: listed(read.slice(0, podiumRows.length)),
     players: listed(read.slice(podiumRows.length)),
     page,
     pageCount,
     total,
-    own: playerId === null ? null : await readOwn(db, playerId, read),
+    own,
+    around,
   };
 };

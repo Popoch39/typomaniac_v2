@@ -78,5 +78,8 @@ export const LeaderboardGet = {
     total: t.Integer(),
     // The signed-in Player's own place, wherever it is; null for a Guest and an Unranked Player.
     own: t.Nullable(leaderboardPlayer),
+    // The Player just ahead (if any), the reader and the Player just behind (if any), in Leaderboard
+    // order; null unless the reader is ranked and neither on the Podium nor on the served page.
+    around: t.Nullable(t.Array(leaderboardPlayer)),
   }),
 };
