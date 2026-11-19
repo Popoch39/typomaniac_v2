@@ -1,6 +1,6 @@
 import { useMatchRoute } from "@tanstack/react-router";
 
-export type Section = "/ranked" | "/leaderboard" | "/custom" | "/profile";
+export type Section = "/ranked" | "/leaderboard" | "/custom" | "/practice" | "/profile";
 
 export function useIsCurrentSection(section: Section) {
   const matchRoute = useMatchRoute();

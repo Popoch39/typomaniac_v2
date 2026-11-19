@@ -81,6 +81,10 @@ _Avoid_: expected word, word to type
 The space that ends a Target word and is typed like a letter.
 _Avoid_: trailing space, delimiter
 
+**Practice**:
+A Game played on its own, outside any Duel, to train; nothing is kept for it, and it is worth no Points.
+_Avoid_: training, solo mode, warm-up
+
 ### Events
 
 **Event** (`GameEvent`):

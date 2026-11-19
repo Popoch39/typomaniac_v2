@@ -12,10 +12,11 @@ export function GameScreen() {
   const restartKeyRef = useRestartKey();
 
   return (
-    <main ref={restartKeyRef} className="p-8 text-left">
+    // A div, not a main: the shell's content area is already the page's main landmark.
+    <div ref={restartKeyRef} className="p-8 text-left">
       <ConfigBar />
       {isFinished ? <ResultPanel /> : <TypingArea key={restartCount} />}
       <RestartButton />
-    </main>
+    </div>
   );
 }
