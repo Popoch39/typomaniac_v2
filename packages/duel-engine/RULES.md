@@ -18,17 +18,19 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 
 What each validated word of a Game weighs in its Points (ADR 0013). The Multiplier is read from the Game, never from its Result, which does not hold what each word was.
 
-| Id           | Rule                                                                                                                       |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| MULTIPLIER-1 | A Perfect word weighs 1 when it starts a Streak, then 0.02 more than the Perfect word before it.                           |
-| MULTIPLIER-2 | From the sixth Perfect word in a row, a word weighs 1.10 and no more.                                                      |
-| MULTIPLIER-3 | A word with an incorrect Keystroke weighs 1 and ends the Streak.                                                           |
-| MULTIPLIER-4 | A mistake corrected before the word is validated still ends the Streak.                                                    |
-| MULTIPLIER-5 | A word validated with a Missed letter ends the Streak.                                                                     |
-| MULTIPLIER-6 | The word being typed when the clock stops is not counted.                                                                  |
-| MULTIPLIER-7 | A Game's Multiplier is the average over its validated words, 1 when it has none.                                           |
-| MULTIPLIER-8 | A validated word reopened to correct its mistake stays imperfect.                                                          |
-| MULTIPLIER-9 | On a perfect Game, 40 WPM averages ×1.085 and 100 WPM ×1.094: the Multiplier does not grow with the number of words typed. |
+| Id            | Rule                                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| MULTIPLIER-1  | A Perfect word weighs 1 when it starts a Streak, then 0.02 more than the Perfect word before it.                           |
+| MULTIPLIER-2  | From the sixth Perfect word in a row, a word weighs 1.10 and no more.                                                      |
+| MULTIPLIER-3  | A word with an incorrect Keystroke weighs 1 and ends the Streak.                                                           |
+| MULTIPLIER-4  | A mistake corrected before the word is validated still ends the Streak.                                                    |
+| MULTIPLIER-5  | A word validated with a Missed letter ends the Streak.                                                                     |
+| MULTIPLIER-6  | The word being typed when the clock stops is not counted.                                                                  |
+| MULTIPLIER-7  | A Game's Multiplier is the average over its validated words, 1 when it has none.                                           |
+| MULTIPLIER-8  | A validated word reopened to correct its mistake stays imperfect.                                                          |
+| MULTIPLIER-9  | On a perfect Game, 40 WPM averages ×1.085 and 100 WPM ×1.094: the Multiplier does not grow with the number of words typed. |
+| MULTIPLIER-10 | The current Multiplier, shown live, is the one the Streak has reached: that of the last validated word, up to 1.10.        |
+| MULTIPLIER-11 | A mistake brings the current Multiplier back to 1 at once, even in the word being typed.                                   |
 
 ## Points
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
-import { DUEL_GAME_CONFIG, getAverageMultiplier } from "../src/index.ts";
+import { DUEL_GAME_CONFIG, getAverageMultiplier, getCurrentMultiplier } from "../src/index.ts";
 
 const WORDS = ["cat", "dog", "owl", "bee", "elk", "yak", "ant", "cow", "pig", "hen"];
 
@@ -93,4 +93,19 @@ test("MULTIPLIER-9: on a perfect Game, a 40 WPM Participant reaches nearly the M
 
   expect(getAverageMultiplier(perfect(20))).toBeCloseTo(1.085, 10);
   expect(getAverageMultiplier(perfect(50))).toBeCloseTo(1.094, 10);
+});
+
+test("MULTIPLIER-10: the current Multiplier is the one the Streak has reached, up to 1.10", () => {
+  expect(getCurrentMultiplier(play())).toBe(1);
+  expect(getCurrentMultiplier(typed("cat "))).toBe(1);
+  expect(getCurrentMultiplier(typed("cat dog owl "))).toBeCloseTo(1.04, 10);
+  expect(getCurrentMultiplier(typed("cat dog owl bee elk yak ant cow "))).toBeCloseTo(1.1, 10);
+});
+
+test("MULTIPLIER-11: a mistake brings the current Multiplier back to 1 at once, even in the word being typed", () => {
+  expect(getCurrentMultiplier(typed("cat dog owx "))).toBe(1);
+  expect(getCurrentMultiplier(typed("cat dog owx bee "))).toBe(1);
+  expect(getCurrentMultiplier(typed("cat dog ox"))).toBe(1);
+  // A word that has no mistake yet leaves the Streak where it was.
+  expect(getCurrentMultiplier(typed("cat dog ow"))).toBeCloseTo(1.02, 10);
 });

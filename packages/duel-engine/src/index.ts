@@ -22,7 +22,7 @@ export type {
   Seat,
   ServerMessage,
 } from "./messages.ts";
-export { getAverageMultiplier } from "./multiplier.ts";
+export { getAverageMultiplier, getCurrentMultiplier } from "./multiplier.ts";
 export { getOutcome } from "./outcome.ts";
 export { getPoints } from "./points.ts";
 export type { PointsMeasures } from "./points.ts";
