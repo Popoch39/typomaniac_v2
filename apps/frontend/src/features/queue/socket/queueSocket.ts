@@ -1,6 +1,7 @@
 import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
+import { reconnectDelay } from "../../../shared/lib/reconnectDelay.ts";
 import { queueQueryOptions } from "../api/queueQueryOptions.ts";
 import { parseQueueMessage } from "../message/parseQueueMessage.ts";
 
@@ -8,7 +9,12 @@ type QueueSocketHandlers = {
   readonly receive: (message: QueueServerMessage) => void;
   /** Told, in words for the user, why this Player could not enter the Queue. */
   readonly refuse: (refusal: string) => void;
-  /** The socket closed after the Player was queued. */
+  /**
+   * The socket dropped and is about to be reopened, unless this answers `false` because the
+   * Player no longer needs it.
+   */
+  readonly reconnect: () => boolean;
+  /** The socket closed after the Player was queued, and is not reopened. */
   readonly disconnect: () => void;
 };
 
@@ -36,10 +42,11 @@ async function findRefusal() {
 
 // Owned by the Queue store because components may not run effects; a tab holds one Queue socket.
 let socket: WebSocket | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Opens the Queue socket in place of any other, and hands over each message it reads. */
-export function openQueueSocket({ receive, refuse, disconnect }: QueueSocketHandlers) {
-  closeQueueSocket();
+// `attempt` counts the tries to reopen the socket since it was last queued, 0 for a first entry.
+function connect(handlers: QueueSocketHandlers, attempt: number) {
+  const { receive, refuse, reconnect, disconnect } = handlers;
   const opened = new WebSocket(socketUrl());
   socket = opened;
   let queued = false;
@@ -48,12 +55,28 @@ export function openQueueSocket({ receive, refuse, disconnect }: QueueSocketHand
     const message = parseQueueMessage(String(event.data));
     if (message !== null) receive(message);
   });
-  opened.addEventListener("close", async () => {
+  opened.addEventListener("close", async ({ code }) => {
     if (socket !== opened) return;
-    if (queued) return disconnect();
+    if (queued || attempt > 0) {
+      // A reconnection is a fresh entry: the server sends the queued message first.
+      const nextAttempt = queued ? 1 : attempt + 1;
+      const delay = reconnectDelay(code, nextAttempt);
+      if (delay === null || !reconnect()) return disconnect();
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        connect(handlers, nextAttempt);
+      }, delay);
+      return;
+    }
     const refusal = await findRefusal();
     if (socket === opened) refuse(refusal);
   });
+}
+
+/** Opens the Queue socket in place of any other, and hands over each message it reads. */
+export function openQueueSocket(handlers: QueueSocketHandlers) {
+  closeQueueSocket();
+  connect(handlers, 0);
 }
 
 export function sendToQueue(message: QueueClientMessage) {
@@ -61,6 +84,8 @@ export function sendToQueue(message: QueueClientMessage) {
 }
 
 export function closeQueueSocket() {
+  if (retryTimer !== null) clearTimeout(retryTimer);
+  retryTimer = null;
   socket?.close();
   socket = null;
 }
