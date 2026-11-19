@@ -1,0 +1,1 @@
+CREATE INDEX "duel_participant_player_idx" ON "duel_participant" USING btree ("player_id","duels_played_before");

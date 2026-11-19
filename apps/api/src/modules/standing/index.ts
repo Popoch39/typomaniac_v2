@@ -3,7 +3,7 @@ import type { Db } from "../../db/client.ts";
 import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
 import * as StandingModel from "./model.ts";
-import { readLeaderboard, readStanding, visibleStanding } from "./service.ts";
+import { readLeaderboard, readOwnStanding } from "./service.ts";
 
 export const createStandingRoutes = (db: Db, auth: Auth) =>
   new Elysia({ prefix: "/api" })
@@ -11,7 +11,7 @@ export const createStandingRoutes = (db: Db, auth: Auth) =>
     .get(
       "/me/standing",
       { signedIn: true, response: StandingModel.MeStandingGet.Response },
-      async ({ player }) => visibleStanding(await readStanding(db, player.id)),
+      ({ player }) => readOwnStanding(db, player.id),
     )
     // Public: a session is only read to find the Player's own place, never required.
     .get(

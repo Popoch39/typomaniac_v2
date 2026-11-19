@@ -1,5 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
+import { DUEL_GAME_CONFIG, type Outcome } from "@repo/duel-engine";
 import { createApp } from "../src/app.ts";
+import { duel, duelParticipant } from "../src/db/schema.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -32,7 +34,10 @@ test("a Player who never played ranked reads as Unranked with 0 Placement Duels 
   const response = await readStanding(cookie);
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ rank: null, placement: { played: 0, total: 5 } });
+  expect(await response.json()).toEqual({
+    rank: null,
+    placement: { played: 0, total: 5, outcomes: [] },
+  });
 });
 
 test("a Player in Placement reads as Unranked with the Placement Duels they played", async () => {
@@ -42,7 +47,59 @@ test("a Player in Placement reads as Unranked with the Placement Duels they play
   const response = await readStanding(cookie);
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ rank: null, placement: { played: 3, total: 5 } });
+  expect(await response.json()).toEqual({
+    rank: null,
+    placement: { played: 3, total: 5, outcomes: [] },
+  });
+});
+
+// A finished Duel the Player sat in, with the Duels they had played before it when it is ranked.
+const saveDuelOf = async (playerId: string, outcome: Outcome, duelsPlayedBefore: number | null) => {
+  const duelId = crypto.randomUUID();
+  await testDb.db.insert(duel).values({
+    id: duelId,
+    kind: duelsPlayedBefore === null ? "custom" : "ranked",
+    config: DUEL_GAME_CONFIG,
+    startedAt: new Date(),
+    endedAt: new Date(),
+  });
+  await testDb.db
+    .insert(duelParticipant)
+    .values({ duelId, seat: 0, playerId, outcome, duelsPlayedBefore });
+};
+
+test("a Player in Placement reads the Outcome of each Placement Duel, in the order they played them", async () => {
+  const { player, cookie } = await signInPlayer(auth);
+  await saveStanding(testDb.db, player.id, { mmr: 1210, duelsPlayed: 3, rank: null });
+  await saveDuelOf(player.id, "draw", 2);
+  await saveDuelOf(player.id, "win", 0);
+  await saveDuelOf(player.id, "loss", null);
+  await saveDuelOf(player.id, "loss", 1);
+
+  const response = await readStanding(cookie);
+
+  expect(await response.json()).toEqual({
+    rank: null,
+    placement: { played: 3, total: 5, outcomes: ["win", "loss", "draw"] },
+  });
+});
+
+test("a ranked Player reads the Outcomes of their Placement Duels only, not of the ranked Duels after", async () => {
+  const { player, cookie } = await signInPlayer(auth);
+  await saveStanding(testDb.db, player.id, {
+    mmr: 1300,
+    duelsPlayed: 6,
+    rank: { tier: "silver", division: 2, lp: 20 },
+  });
+  for (const [index, outcome] of (["win", "win", "loss", "win", "draw", "loss"] as const).entries())
+    await saveDuelOf(player.id, outcome, index);
+
+  const response = await readStanding(cookie);
+
+  expect(await response.json()).toEqual({
+    rank: { tier: "silver", division: 2, lp: 20 },
+    placement: { played: 5, total: 5, outcomes: ["win", "win", "loss", "win", "draw"] },
+  });
 });
 
 test("a ranked Player reads their Tier, Division and LP, with their Placement complete", async () => {
@@ -58,7 +115,7 @@ test("a ranked Player reads their Tier, Division and LP, with their Placement co
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({
     rank: { tier: "gold", division: 2, lp: 45 },
-    placement: { played: 5, total: 5 },
+    placement: { played: 5, total: 5, outcomes: [] },
   });
 });
 
@@ -74,7 +131,7 @@ test("a Master Player reads their Tier and LP, without a Division", async () => 
 
   expect(await response.json()).toEqual({
     rank: { tier: "master", lp: 340 },
-    placement: { played: 5, total: 5 },
+    placement: { played: 5, total: 5, outcomes: [] },
   });
 });
 
@@ -105,7 +162,7 @@ test("a Player has one Standing: saving it again replaces it", async () => {
 
   expect(await response.json()).toEqual({
     rank: { tier: "silver", division: 1, lp: 0 },
-    placement: { played: 5, total: 5 },
+    placement: { played: 5, total: 5, outcomes: [] },
   });
 });
 
@@ -120,10 +177,10 @@ test("a Player reads their own Standing, not another Player's", async () => {
 
   expect(await (await readStanding(newcomer.cookie)).json()).toEqual({
     rank: null,
-    placement: { played: 0, total: 5 },
+    placement: { played: 0, total: 5, outcomes: [] },
   });
   expect(await (await readStanding(ranked.cookie)).json()).toEqual({
     rank: { tier: "bronze", division: 3, lp: 12 },
-    placement: { played: 5, total: 5 },
+    placement: { played: 5, total: 5, outcomes: [] },
   });
 });

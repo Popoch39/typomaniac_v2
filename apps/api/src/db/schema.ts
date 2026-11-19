@@ -230,5 +230,9 @@ export const duelParticipant = pgTable(
       enum: ["placed", "promoted", "demoted", "none"],
     }).$type<RankChange>(),
   },
-  (table) => [primaryKey({ columns: [table.duelId, table.seat] })],
+  (table) => [
+    primaryKey({ columns: [table.duelId, table.seat] }),
+    // A Player's ranked Duels in the order they played them, for the Outcomes of their Placement.
+    index("duel_participant_player_idx").on(table.playerId, table.duelsPlayedBefore),
+  ],
 );

@@ -1,13 +1,22 @@
+import type { Outcome } from "@repo/ranked-engine";
 import { cn } from "../../../shared/lib/utils.ts";
 import { usePlacementPips } from "../hooks/usePlacementPips.ts";
 
 interface PlacementPipsProps {
-  played: number;
+  outcomes: readonly Outcome[];
   total: number;
 }
 
-export function PlacementPips({ played, total }: PlacementPipsProps) {
-  const pips = usePlacementPips(played, total);
+const outcomeLabel = { win: "won", loss: "lost", draw: "drawn" } as const;
+
+const outcomeKey = {
+  win: "bg-action text-on-key [--keycap-edge:var(--action-edge)]",
+  loss: "bg-loss text-on-key [--keycap-edge:var(--loss-edge)]",
+  draw: "bg-key-face text-ink",
+} as const;
+
+export function PlacementPips({ outcomes, total }: PlacementPipsProps) {
+  const pips = usePlacementPips(outcomes, total);
 
   return (
     <ol
@@ -15,13 +24,17 @@ export function PlacementPips({ played, total }: PlacementPipsProps) {
       className="m-0 grid list-none gap-2.5 p-0 pb-1.5"
       style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
     >
-      {pips.map(({ number, isPlayed }) => (
+      {pips.map(({ number, outcome }) => (
         <li
           key={number}
-          aria-label={isPlayed ? `Duel ${number}, played` : `Duel ${number}, not played yet`}
+          aria-label={
+            outcome === null
+              ? `Duel ${number}, not played yet`
+              : `Duel ${number}, ${outcomeLabel[outcome]}`
+          }
           className={cn(
             "keycap grid h-14 place-items-center rounded-md font-display text-[22px]",
-            isPlayed ? "bg-key-face text-ink" : "bg-surface-plate text-ink-subtle",
+            outcome === null ? "bg-surface-plate text-ink-subtle" : outcomeKey[outcome],
           )}
         >
           {number}

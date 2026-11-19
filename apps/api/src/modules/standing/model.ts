@@ -22,7 +22,12 @@ const rank = t.Union([
 export const standing = t.Object({
   // Null while Unranked.
   rank: t.Nullable(rank),
-  placement: t.Object({ played: t.Integer(), total: t.Integer() }),
+  placement: t.Object({
+    played: t.Integer(),
+    total: t.Integer(),
+    // The Outcome of each Placement Duel played, in the order they were played.
+    outcomes: t.Array(t.Union([t.Literal("win"), t.Literal("loss"), t.Literal("draw")])),
+  }),
 });
 
 export const MeStandingGet = {

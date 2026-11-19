@@ -9,9 +9,9 @@ import {
   rankAtLadderIndex,
   type Standing,
 } from "@repo/ranked-engine";
-import { and, asc, count, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, lt, sql } from "drizzle-orm";
 import type { Db, Transaction } from "../../db/client.ts";
-import { standing as standingTable, user } from "../../db/schema.ts";
+import { duelParticipant, standing as standingTable, user } from "../../db/schema.ts";
 
 /** A Rank as it is stored: the ladder index of its Division and its LP, both `null` while Unranked. */
 export const storedRank = (rank: Rank | null) => ({
@@ -104,6 +104,26 @@ export const moveStandings = async (
 export const visibleStanding = ({ duelsPlayed, rank }: Pick<Standing, "duelsPlayed" | "rank">) => {
   const total = DEFAULT_RANKED_CONFIG.placementDuels;
   return { rank, placement: { played: Math.min(duelsPlayed, total), total } };
+};
+
+/**
+ * What a Player may see of their own Standing: `visibleStanding`, with the Outcome of each Placement
+ * Duel they played, in the order they played them.
+ */
+export const readOwnStanding = async (db: Db, playerId: string) => {
+  const { rank, placement } = visibleStanding(await readStanding(db, playerId));
+  // Only ranked Duels store the Standing before them, so a Custom Duel never counts.
+  const placementDuels = await db
+    .select({ outcome: duelParticipant.outcome })
+    .from(duelParticipant)
+    .where(
+      and(
+        eq(duelParticipant.playerId, playerId),
+        lt(duelParticipant.duelsPlayedBefore, placement.total),
+      ),
+    )
+    .orderBy(asc(duelParticipant.duelsPlayedBefore));
+  return { rank, placement: { ...placement, outcomes: placementDuels.map((d) => d.outcome) } };
 };
 
 /** How many ranked Players the Leaderboard lists. */

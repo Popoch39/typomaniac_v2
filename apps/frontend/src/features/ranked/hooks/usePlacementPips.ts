@@ -1,7 +1,9 @@
-/** One pip per Placement Duel, the first ones played. The API does not tell their outcomes. */
-export function usePlacementPips(played: number, total: number) {
+import type { Outcome } from "@repo/ranked-engine";
+
+/** One pip per Placement Duel, with its Outcome once played, `null` before. */
+export function usePlacementPips(outcomes: readonly Outcome[], total: number) {
   return Array.from({ length: total }, (_, index) => ({
     number: index + 1,
-    isPlayed: index < played,
+    outcome: outcomes[index] ?? null,
   }));
 }

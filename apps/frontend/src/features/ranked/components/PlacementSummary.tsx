@@ -1,9 +1,10 @@
+import type { OwnStanding } from "../standing/describeStanding.ts";
 import { usePlacementSummary } from "../hooks/usePlacementSummary.ts";
 import { PlacementPips } from "./PlacementPips.tsx";
 import { TierBadge } from "./TierBadge.tsx";
 
 interface PlacementSummaryProps {
-  placement: { readonly played: number; readonly total: number };
+  placement: OwnStanding["placement"];
 }
 
 // The Rank stays hidden until the last Placement Duel: no Tier, no LP.
@@ -23,7 +24,7 @@ export function PlacementSummary({ placement }: PlacementSummaryProps) {
         </div>
       </div>
       <div className="flex flex-col gap-3.5">
-        <PlacementPips played={placement.played} total={placement.total} />
+        <PlacementPips outcomes={placement.outcomes} total={placement.total} />
         <p className="m-0 text-sm text-ink-subtle">{hint}</p>
       </div>
     </>

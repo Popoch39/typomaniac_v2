@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { useStanding } from "../hooks/useStanding.ts";
-import type { VisibleStanding } from "../standing/describeStanding.ts";
+import type { OwnStanding } from "../standing/describeStanding.ts";
 
 interface StandingGateProps {
   player: SignedInPlayer;
-  children: (standing: VisibleStanding) => ReactNode;
+  children: (standing: OwnStanding) => ReactNode;
 }
 
 // Shows its content once the Player's Standing is read, and says so while it is not.

@@ -64,6 +64,13 @@
       "when": 1795024500339,
       "tag": "0008_standing_leaderboard_index",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795083305022,
+      "tag": "0009_duel_participant_player_idx",
+      "breakpoints": true
     }
   ]
 }

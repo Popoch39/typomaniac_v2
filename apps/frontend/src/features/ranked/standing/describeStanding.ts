@@ -1,4 +1,4 @@
-import type { Rank } from "@repo/ranked-engine";
+import type { Outcome, Rank } from "@repo/ranked-engine";
 import { rankName } from "./rankName.ts";
 
 /** A Player's Standing as the API gives it to them: the MMR is hidden (ADR 0006). */
@@ -6,6 +6,11 @@ export type VisibleStanding = {
   /** `null` while the Player is Unranked. */
   readonly rank: Rank | null;
   readonly placement: { readonly played: number; readonly total: number };
+};
+
+/** The Standing a Player reads of their own, with the Outcome of each Placement Duel they played. */
+export type OwnStanding = VisibleStanding & {
+  readonly placement: { readonly outcomes: readonly Outcome[] };
 };
 
 export type StandingSummary = { readonly headline: string; readonly detail: string };

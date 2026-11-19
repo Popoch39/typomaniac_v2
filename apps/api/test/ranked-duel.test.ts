@@ -199,8 +199,14 @@ test("a Placement Duel moves each Player's MMR and ranked Duels played, leaves b
     duelsPlayed: 1,
     rank: null,
   });
-  expect(await visibleStandingOf(origin, first)).toEqual(newcomer);
-  expect(await visibleStandingOf(origin, second)).toEqual(newcomer);
+  expect(await visibleStandingOf(origin, first)).toEqual({
+    rank: null,
+    placement: { ...newcomer.placement, outcomes: ["win"] },
+  });
+  expect(await visibleStandingOf(origin, second)).toEqual({
+    rank: null,
+    placement: { ...newcomer.placement, outcomes: ["loss"] },
+  });
   expect(await testDb.db.select({ kind: duel.kind }).from(duel).where(eq(duel.id, duelId))).toEqual(
     [{ kind: "ranked" }],
   );
@@ -294,9 +300,10 @@ test("the last Placement Duel gives a Player their first Rank, and tells them so
     rank: { tier: "silver", division: 3, lp: 0 },
     placement,
   });
+  // Only the last Placement Duel was played here: the four before it were stored as a Standing.
   expect(await visibleStandingOf(origin, first)).toEqual({
     rank: { tier: "silver", division: 2, lp: 0 },
-    placement,
+    placement: { ...placement, outcomes: ["win"] },
   });
 });
 
@@ -313,8 +320,10 @@ test("a win that reaches 100 LP promotes the Player, and a loss at 0 LP demotes 
   const demoted = { rank: { tier: "gold", division: 3, lp: 75 }, placement } as const;
   expect(end.ranked?.[first.seat]).toEqual({ lpDelta: 23, rankChange: "promoted", ...promoted });
   expect(end.ranked?.[second.seat]).toEqual({ lpDelta: -23, rankChange: "demoted", ...demoted });
-  expect(await visibleStandingOf(origin, first)).toEqual(promoted);
-  expect(await visibleStandingOf(origin, second)).toEqual(demoted);
+  // A Duel played past the Placement adds no Outcome to it.
+  const told = { placement: { ...placement, outcomes: [] } };
+  expect(await visibleStandingOf(origin, first)).toEqual({ ...promoted, ...told });
+  expect(await visibleStandingOf(origin, second)).toEqual({ ...demoted, ...told });
 });
 
 test("a drawn ranked Duel leaves the LP of both Players unchanged, and still counts as a ranked Duel played", async () => {
@@ -376,7 +385,7 @@ test("a Custom Duel between two Players leaves both Standings untouched, and its
   expect(await readStanding(testDb.db, accounts[0].id)).toEqual(goldTwo(40));
   expect(await visibleStandingOf(origin, accounts[1])).toEqual({
     rank: null,
-    placement: { played: 0, total: 5 },
+    placement: { played: 0, total: 5, outcomes: [] },
   });
 });
 
