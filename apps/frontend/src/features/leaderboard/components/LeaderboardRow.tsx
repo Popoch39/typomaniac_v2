@@ -2,7 +2,10 @@ import { TableCell, TableRow } from "../../../shared/components/ui/table.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
-import { LeaderboardRank } from "./LeaderboardRank.tsx";
+import { ownRowAttributes } from "../own/ownRowAttributes.ts";
+import { LpAmount } from "./LpAmount.tsx";
+import { RankLabel } from "./RankLabel.tsx";
+import { YouTag } from "./YouTag.tsx";
 
 interface LeaderboardRowProps {
   player: LeaderboardPlayer;
@@ -13,18 +16,24 @@ interface LeaderboardRowProps {
 export function LeaderboardRow({ player, isOwn }: LeaderboardRowProps) {
   return (
     <TableRow
-      aria-current={isOwn ? "true" : undefined}
-      className="border-t-2 border-b-0 border-surface-plate hover:bg-transparent aria-[current=true]:bg-key-face"
+      {...ownRowAttributes(isOwn)}
+      className="group/row scroll-my-6 border-t-2 border-b-0 border-surface-plate outline-none hover:bg-transparent aria-[current=true]:bg-surface-raised aria-[current=true]:outline-2 aria-[current=true]:-outline-offset-2 aria-[current=true]:outline-action"
     >
-      <TableCell className="px-5 py-3.5 font-mono font-bold">{player.position}</TableCell>
-      <TableCell className="px-3 py-3.5">
-        <span className="flex items-center gap-3 font-bold">
+      <TableCell className="py-2.5 pr-4 pl-5 text-right font-mono text-[17px] font-bold group-aria-[current=true]/row:text-action">
+        {player.position}
+      </TableCell>
+      <TableCell className="px-4 py-2.5">
+        <span className="flex items-center gap-3.5 text-base font-extrabold">
           <OrnamentedAvatar player={player} ornament={player.ornament} size="sm" isOwn={isOwn} />
           <PlayerNickname player={player} />
+          {isOwn && <YouTag />}
         </span>
       </TableCell>
-      <TableCell className="px-5 py-3.5 font-mono text-ink-muted">
-        <LeaderboardRank player={player} />
+      <TableCell className="px-4 py-2.5">
+        <RankLabel rank={player.rank} />
+      </TableCell>
+      <TableCell className="py-2.5 pr-6 pl-4 text-right font-mono text-[17px] font-bold">
+        <LpAmount lp={player.rank.lp} />
       </TableCell>
     </TableRow>
   );

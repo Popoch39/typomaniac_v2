@@ -4,7 +4,7 @@ import { apiClient } from "../../../shared/api/apiClient.ts";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
-import { leaderboardQueryOptions } from "../../leaderboard/api/leaderboardQueryOptions.ts";
+import { leaderboardQueryKey } from "../../leaderboard/api/leaderboardQueryOptions.ts";
 import { ornamentQueryOptions } from "../api/ornamentQueryOptions.ts";
 
 const FAILURES = {
@@ -25,7 +25,7 @@ export function useChooseOrnament(playerId: string) {
       queryClient.setQueryData(ornamentQueryOptions(playerId).queryKey, ornament);
       // The worn Ornament shows in the sidebar and on the Leaderboard too.
       void queryClient.invalidateQueries({ queryKey: meQueryOptions().queryKey });
-      void queryClient.invalidateQueries({ queryKey: leaderboardQueryOptions().queryKey });
+      void queryClient.invalidateQueries({ queryKey: leaderboardQueryKey });
     },
   });
   return {

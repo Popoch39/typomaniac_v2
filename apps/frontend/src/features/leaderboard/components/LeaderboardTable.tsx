@@ -1,31 +1,41 @@
 import {
   Table,
   TableBody,
+  TableCaption,
   TableHead,
   TableHeader,
   TableRow,
 } from "../../../shared/components/ui/table.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
+import { pagePositions } from "../page/pagePositions.ts";
+import { AroundYouRows } from "./AroundYouRows.tsx";
 import { LeaderboardRow } from "./LeaderboardRow.tsx";
 
 interface LeaderboardTableProps {
   players: LeaderboardPlayer[];
   own: LeaderboardPlayer | null;
+  /** The reader between their neighbours, when neither on the Podium nor on this page. */
+  around: LeaderboardPlayer[] | null;
 }
 
-export function LeaderboardTable({ players, own }: LeaderboardTableProps) {
+// On a narrow screen the table scrolls sideways inside its box rather than squeezing its columns.
+export function LeaderboardTable({ players, own, around }: LeaderboardTableProps) {
+  const positions = pagePositions(players);
+
   return (
-    <div className="w-full max-w-2xl overflow-hidden rounded-3xl border-3 border-key-outline bg-surface-card">
-      <Table className="text-[15px] text-ink">
+    <div className="w-full overflow-hidden rounded-[20px] border-3 border-key-outline bg-surface-card">
+      <Table className="min-w-170 text-ink">
+        <TableCaption className="sr-only">Leaderboard, {positions}</TableCaption>
         <TableHeader>
-          <TableRow className="border-0 hover:bg-transparent">
-            <TableHead className="h-auto w-20 px-5 py-4 type-table-head text-ink-subtle">
+          <TableRow className="border-0 bg-surface-raised hover:bg-surface-raised">
+            <TableHead className="h-auto w-22 py-4 pr-4 pl-5 text-right type-table-head text-ink-subtle">
               Position
             </TableHead>
-            <TableHead className="h-auto px-3 py-4 type-table-head text-ink-subtle">
-              Player
+            <TableHead className="h-auto p-4 type-table-head text-ink-subtle">Player</TableHead>
+            <TableHead className="h-auto p-4 type-table-head text-ink-subtle">Rank</TableHead>
+            <TableHead className="h-auto w-30 py-4 pr-6 pl-4 text-right type-table-head text-ink-subtle">
+              LP
             </TableHead>
-            <TableHead className="h-auto px-5 py-4 type-table-head text-ink-subtle">Rank</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -37,6 +47,7 @@ export function LeaderboardTable({ players, own }: LeaderboardTableProps) {
             />
           ))}
         </TableBody>
+        {around !== null && <AroundYouRows around={around} own={own} />}
       </Table>
     </div>
   );

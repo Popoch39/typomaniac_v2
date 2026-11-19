@@ -13,12 +13,15 @@ export const createStandingRoutes = (db: Db, auth: Auth) =>
       { signedIn: true, response: StandingModel.MeStandingGet.Response },
       ({ player }) => readOwnStanding(db, player.id),
     )
-    // Public: a session is only read to find the Player's own place, never required.
+    // Public: a session is only read to find the Player's own Position, never required.
     .get(
       "/leaderboard",
-      { response: StandingModel.LeaderboardGet.Response },
-      async ({ request: { headers } }) => {
+      {
+        query: StandingModel.LeaderboardGet.Query,
+        response: StandingModel.LeaderboardGet.Response,
+      },
+      async ({ query, request: { headers } }) => {
         const session = await auth.api.getSession({ headers });
-        return readLeaderboard(db, session?.user.id ?? null);
+        return readLeaderboard(db, session?.user.id ?? null, query.page ?? 1);
       },
     );

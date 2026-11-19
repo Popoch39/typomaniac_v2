@@ -187,6 +187,14 @@ _Avoid_: qualifiers, calibration, placement matches
 The public list of ranked Players, ordered by Rank.
 _Avoid_: ladder (reserved for the scale of Tiers and Divisions), ranking, standings, top
 
+**Position**:
+The place of a ranked Player on the Leaderboard, counted from 1; no two Players share one.
+_Avoid_: place, rank (reserved for the Rank), spot
+
+**Podium**:
+The first three Positions of the Leaderboard.
+_Avoid_: top 3, top
+
 **Peak Tier**:
 The highest Tier a Player has ever reached; a demotion does not lower it.
 _Avoid_: best rank, max tier, highest rank
