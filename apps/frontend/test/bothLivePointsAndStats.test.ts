@@ -20,16 +20,19 @@ test("the Opponent's Points read 0 before their Game has reached the Participant
     points: 0,
     wpm: 0,
     accuracy: 0,
+    multiplier: 1,
   });
 });
 
-test("the Participant's own Points are shown with the WPM and Accuracy they are made of", () => {
+test("the Participant's own Points are shown with the WPM, Accuracy and Multiplier they are made of", () => {
   const self = play(started(0), typed(1000, "cat dog "));
 
+  // Two Perfect words weigh 1 and 1.02: 160 Points times their average of 1.01.
   expect(bothLivePointsAndStats(self, play(started(0)), 6000).self).toEqual({
-    points: 160,
+    points: 162,
     wpm: 16,
     accuracy: 100,
+    multiplier: 1.02,
   });
 });
 
@@ -40,6 +43,7 @@ test("a mistake makes the Participant's own Points drop", () => {
     points: 61,
     wpm: 8,
     accuracy: 87,
+    multiplier: 1,
   });
 });
 
@@ -48,8 +52,22 @@ test("the Opponent's Points are read as long after their Start as the Participan
   const opponent = play(started(5000), typed(6000, "cat dog "));
 
   expect(bothLivePointsAndStats(play(started(0)), opponent, 6000).opponent).toEqual({
-    points: 160,
+    points: 162,
     wpm: 16,
     accuracy: 100,
+    multiplier: 1.02,
   });
+});
+
+test("the Opponent's Points weigh their own Multiplier, and a mistake brings it back to 1", () => {
+  const self = play(started(0), typed(1000, "cat dog "));
+  const opponent = play(started(5000), typed(6000, "cat dog fx"));
+
+  const sides = bothLivePointsAndStats(self, opponent, 6000);
+
+  expect(sides.self.multiplier).toBe(1.02);
+  expect(sides.opponent.multiplier).toBe(1);
+  // 16 WPM at 90 %: 129.6, times the average of 1.01 of their two Perfect words, the typo in the
+  // word being typed weighing nothing yet.
+  expect(sides.opponent).toEqual({ points: 131, wpm: 16, accuracy: 90, multiplier: 1 });
 });
