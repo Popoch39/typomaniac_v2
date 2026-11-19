@@ -17,6 +17,7 @@ import {
   smallint,
   primaryKey,
   foreignKey,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 
 // Named so the route can tell a Nickname already taken from any other unique violation.
@@ -199,6 +200,9 @@ export const duelGame = pgTable(
     outcome: text("outcome", { enum: ["win", "loss", "draw"] })
       .$type<Outcome>()
       .notNull(),
+    // The average Multiplier the server judged the Game with: the Result does not hold what each
+    // word was. A Game saved before the Multiplier reads as ×1, and its Outcome stays as judged.
+    multiplier: doublePrecision("multiplier").notNull().default(1),
   },
   (table) => [
     primaryKey({ columns: [table.duelId, table.round, table.seat] }),

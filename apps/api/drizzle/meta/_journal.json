@@ -78,6 +78,13 @@
       "when": 1795086213124,
       "tag": "0010_ornament",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795117557324,
+      "tag": "0011_duel_game_multiplier",
+      "breakpoints": true
     }
   ]
 }

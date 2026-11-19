@@ -84,7 +84,11 @@ const isResult: Check = (value) =>
   });
 
 const isFinishedRound: Check = (value) =>
-  hasFields(value, { results: isPairOf(isResult), outcomes: isPairOf(isOutcome) });
+  hasFields(value, {
+    results: isPairOf(isResult),
+    multipliers: isPairOf(isNumber),
+    outcomes: isPairOf(isOutcome),
+  });
 
 const isRank: Check = (value) => {
   if (!isRecord(value) || !Number.isInteger(value.lp)) return false;
@@ -121,6 +125,7 @@ const FIELDS: Record<ServerMessage["type"], Record<string, Check>> = {
   roundEnd: {
     round: isRound,
     results: isPairOf(isResult),
+    multipliers: isPairOf(isNumber),
     outcomes: isPairOf(isOutcome),
     nextStartAt: isNullOr(isNumber),
   },

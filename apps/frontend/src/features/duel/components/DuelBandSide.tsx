@@ -8,8 +8,8 @@ interface DuelBandSideProps {
 }
 
 // Every slot keeps its box whatever it holds: the Avatar its frame before the Participant arrives,
-// the name and the Rank line their line height, the Points and the Lead fixed widths of monospaced
-// figures, so the band never moves while the numbers change.
+// the name and the Rank line their line height, the Multiplier, the Points and the Lead fixed widths
+// of monospaced figures, so the band never moves while the numbers change or a Streak resets.
 export function DuelBandSide({ side, isOwn = false }: DuelBandSideProps) {
   return (
     <div className={cn("flex min-w-0 items-center gap-5", !isOwn && "flex-row-reverse")}>
@@ -43,6 +43,16 @@ export function DuelBandSide({ side, isOwn = false }: DuelBandSideProps) {
           !isOwn && "flex-row-reverse",
         )}
       >
+        <span
+          className={cn(
+            "w-[5ch] text-[15px] text-ink-muted",
+            isOwn ? "text-right" : "text-left",
+            side.multiplier === null && "invisible",
+          )}
+        >
+          <span className="sr-only">Multiplier </span>
+          {side.multiplier}
+        </span>
         <span
           className={cn(
             "w-[6ch] text-[15px]",

@@ -17,7 +17,11 @@ const typed = (word: string) =>
   );
 const fast = typed("catalogue");
 const slow = typed("cat");
-const finished: FinishedRound = { results: [fast, slow], outcomes: ["win", "loss"] };
+const finished: FinishedRound = {
+  results: [fast, slow],
+  multipliers: [1, 1],
+  outcomes: ["win", "loss"],
+};
 const live = { own: 412, opponent: 380 };
 
 test("during a Round, the band shows both live Points", () => {
@@ -41,4 +45,16 @@ test("between Rounds, the band keeps the Points of the last Round, the Participa
     slowPoints,
     fastPoints,
   ]);
+});
+
+test("between Rounds, the Points of the last Round are those its Multipliers gave", () => {
+  const even = { ...fast, wpm: 80, accuracy: 100 };
+  const judged: FinishedRound = {
+    results: [even, even],
+    multipliers: [1.1, 1.02],
+    outcomes: ["win", "loss"],
+  };
+
+  expect(bandPoints({ isLive: false, live, lastRound: judged, seat: 0 })).toEqual([880, 816]);
+  expect(bandPoints({ isLive: false, live, lastRound: judged, seat: 1 })).toEqual([816, 880]);
 });
