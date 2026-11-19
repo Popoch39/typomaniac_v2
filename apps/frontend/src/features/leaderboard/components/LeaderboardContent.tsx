@@ -2,9 +2,9 @@ import { Navigate } from "@tanstack/react-router";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
 import { useLeaderboard } from "../hooks/useLeaderboard.ts";
+import { AllRankedPlayers } from "./AllRankedPlayers.tsx";
 import { LeaderboardPodium } from "./LeaderboardPodium.tsx";
-import { LeaderboardRanking } from "./LeaderboardRanking.tsx";
-import { OwnPlace } from "./OwnPlace.tsx";
+import { YourPosition } from "./YourPosition.tsx";
 
 export function LeaderboardContent() {
   const { leaderboard, isPending, failure, replacingPage } = useLeaderboard();
@@ -22,8 +22,8 @@ export function LeaderboardContent() {
         <Navigate to="/leaderboard" search={{ page: replacingPage }} replace />
       )}
       <LeaderboardPodium podium={leaderboard.podium} own={leaderboard.own} />
-      <OwnPlace own={leaderboard.own} />
-      <LeaderboardRanking leaderboard={leaderboard} />
+      <YourPosition own={leaderboard.own} />
+      <AllRankedPlayers leaderboard={leaderboard} />
     </>
   );
 }

@@ -76,7 +76,7 @@ export const LeaderboardGet = {
     pageCount: t.Integer(),
     // How many Players are ranked.
     total: t.Integer(),
-    // The signed-in Player's own place, wherever it is; null for a Guest and an Unranked Player.
+    // The signed-in Player's own Position, wherever it is; null for a Guest and an Unranked Player.
     own: t.Nullable(leaderboardPlayer),
     // The Player just ahead (if any), the reader and the Player just behind (if any), in Leaderboard
     // order; null unless the reader is ranked and neither on the Podium nor on the served page.

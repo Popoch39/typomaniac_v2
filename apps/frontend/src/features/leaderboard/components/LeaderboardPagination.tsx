@@ -1,16 +1,14 @@
-import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
+import type { Leaderboard } from "../hooks/useLeaderboard.ts";
 import { useLeaderboardPagination } from "../hooks/useLeaderboardPagination.ts";
 import { PageKey } from "./PageKey.tsx";
 import { StepKey } from "./StepKey.tsx";
 
 interface LeaderboardPaginationProps {
-  page: number;
-  pageCount: number;
-  players: LeaderboardPlayer[];
+  leaderboard: Leaderboard;
 }
 
-export function LeaderboardPagination({ page, pageCount, players }: LeaderboardPaginationProps) {
-  const { summary, items, previous, next } = useLeaderboardPagination(page, pageCount, players);
+export function LeaderboardPagination({ leaderboard }: LeaderboardPaginationProps) {
+  const { summary, items, previous, next } = useLeaderboardPagination(leaderboard);
 
   return (
     <nav
@@ -30,7 +28,7 @@ export function LeaderboardPagination({ page, pageCount, players }: LeaderboardP
               …
             </span>
           ) : (
-            <PageKey key={item} page={item} isCurrent={item === page} />
+            <PageKey key={item.page} {...item} />
           ),
         )}
         <StepKey label="Next" page={next} />
