@@ -13,9 +13,10 @@ test("LP won show as a gain, with the Rank reached and the climb toward the next
     }),
   ).toEqual({
     lpDelta: { amount: "+18", tone: "gain" },
+    tier: "gold",
     standing: "Gold II · 80 LP",
     isAnnounced: false,
-    progress: { lp: 80, next: "Gold I" },
+    progress: { lp: 80, from: 62, next: "Gold I" },
     placement: null,
   });
 });
@@ -61,6 +62,17 @@ test("a promotion and a demotion are announced with the Rank they lead to", () =
   expect(demoted.isAnnounced).toBe(true);
 });
 
+test("the LP bar sweeps from the LP held before the Duel, a new Division from its bound", () => {
+  const goldTwo = { tier: "gold", division: 2 } as const;
+  const sweep = (lpDelta: number, rankChange: "none" | "promoted" | "demoted", lp: number) =>
+    rankedEndBlock({ lpDelta, rankChange, rank: { ...goldTwo, lp }, placement: placed }).progress;
+
+  expect(sweep(-12, "none", 50)).toEqual({ lp: 50, from: 62, next: "Gold I" });
+  expect(sweep(0, "none", 50)).toEqual({ lp: 50, from: 50, next: "Gold I" });
+  expect(sweep(21, "promoted", 4)).toEqual({ lp: 4, from: 0, next: "Gold I" });
+  expect(sweep(-23, "demoted", 75)).toEqual({ lp: 75, from: 100, next: "Gold I" });
+});
+
 test("a first Rank is announced, with no LP won or lost to reach it", () => {
   expect(
     rankedEndBlock({
@@ -71,9 +83,10 @@ test("a first Rank is announced, with no LP won or lost to reach it", () => {
     }),
   ).toEqual({
     lpDelta: null,
+    tier: "silver",
     standing: "Placed in Silver I · 0 LP",
     isAnnounced: true,
-    progress: { lp: 0, next: "Gold IV" },
+    progress: { lp: 0, from: 0, next: "Gold IV" },
     placement: null,
   });
 });
@@ -88,6 +101,7 @@ test("a Player in Placement sees their Placement progress, with no LP and no cli
     }),
   ).toEqual({
     lpDelta: null,
+    tier: "unranked",
     standing: "Placement",
     isAnnounced: false,
     progress: null,

@@ -76,6 +76,7 @@
   --sidebar-ring: var(--focus-ring);
 
   /* Typing colours. The Opponent is red everywhere, against the Participant's own action colour. */
+  --letter-correct: #a3c98a;
   --letter-incorrect: #ca4754;
   --letter-extra: #7e2a33;
   --opponent: var(--danger);
@@ -113,6 +114,7 @@
   --color-tier-platinum: var(--tier-platinum);
   --color-tier-diamond: var(--tier-diamond);
   --color-tier-master: var(--tier-master);
+  --color-letter-correct: var(--letter-correct);
   --color-letter-incorrect: var(--letter-incorrect);
   --color-letter-extra: var(--letter-extra);
   --color-opponent: var(--opponent);
@@ -255,6 +257,23 @@
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+  }
+}
+
+/* An LP bar cell filling or emptying from --lp-from; its delay and duration are set per cell. */
+@utility lp-sweep {
+  animation-name: lp-sweep;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes lp-sweep {
+  from {
+    width: var(--lp-from);
   }
 }
 

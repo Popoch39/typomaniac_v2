@@ -5,7 +5,7 @@ import { CaretAnchor } from "./CaretAnchor.tsx";
 
 const LETTER_CLASS: Record<LetterState, string> = {
   untyped: "text-muted-foreground",
-  correct: "text-foreground",
+  correct: "text-letter-correct",
   incorrect: "text-letter-incorrect",
   extra: "text-letter-extra",
   missed: "text-letter-incorrect",

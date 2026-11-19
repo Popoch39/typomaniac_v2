@@ -37,6 +37,7 @@
     "../src/features/queue/refusal",
     "../src/shared/api/describeApiError.ts",
     "../src/shared/lib/formatClock.ts",
+    "../src/shared/lib/lpBarCells.ts",
     "../src/shared/lib/reconnectDelay.ts",
     "../src/shared/lib/reconnectingSocket.ts"
   ],
