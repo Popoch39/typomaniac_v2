@@ -6,6 +6,7 @@ import {
   END_GRACE_MS,
   type FinishedRound,
   finalTickAt,
+  getAverageMultiplier,
   getDuelOutcomes,
   getOutcome,
   type Outcome,
@@ -83,7 +84,10 @@ export type Round = {
   readonly anchorAts: readonly (number | null)[];
   /** Whether each seat's Game has ended. */
   readonly gamesEnded: readonly boolean[];
-  /** Both Results and both Outcomes of the Round and the instant it ended, `null` until then. */
+  /**
+   * Both Results, both Multipliers and both Outcomes of the Round and the instant it ended, `null`
+   * until then.
+   */
   readonly end: (FinishedRound & { readonly endedAt: number }) | null;
 };
 
@@ -307,7 +311,9 @@ export const readRounds = async (redis: Redis, duelId: string, upTo: number) => 
 /** What a client is told of the finished Rounds among `rounds`. */
 export const finishedRounds = (rounds: readonly Round[]) =>
   rounds.flatMap(({ end }): FinishedRound[] =>
-    end === null ? [] : [{ results: end.results, outcomes: end.outcomes }],
+    end === null
+      ? []
+      : [{ results: end.results, multipliers: end.multipliers, outcomes: end.outcomes }],
   );
 
 export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | null> => {
@@ -708,6 +714,7 @@ export const saveDuel = async (
           result: round.results[seat],
           journal: round.journals[seat],
           outcome: round.outcomes[seat],
+          multiplier: round.multipliers[seat],
         })),
       ),
     );
@@ -794,8 +801,9 @@ const finaliseDuel = async (
       type: "end",
       outcomes,
       ranked,
-      rounds: rounds.map(({ results, outcomes: roundOutcomes }) => ({
+      rounds: rounds.map(({ results, multipliers, outcomes: roundOutcomes }) => ({
         results,
+        multipliers,
         outcomes: roundOutcomes,
       })),
     } as const;
@@ -826,13 +834,20 @@ export const endRound = async (
   const isOver = current?.gamesEnded.every((ended) => ended) === true;
   if (current?.number === round && rounds.length === round && current.end === null && isOver) {
     const journals = await readJournals(redis, duelId, round);
-    const results = [
-      getResult(replayGame(current.words, journals[0])),
-      getResult(replayGame(current.words, journals[1])),
+    const games = [
+      replayGame(current.words, journals[0]),
+      replayGame(current.words, journals[1]),
+    ] as const;
+    const results = [getResult(games[0]), getResult(games[1])] as const;
+    // Judged from the replayed Keystrokes, never reported by a client (ADR 0013).
+    const multipliers = [getAverageMultiplier(games[0]), getAverageMultiplier(games[1])] as const;
+    const measures = [
+      { ...results[0], multiplier: multipliers[0] },
+      { ...results[1], multiplier: multipliers[1] },
     ] as const;
     const outcomes = [
-      getOutcome(results[0], results[1]),
-      getOutcome(results[1], results[0]),
+      getOutcome(measures[0], measures[1]),
+      getOutcome(measures[1], measures[0]),
     ] as const;
     const earlier = finishedRounds(rounds).map((finished) => finished.outcomes);
     const decided = getDuelOutcomes([...earlier, outcomes]) !== null;
@@ -846,7 +861,7 @@ export const endRound = async (
       roundKey(redis, duelId, round + 1),
       dueKey(redis),
       round,
-      JSON.stringify({ results, outcomes, endedAt }),
+      JSON.stringify({ results, multipliers, outcomes, endedAt }),
       decided ? "" : round + 1,
       // Drawn anew: no Round is played on the Target words of another.
       JSON.stringify(drawWords(DUEL_WORD_COUNT, Math.random)),
@@ -860,6 +875,7 @@ export const endRound = async (
         type: "roundEnd",
         round,
         results,
+        multipliers,
         outcomes,
         nextStartAt,
       });

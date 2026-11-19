@@ -49,8 +49,20 @@ The other Participant of a Duel, seen from one Participant.
 _Avoid_: enemy, rival, adversary
 
 **Points**:
-What a Participant's Game in a Duel is worth, an integer: `round(WPM × (Accuracy / 100)² × 10)`, so Accuracy counts twice. Nothing typed is worth 0 Points. Points belong to a Duel, not to a Game's measures: a Practice Game has none.
+What a Participant's Game in a Duel is worth, an integer: `round(WPM × (Accuracy / 100)² × 10 × M)`, so Accuracy counts twice, where M is the average **Multiplier** of the Game's validated words, 1 when none is validated. Nothing typed is worth 0 Points. Points belong to a Duel, not to a Game's measures: a Practice Game has none.
 _Avoid_: score, LP (reserved for ranked progression), Round score (reserved for Rounds won)
+
+**Perfect word**:
+A validated Target word typed without a single incorrect Keystroke, even a corrected one, and without any Missed letter.
+_Avoid_: clean word, flawless word
+
+**Streak**:
+The Perfect words a Participant has validated in a row in a Game; a word that is not a Perfect word ends it, and every Game starts without one.
+_Avoid_: combo, chain, run
+
+**Multiplier**:
+What a validated word weighs in a Game's Points: 1 for a word that is not a Perfect word, otherwise 1 for the first word of a Streak, rising by 0.02 with each Perfect word after it, up to 1.10.
+_Avoid_: combo, bonus, boost
 
 **Lead**:
 The difference in Points between the two Participants of a Round, held by the one with more; with equal Points, nobody leads.

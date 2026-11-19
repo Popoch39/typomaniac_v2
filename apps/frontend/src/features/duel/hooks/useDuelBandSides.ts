@@ -2,6 +2,7 @@ import { opponentSeat, type Participant } from "@repo/duel-engine";
 import type { Ornament } from "@repo/ranked-engine";
 import type { AvatarPlayer } from "../../../shared/hooks/useAvatar.ts";
 import { bandPoints } from "../points/bandPoints.ts";
+import { formatMultiplier } from "../points/formatMultiplier.ts";
 import { lead } from "../points/lead.ts";
 import { rankLine } from "../rank/rankLine.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
@@ -17,13 +18,15 @@ export type BandSide = {
   readonly rankLine: string | null;
   readonly isAway: boolean;
   readonly points: number;
+  /** The Multiplier the Streak has reached, shown only while a Round is played. */
+  readonly multiplier: string | null;
   /** The Lead, only on the side of the one who holds it. */
   readonly lead: number | null;
 };
 
 const asSide = (
   participant: Participant | undefined,
-  rest: Pick<BandSide, "rankLine" | "points" | "lead">,
+  rest: Pick<BandSide, "rankLine" | "points" | "multiplier" | "lead">,
 ): BandSide => ({
   isKnown: participant !== undefined,
   name: participant?.name ?? "",
@@ -35,7 +38,7 @@ const asSide = (
 
 /**
  * Both sides of the Broadcast band, the Participant's own first: who they are, their Rank line, their
- * Points and, for the one who leads, the Lead.
+ * Points, their Multiplier during a Round and, for the one who leads, the Lead.
  */
 export function useDuelBandSides() {
   const phase = useDuelStore((state) => state.phase);
@@ -45,11 +48,12 @@ export function useDuelBandSides() {
   const live = useDuelLivePoints();
   const { self, opponent } = useDuelParticipants();
   if (seat === null) {
-    const unknown = asSide(undefined, { rankLine: null, points: 0, lead: null });
+    const unknown = asSide(undefined, { rankLine: null, points: 0, multiplier: null, lead: null });
     return { self: unknown, opponent: unknown };
   }
+  const isLive = phase === "running";
   const [ownPoints, opponentPoints] = bandPoints({
-    isLive: phase === "running",
+    isLive,
     live: { own: live.self.points, opponent: live.opponent.points },
     lastRound: rounds.at(-1),
     seat,
@@ -59,11 +63,13 @@ export function useDuelBandSides() {
     self: asSide(self, {
       rankLine: rankLine(ranks, seat, self?.connected ?? true),
       points: ownPoints,
+      multiplier: isLive ? formatMultiplier(live.self.multiplier) : null,
       lead: held?.holder === "self" ? held.points : null,
     }),
     opponent: asSide(opponent, {
       rankLine: rankLine(ranks, opponentSeat(seat), opponent?.connected ?? true),
       points: opponentPoints,
+      multiplier: isLive ? formatMultiplier(live.opponent.multiplier) : null,
       lead: held?.holder === "opponent" ? held.points : null,
     }),
   };

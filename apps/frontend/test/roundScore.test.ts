@@ -16,9 +16,21 @@ const typed = getResult(
   }),
 );
 
-const wonBySeat0: FinishedRound = { results: [typed, idle], outcomes: ["win", "loss"] };
-const wonBySeat1: FinishedRound = { results: [idle, typed], outcomes: ["loss", "win"] };
-const drawn: FinishedRound = { results: [idle, idle], outcomes: ["draw", "draw"] };
+const wonBySeat0: FinishedRound = {
+  results: [typed, idle],
+  multipliers: [1, 1],
+  outcomes: ["win", "loss"],
+};
+const wonBySeat1: FinishedRound = {
+  results: [idle, typed],
+  multipliers: [1, 1],
+  outcomes: ["loss", "win"],
+};
+const drawn: FinishedRound = {
+  results: [idle, idle],
+  multipliers: [1, 1],
+  outcomes: ["draw", "draw"],
+};
 
 test("the Round score is 0-0 before any Round has ended", () => {
   expect(ownRoundScore([], 0)).toEqual({ own: 0, opponent: 0 });
@@ -45,8 +57,8 @@ test("a finished Round is shown with the Participant's own Outcome, and both Res
     number: 2,
     outcome: "loss",
     sides: [
-      { seat: 1, name: "Guest 4821", result: idle, points: 0 },
-      { seat: 0, name: "ada", result: typed, points: 360 },
+      { seat: 1, name: "Guest 4821", result: idle, multiplier: 1, points: 0 },
+      { seat: 0, name: "ada", result: typed, multiplier: 1, points: 360 },
     ],
   });
 });
@@ -56,6 +68,7 @@ test("each side shows the Points that decided the Round, the winner's the higher
   const slowerButCleaner = { ...typed, wpm: 90, accuracy: 99 };
   const round: FinishedRound = {
     results: [fasterButSloppier, slowerButCleaner],
+    multipliers: [1, 1],
     outcomes: ["loss", "win"],
   };
 

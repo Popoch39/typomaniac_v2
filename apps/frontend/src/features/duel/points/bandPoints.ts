@@ -1,4 +1,4 @@
-import { type FinishedRound, getPoints, opponentSeat, type Seat } from "@repo/duel-engine";
+import { type FinishedRound, getRoundPoints, opponentSeat, type Seat } from "@repo/duel-engine";
 
 /**
  * Both Points the band shows, the Participant's own first: live during a Round; outside one, those
@@ -17,5 +17,5 @@ export function bandPoints({
 }): readonly [number, number] {
   if (isLive) return [live.own, live.opponent];
   if (lastRound === undefined) return [0, 0];
-  return [getPoints(lastRound.results[seat]), getPoints(lastRound.results[opponentSeat(seat)])];
+  return [getRoundPoints(lastRound, seat), getRoundPoints(lastRound, opponentSeat(seat))];
 }

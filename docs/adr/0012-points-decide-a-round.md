@@ -4,7 +4,7 @@ A Round used to go to the higher WPM, with Accuracy only breaking an exact tie: 
 
 ## Considered Options
 
-- **A combo multiplier that breaks on a mistake**: rejected. It rewards long clean streaks, but a faster typist chains more words between two mistakes, so it widens the gap it was meant to close, and it makes a Round's Outcome hard to explain.
+- **A combo multiplier that breaks on a mistake**: rejected. It rewards long clean streaks, but a faster typist chains more words between two mistakes, so it widens the gap it was meant to close, and it makes a Round's Outcome hard to explain. A capped, averaged Multiplier that answers this objection has since been added, see ADR 0013.
 - **Bonus words worth double or triple**: rejected. The faster typist reaches more of them, which again favours speed, and luck in where the bonus words fall would start to decide Rounds.
 - **A bonus for the trailing Participant**: rejected. It punishes the better typist for leading and turns a ranked Duel into something other than a measure of typing.
 - **Points summed over the three Rounds**: rejected, for the reason ADR 0010 gives against adding up WPM: one exceptional or one failed Game would decide the Duel again.
@@ -19,4 +19,4 @@ A Round used to go to the higher WPM, with Accuracy only breaking an exact tie: 
 - Points are not stored and add nothing to the API contract: they are derived from the Results the server already saves and sends. No schema change, no migration.
 - Duels played before this change keep their stored Outcomes, decided by WPM; they are not re-judged.
 - Live Points come from Live stats, which are integers, floor the Accuracy and credit the word being typed, so they can differ by a few units from the final Points of the Result. Only the final Points decide the Round.
-- Combos, bonus words and other arcade mechanics stay out until real Duels show whether the formula alone is enough.
+- Combos, bonus words and other arcade mechanics stay out until real Duels show whether the formula alone is enough. A Multiplier for a Streak of Perfect words has since been added, see ADR 0013.

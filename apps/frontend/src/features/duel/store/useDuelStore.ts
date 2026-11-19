@@ -202,8 +202,12 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       stopResumingGame();
       stopForwardingEvents();
       resumedJournal = [];
-      const { results, outcomes } = message;
-      set({ phase: "roundEnd", rounds: [...rounds, { results, outcomes }], opponentGame: null });
+      const { results, multipliers, outcomes } = message;
+      set({
+        phase: "roundEnd",
+        rounds: [...rounds, { results, multipliers, outcomes }],
+        opponentGame: null,
+      });
       if (message.nextStartAt !== null) showNextStart(message.nextStartAt);
     } else if (message.type === "end") {
       useDuelCountdownStore.getState().cancel();

@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
+  getPoints,
   type ServerMessage,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
@@ -1044,6 +1045,79 @@ test("a slower but cleaner Participant has more Points and both Participants rec
   }
 });
 
+test("the server judges each Participant's Multiplier from their Keystrokes: a perfect Participant wins a Round the faster one would win without it, and the Round end, the end, the state on return and the saved Games all carry both Multipliers", async () => {
+  const { creator, opponent, duelId, words, reopenCreator, stop } = await startDuel(0);
+  try {
+    const perfect = (count: number): GameEvent[] => [
+      { type: "start", at: 10 },
+      { type: "insert", at: 1010, text: `${words.slice(0, count).join(" ")} ` },
+      { type: "tick", at: 30_010 },
+    ];
+    // Every word mistyped at its first letter, then corrected: exact, but never a Perfect word.
+    const corrected = (count: number): GameEvent[] => [
+      { type: "start", at: 11 },
+      ...words.slice(0, count).flatMap((word, index): GameEvent[] => [
+        { type: "insert", at: 1011 + index * 30, text: "#" },
+        { type: "delete", at: 1021 + index * 30, unit: "char" },
+        { type: "insert", at: 1031 + index * 30, text: `${word} ` },
+      ]),
+      { type: "tick", at: 30_011 },
+    ];
+    const pointsWithout = (journal: GameEvent[]) =>
+      getPoints({
+        ...getResult(journal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words))),
+        multiplier: 1,
+      });
+    // A perfect Game of n words: 1, 1.02, 1.04, 1.06, 1.08, then 1.10 for each word after.
+    const perfectMultiplier = (count: number) => (5.2 + (count - 5) * 1.1) / count;
+    // The word counts where the corrected Game has more Points than the perfect one without the
+    // Multiplier, and fewer with it.
+    const counts = Array.from({ length: 11 }, (_, index) => 15 + index)
+      .flatMap((perfectCount) =>
+        Array.from({ length: 50 }, (_, index) => [perfectCount, perfectCount + index] as const),
+      )
+      .find(([perfectCount, correctedCount]) => {
+        const sloppy = pointsWithout(corrected(correctedCount));
+        const clean = pointsWithout(perfect(perfectCount));
+        return sloppy > clean && sloppy < Math.round(clean * perfectMultiplier(perfectCount));
+      });
+    if (!counts) throw new Error("No word counts let the Multiplier turn the Round");
+    const [perfectCount, correctedCount] = counts;
+
+    for (const event of perfect(perfectCount)) creator.send({ type: "event", round: 1, event });
+    for (const event of corrected(correctedCount))
+      opponent.send({ type: "event", round: 1, event });
+    const ends = [await nextRoundEnd(creator), await nextRoundEnd(opponent)] as const;
+    const end = await playOut([creator, opponent], 1);
+    creator.close();
+    const again = await reopenCreator();
+    const state = await again.next();
+    again.close();
+    const games = await testDb.db
+      .select({ round: duelGame.round, seat: duelGame.seat, multiplier: duelGame.multiplier })
+      .from(duelGame)
+      .where(eq(duelGame.duelId, duelId))
+      .orderBy(duelGame.round, duelGame.seat);
+
+    expect(ends[0]).toEqual(ends[1]);
+    expect(ends[0].outcomes).toEqual(["win", "loss"]);
+    expect(ends[0].multipliers[0]).toBeCloseTo(perfectMultiplier(perfectCount), 10);
+    expect(ends[0].multipliers[1]).toBe(1);
+    const firstRound = { results: ends[0].results, multipliers: ends[0].multipliers };
+    expect(end.rounds[0]).toEqual({ ...firstRound, outcomes: ["win", "loss"] });
+    expect(state).toMatchObject({ type: "state", rounds: end.rounds });
+    expect(games[0]?.multiplier).toBeCloseTo(perfectMultiplier(perfectCount), 10);
+    expect(games.slice(1)).toEqual([
+      { round: 1, seat: 1, multiplier: 1 },
+      // The second Round, won 2-0 by a single word: a Streak of one weighs 1.
+      { round: 2, seat: 0, multiplier: 1 },
+      { round: 2, seat: 1, multiplier: 1 },
+    ]);
+  } finally {
+    await stop();
+  }
+});
+
 test("the pause between two Rounds lasts 5 seconds unless the app is given another", async () => {
   const cookies = [
     await signInPlayerWithNickname(uniqueNickname()),
@@ -1269,8 +1343,24 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
       },
     ]);
     expect(games).toEqual([
-      { duelId, round: 1, seat: 0, result: results[0], journal: creatorJournal, outcome: "win" },
-      { duelId, round: 1, seat: 1, result: results[1], journal: guestJournal, outcome: "loss" },
+      {
+        duelId,
+        round: 1,
+        seat: 0,
+        result: results[0],
+        journal: creatorJournal,
+        outcome: "win",
+        multiplier: 1,
+      },
+      {
+        duelId,
+        round: 1,
+        seat: 1,
+        result: results[1],
+        journal: guestJournal,
+        outcome: "loss",
+        multiplier: 1,
+      },
       {
         duelId,
         round: 2,
@@ -1278,6 +1368,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         result: secondEnded.results[0],
         journal: secondJournals[0],
         outcome: "win",
+        multiplier: 1,
       },
       {
         duelId,
@@ -1286,6 +1377,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         result: secondEnded.results[1],
         journal: secondJournals[1],
         outcome: "loss",
+        multiplier: 1,
       },
     ]);
     // A Custom Duel keeps no Standing: the ranked columns stay empty.

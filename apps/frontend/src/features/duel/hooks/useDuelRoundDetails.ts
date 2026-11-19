@@ -7,7 +7,8 @@ import { useDuelRounds } from "./useDuelRounds.ts";
 
 /**
  * The details of the last finished Round, the Participant's own side first: both WPM curves with
- * their axes, the WPM / Accuracy / Consistency table and every finished Round with both Points.
+ * their axes, the WPM / Accuracy / Multiplier / Consistency table and every finished Round with both
+ * Points.
  */
 export function useDuelRoundDetails() {
   const seat = useDuelStore((state) => state.seat);
@@ -26,7 +27,7 @@ export function useDuelRoundDetails() {
       { name: opponent.name, wpm: opponent.result.wpm, history: opponent.result.history.wpm },
     ]),
     names,
-    rows: roundTable(own.result, opponent.result),
+    rows: roundTable(own, opponent),
     rounds: roundList(summaries, pips),
   };
 }

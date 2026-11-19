@@ -87,7 +87,11 @@ const result = t.Object({
 
 const outcome = t.Union([t.Literal("win"), t.Literal("loss"), t.Literal("draw")]);
 
-const finishedRound = { results: pair(result), outcomes: pair(outcome) };
+const finishedRound = {
+  results: pair(result),
+  multipliers: pair(t.Number()),
+  outcomes: pair(outcome),
+};
 
 const lp = t.Integer();
 

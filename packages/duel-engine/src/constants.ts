@@ -18,6 +18,10 @@ export const ROUNDS_TO_WIN = 2;
 export const MAX_ROUNDS = 3;
 /** What WPM × (Accuracy / 100)² is multiplied by to give Points, so they read as whole numbers. */
 export const POINTS_FACTOR = 10;
+/** What each Perfect word of a Streak weighs more than the one before it (ADR 0013). */
+export const MULTIPLIER_STEP = 0.02;
+/** The most a validated word can weigh, reached at the sixth Perfect word in a row (ADR 0013). */
+export const MAX_MULTIPLIER = 1.1;
 /** Between the end of a Round and the Countdown of the next one, while both Results are shown. */
 export const ROUND_PAUSE_MS = 5000;
 /**

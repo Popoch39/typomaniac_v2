@@ -12,6 +12,8 @@ import { withoutSeparator } from "../words/withoutSeparator.ts";
 
 const DEFAULT_CONFIG: GameConfig = { mode: "time", seconds: 30 };
 const TICK_INTERVAL_MS = 1000;
+// Ten readings a second make the Live stats follow the typing without reading them on every frame.
+const READ_INTERVAL_MS = 100;
 const TIME_GAME_INITIAL_WORDS = 50;
 // A time Game has no last word: it is topped up before the player can reach the end of its text.
 const TIME_GAME_MIN_WORDS_AHEAD = 20;
@@ -19,7 +21,10 @@ const TIME_GAME_ADDED_WORDS = 50;
 
 type GameState = {
   readonly game: Game;
-  /** The instant the Live stats are read at, refreshed on each Tick. */
+  /**
+   * The instant the Live stats are read at: it never goes back. A running Game moves it forward on a
+   * timer, on each Tick and on each Event; a finished one is read at its end.
+   */
   readonly readAt: number;
   /** Keys the typing area, so a restart or a config change remounts it and its input takes the focus again. */
   readonly restartCount: number;
@@ -57,23 +62,46 @@ function withEnoughWords(game: Game) {
 
 // Owned by the store because components may not run effects; at most one Game ticks at a time.
 let tickTimer: ReturnType<typeof setInterval> | null = null;
+let readTimer: ReturnType<typeof setInterval> | null = null;
 
-function stopTicking() {
-  if (tickTimer === null) return;
-  clearInterval(tickTimer);
+function stopTickingAndReading() {
+  if (tickTimer !== null) clearInterval(tickTimer);
+  if (readTimer !== null) clearInterval(readTimer);
   tickTimer = null;
+  readTimer = null;
 }
 
 export const useGameStore = create<GameState>()((set, get) => {
+  // A late refresh, Tick or Event must not move the Live stats back to an earlier reading.
+  const readAtLeast = (at: number) => Math.max(get().readAt, at);
+
   const tick = () => {
     const event: GameEvent = { type: "tick", at: eventTime() };
     const game = applyEngineEvent(get().game, event);
-    set({ game, readAt: event.at, lastEvent: event });
-    if (game.status === "finished") stopTicking();
+    set({ game, readAt: readAtLeast(game.endedAt ?? event.at), lastEvent: event });
+    if (game.status === "finished") stopTickingAndReading();
+  };
+
+  // Not an Event: it is not applied to the Game nor forwarded, so Ticks stay at one per second.
+  const refreshReadAt = () => set({ readAt: readAtLeast(eventTime()) });
+
+  const startTickingAndReading = () => {
+    stopTickingAndReading();
+    // One Tick per second from the start keeps Monkeytype parity (ADR 0003).
+    tickTimer = setInterval(tick, TICK_INTERVAL_MS);
+    readTimer = setInterval(refreshReadAt, READ_INTERVAL_MS);
+  };
+
+  const readAtAfter = (game: Game, event: GameEvent) => {
+    // Read at its end, as its own Live stats are, so the Opponent is read up to the same elapsed time.
+    if (game.endedAt !== null) return readAtLeast(game.endedAt);
+    // Without it, what typing changes is read against the last Tick, up to a second behind.
+    if (game.status === "running" && event.type !== "addWords") return readAtLeast(event.at);
+    return get().readAt;
   };
 
   const replaceGame = (game: Game, topsUpWords: boolean) => {
-    stopTicking();
+    stopTickingAndReading();
     set((state) => ({
       game,
       readAt: eventTime(),
@@ -97,17 +125,16 @@ export const useGameStore = create<GameState>()((set, get) => {
       const game = topsUpWords ? withEnoughWords(applied) : applied;
       if (before.status === "ready" && game.status === "running") {
         set({ game, readAt: game.startedAt ?? eventTime(), lastEvent: event });
-        // One Tick per second from the start keeps Monkeytype parity (ADR 0003).
-        tickTimer = setInterval(tick, TICK_INTERVAL_MS);
+        startTickingAndReading();
       } else {
-        set({ game, lastEvent: event });
+        set({ game, readAt: readAtAfter(game, event), lastEvent: event });
       }
-      if (game.status === "finished") stopTicking();
+      if (game.status === "finished") stopTickingAndReading();
     },
     loadGame: (config, words, journal = []) => {
       replaceGame(journal.reduce(applyEngineEvent, createGame(config, words)), false);
       if (get().game.status !== "running") return;
-      tickTimer = setInterval(tick, TICK_INTERVAL_MS);
+      startTickingAndReading();
       // The clock ran on while the Game was away: one already past its end ends at once.
       tick();
     },

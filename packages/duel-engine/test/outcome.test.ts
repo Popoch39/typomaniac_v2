@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import type { Result } from "@repo/typing-engine";
 import { getOutcome } from "../src/index.ts";
 
-function result(wpm: number, accuracy: number): Result {
-  return {
+function result(wpm: number, accuracy: number, multiplier = 1) {
+  const measured: Result = {
     duration: 30,
     wpm,
     rawWpm: wpm,
@@ -17,6 +17,7 @@ function result(wpm: number, accuracy: number): Result {
     inactiveSeconds: 0,
     inactiveAtEnd: false,
   };
+  return { ...measured, multiplier };
 }
 
 test("OUTCOME-1: at equal Accuracy, the Participant with the higher WPM has more Points and wins the Round", () => {
@@ -66,4 +67,16 @@ test("OUTCOME-4: the two Outcomes of a Round are always win and loss, or draw an
     ["win", "loss"],
     ["draw", "draw"],
   ]);
+});
+
+test("OUTCOME-5: the Multiplier can turn the Round: a perfect 90 WPM Game beats 100 WPM at 95 % only with it", () => {
+  // 900 Points against 903 without the Multiplier, 984 against 903 with it.
+  expect(getOutcome(result(90, 100), result(100, 95))).toBe("loss");
+  expect(getOutcome(result(90, 100, (5.2 + 40 * 1.1) / 45), result(100, 95))).toBe("win");
+  expect(getOutcome(result(100, 95), result(90, 100, (5.2 + 40 * 1.1) / 45))).toBe("loss");
+});
+
+test("OUTCOME-6: equal Points with their Multipliers are still a draw, with no tie-break on the Multiplier", () => {
+  // 968 Points each.
+  expect(getOutcome(result(88, 100, 1.1), result(96.8, 100))).toBe("draw");
 });

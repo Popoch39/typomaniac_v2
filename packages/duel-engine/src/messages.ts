@@ -16,9 +16,13 @@ export type Participant = {
   readonly connected: boolean;
 };
 
-/** A Round whose two Games are over: both Results and both Outcomes of the Round, indexed by seat. */
+/**
+ * A Round whose two Games are over: both Results, both average Multipliers the server judged them
+ * with, and both Outcomes of the Round, indexed by seat.
+ */
 export type FinishedRound = {
   readonly results: readonly [Result, Result];
+  readonly multipliers: readonly [number, number];
   readonly outcomes: RoundOutcomes;
 };
 
