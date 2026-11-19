@@ -31,7 +31,13 @@ const hasFields = (value: unknown, checks: Record<string, Check>) =>
 const isNumbers = isListOf(isNumber);
 
 const isParticipant: Check = (value) =>
-  hasFields(value, { seat: isSeat, name: isString, connected: isBoolean });
+  hasFields(value, {
+    seat: isSeat,
+    name: isString,
+    // `null` for a Guest, but never left out.
+    avatarUrl: (avatarUrl) => avatarUrl !== undefined && isNullOr(isString)(avatarUrl),
+    connected: isBoolean,
+  });
 
 const isGameEvent: Check = (value) => {
   if (!isRecord(value)) return false;

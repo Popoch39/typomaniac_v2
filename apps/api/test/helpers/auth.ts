@@ -32,8 +32,12 @@ export const signInPlayer = async (
 };
 
 // A Player with a Nickname of their own, chosen as a Player does, through the app listening at `origin`.
-export const signInPlayerWithNickname = async (auth: Auth, origin: string) => {
-  const { player, cookie } = await signInPlayer(auth);
+export const signInPlayerWithNickname = async (
+  auth: Auth,
+  origin: string,
+  { image }: { image?: string } = {},
+) => {
+  const { player, cookie } = await signInPlayer(auth, { image });
   const nickname = `p_${crypto.randomUUID().slice(0, 8)}`;
   const response = await fetch(`${origin}/api/me/nickname`, {
     method: "PUT",

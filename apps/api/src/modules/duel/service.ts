@@ -46,14 +46,17 @@ export type Identity = {
   readonly name: string;
   /** `null` for a Guest. */
   readonly playerId: string | null;
+  /** `null` for a Guest or a Player without a picture. */
+  readonly avatarUrl: string | null;
 };
 
 export type DuelKind = "custom" | "ranked";
 
-/** A Player a seat of a ranked Duel is held for, shown by their Nickname and their Rank. */
+/** A Player a seat of a ranked Duel is held for, shown by their Nickname, their Avatar and their Rank. */
 export type RankedSeat = {
   readonly playerId: string;
   readonly nickname: string;
+  readonly avatarUrl: string | null;
   /** The Rank as the Duel is created, `null` while the Player is Unranked. */
   readonly rank: Rank | null;
 };
@@ -163,11 +166,13 @@ export const draftRankedDuel = (
 ) => {
   const duelId = crypto.randomUUID();
   const seats: Record<string, string> = Object.fromEntries(
-    players.flatMap(({ playerId, nickname, rank }, seat) => [
+    players.flatMap(({ playerId, nickname, avatarUrl, rank }, seat) => [
       [`holder${seat}`, playerId],
       [`name${seat}`, nickname],
       [`player${seat}`, playerId],
       [`rank${seat}`, JSON.stringify(rank)],
+      // Left out without a picture: Redis holds no `null`.
+      ...(avatarUrl === null ? [] : [[`avatar${seat}`, avatarUrl]]),
     ]),
   );
   const hashes: { key: string; fields: Record<string, string> }[] = [
@@ -198,6 +203,7 @@ for seat = 0, 1 do
   if redis.call('HEXISTS', KEYS[1], 'holder' .. seat) == 0 then
     redis.call('HSET', KEYS[1], 'holder' .. seat, ARGV[1], 'name' .. seat, ARGV[2], 'connected' .. seat, '1')
     if ARGV[3] ~= '' then redis.call('HSET', KEYS[1], 'player' .. seat, ARGV[3]) end
+    if ARGV[4] ~= '' then redis.call('HSET', KEYS[1], 'avatar' .. seat, ARGV[4]) end
     return tostring(seat)
   end
 end
@@ -216,6 +222,7 @@ export const claimSeat = async (
     identity.id,
     identity.name,
     identity.playerId ?? "",
+    identity.avatarUrl ?? "",
   );
   if (claimed === "0") return 0;
   if (claimed === "1") return 1;
@@ -303,7 +310,8 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   const participants = SEATS.flatMap((seat): Participant[] => {
     const name = fields[`name${seat}`];
     if (name === undefined) return [];
-    return [{ seat, name, connected: fields[`connected${seat}`] === "1" }];
+    const avatarUrl = fields[`avatar${seat}`] ?? null;
+    return [{ seat, name, avatarUrl, connected: fields[`connected${seat}`] === "1" }];
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);

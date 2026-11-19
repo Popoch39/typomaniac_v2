@@ -2,8 +2,13 @@ import { Elysia, ElysiaStatus, status } from "elysia";
 import { createGuestCookies } from "./guest.ts";
 import type { Auth } from "./service.ts";
 
-/** A Participant as the routes see them: `playerId` is `null` for a Guest. */
-type Identity = { readonly id: string; readonly name: string; readonly playerId: string | null };
+/** A Participant as the routes see them: `playerId` and `avatarUrl` are `null` for a Guest. */
+type Identity = {
+  readonly id: string;
+  readonly name: string;
+  readonly playerId: string | null;
+  readonly avatarUrl: string | null;
+};
 
 // One type for both branches, so that a route sees a single identity rather than their intersection.
 const withIdentity = (identity: Identity) => ({ identity });
@@ -40,17 +45,17 @@ export const createProtection = (auth: Auth) => {
       async derive({ request: { headers }, set }) {
         const found = await auth.api.getSession({ headers });
         if (found) {
-          const { id, nickname } = found.user;
+          const { id, nickname, image } = found.user;
           // A Player without a Nickname is refused rather than seated as a Guest under a name they did not choose.
           if (!nickname) return status(403, { code: "NICKNAME_REQUIRED" });
-          return withIdentity({ id, name: nickname, playerId: id });
+          return withIdentity({ id, name: nickname, playerId: id, avatarUrl: image ?? null });
         }
         // A Guest has no Player id: nothing they play is attached to anyone.
         const guest = await guestCookies.read(headers);
-        if (guest) return withIdentity({ ...guest, playerId: null });
+        if (guest) return withIdentity({ ...guest, playerId: null, avatarUrl: null });
         const issued = await guestCookies.issue();
         set.headers["set-cookie"] = issued.setCookie;
-        return withIdentity({ ...issued.guest, playerId: null });
+        return withIdentity({ ...issued.guest, playerId: null, avatarUrl: null });
       },
     },
   });

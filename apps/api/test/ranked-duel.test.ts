@@ -42,8 +42,8 @@ const nextOfType = async <Type extends ServerMessage["type"]>(
   }
 };
 
-const signIn = async (origin: string, standing?: Standing) => {
-  const { player, cookie } = await signInPlayerWithNickname(auth, origin);
+const signIn = async (origin: string, standing?: Standing, image?: string) => {
+  const { player, cookie } = await signInPlayerWithNickname(auth, origin, { image });
   if (standing) await saveStanding(testDb.db, player.id, standing);
   return { id: player.id, cookie };
 };
@@ -114,6 +114,7 @@ const pairRankedDuel = async (
     instances = 1,
     db = testDb.db,
     options = { countdownMs: 0, roundPauseMs: 0 } as DuelOptions,
+    images = [] as readonly [string?, string?],
   } = {},
 ) => {
   const testRedis = await createTestRedis();
@@ -127,8 +128,8 @@ const pairRankedDuel = async (
   const origins = apps.map((app) => `http://localhost:${app.server?.port}`);
   const origin = origins[0] ?? "";
   const accounts = [
-    await signIn(origin, standings[0]),
-    await signIn(origin, standings[1]),
+    await signIn(origin, standings[0], images[0]),
+    await signIn(origin, standings[1], images[1]),
   ] as const;
   const queued = [];
   for (const { cookie } of accounts) {
@@ -603,6 +604,21 @@ test("a ranked Duel with one Player connected starts without the other once the 
     rank: null,
   });
   socket.close();
+});
+
+test("each Player of a ranked Duel is shown both Avatars, none for a Player without a picture", async () => {
+  const avatarUrl = "https://avatars.githubusercontent.com/u/2?v=4";
+  const { players } = await openRankedDuel([], { images: [avatarUrl] });
+  const bySeat = players
+    .map(({ seat: playerSeat }, index) => ({
+      seat: playerSeat,
+      avatarUrl: index === 0 ? avatarUrl : null,
+    }))
+    .toSorted((a, b) => a.seat - b.seat);
+  for (const { received } of players) {
+    const state = received.find((message) => isOfType(message, "state"));
+    expect(state).toMatchObject({ participants: bySeat });
+  }
 });
 
 test("each Player of a ranked Duel is shown both Ranks, Unranked as none, and a Custom Duel shows no Rank", async () => {
