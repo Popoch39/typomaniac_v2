@@ -1,11 +1,11 @@
-import { getDuelOutcomes } from "@repo/duel-engine";
+import { formatClock } from "../../../shared/lib/formatClock.ts";
 import { useDuelCountdownStore } from "../store/useDuelCountdownStore.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 
-/** What follows the Round that just ended, in words: the next Round and its Start, or the end of the Duel. */
+/** The time until the next Round's Start, in words; the last Round's end shows the Duel's instead. */
 export function useDuelNextRound() {
   const rounds = useDuelStore((state) => state.rounds);
   const secondsLeft = useDuelCountdownStore((state) => state.secondsLeft);
-  if (getDuelOutcomes(rounds.map((round) => round.outcomes)) !== null) return "The Duel is over…";
-  return secondsLeft === null ? "Next Round coming…" : `Next Round starts in ${secondsLeft}…`;
+  const next = `Round ${rounds.length + 1}`;
+  return secondsLeft === null ? `${next} soon` : `${next} in ${formatClock(secondsLeft)}`;
 }

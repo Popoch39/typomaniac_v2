@@ -1,4 +1,4 @@
-import { opponentRankName } from "../rank/opponentRankName.ts";
+import { seatRankName } from "../rank/seatRankName.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 
 /**
@@ -12,6 +12,6 @@ export function useDuelParticipants() {
   const self = participants.find((participant) => participant.seat === seat);
   const opponent = participants.find((participant) => participant.seat !== seat);
   const opponentAway = opponent?.connected === false;
-  const opponentRank = seat === null ? null : opponentRankName(ranks, seat);
+  const opponentRank = opponent === undefined ? null : seatRankName(ranks, opponent.seat);
   return { self, opponent, opponentAway, opponentRank };
 }

@@ -15,7 +15,3 @@ export type QueueEntry = {
 export function waitingSeconds({ queuedAt, serverAt, receivedAt }: QueueEntry, now: number) {
   return Math.max(0, Math.floor((serverAt - queuedAt + (now - receivedAt)) / 1000));
 }
-
-export function formatWaitingTime(seconds: number) {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}

@@ -1,6 +1,6 @@
 import type { Rank } from "@repo/ranked-engine";
 import { useRankSummary } from "../hooks/useRankSummary.ts";
-import { LpBar } from "./LpBar.tsx";
+import { LpBar } from "../../../shared/components/LpBar.tsx";
 import { TierBadge } from "./TierBadge.tsx";
 
 interface RankSummaryProps {

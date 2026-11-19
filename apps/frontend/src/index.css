@@ -75,10 +75,10 @@
   --sidebar-border: var(--key-outline);
   --sidebar-ring: var(--focus-ring);
 
-  /* Typing colours. The Opponent's blue stays apart from the brand purple of the Participant's own caret. */
+  /* Typing colours. The Opponent is red everywhere, against the Participant's own action colour. */
   --letter-incorrect: #ca4754;
   --letter-extra: #7e2a33;
-  --opponent: #4f9dde;
+  --opponent: var(--danger);
 
   color-scheme: dark;
 }

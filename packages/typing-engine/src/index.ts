@@ -13,5 +13,5 @@ export type {
 } from "./game.ts";
 export { getLiveStats } from "./live-stats.ts";
 export type { LiveStats } from "./live-stats.ts";
-export { getResult } from "./result.ts";
+export { getResult, getWpmHistory } from "./result.ts";
 export type { History, Result } from "./result.ts";
