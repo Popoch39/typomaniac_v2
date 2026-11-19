@@ -5,6 +5,7 @@ import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
 import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
+import { createRequestLog } from "./modules/http/index.ts";
 import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
 import { createQueueRoutes, type QueueOptions } from "./modules/queue/index.ts";
@@ -24,6 +25,8 @@ export const createApp = (
   devOptions?: DevOptions,
 ) =>
   new Elysia()
+    // First, so that its hooks reach every route after it.
+    .use(createRequestLog(logger.getChild("http")))
     .decorate("db", db)
     // Mounted without a prefix: Better Auth routes on its own basePath (/api/auth).
     .mount(auth.handler)
