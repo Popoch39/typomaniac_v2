@@ -2,6 +2,7 @@ import { Panel } from "../../../shared/components/Panel.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
+import { OrnamentPicker } from "../../ornament/components/OrnamentPicker.tsx";
 import { RankCard } from "../../ranked/components/RankCard.tsx";
 import { StandingGate } from "../../ranked/components/StandingGate.tsx";
 
@@ -21,6 +22,8 @@ export function PlayerProfile({ player }: PlayerProfileProps) {
         </div>
       </Panel>
       <StandingGate player={player}>{(standing) => <RankCard standing={standing} />}</StandingGate>
+      {/* Choosing an Ornament takes a Nickname, like everything shown to other Players. */}
+      {player.nickname !== null && <OrnamentPicker player={player} />}
     </div>
   );
 }
