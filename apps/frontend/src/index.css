@@ -27,8 +27,9 @@
   /* The design system's "accent" (the action and the Win), renamed because shadcn/ui owns --accent. */
   --action: #c6f432;
   --action-edge: #6d861c;
-  --loss: #ff8a4c;
-  --loss-edge: #a44a1c;
+  /* A Loss and an error. */
+  --danger: #ff5c6c;
+  --danger-edge: #a3283a;
   --on-key: #16171d;
 
   /* Text */
@@ -60,7 +61,7 @@
   --muted-foreground: var(--ink-muted);
   --accent: var(--key-face);
   --accent-foreground: var(--ink);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: var(--danger);
   --border: var(--key-outline);
   --input: var(--key-outline);
   --ring: var(--focus-ring);
@@ -99,8 +100,8 @@
   --color-brand-soft: var(--brand-soft);
   --color-action: var(--action);
   --color-action-edge: var(--action-edge);
-  --color-loss: var(--loss);
-  --color-loss-edge: var(--loss-edge);
+  --color-danger: var(--danger);
+  --color-danger-edge: var(--danger-edge);
   --color-on-key: var(--on-key);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);

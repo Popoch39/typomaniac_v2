@@ -11,7 +11,7 @@ const keycapVariants = cva(
         neutral: "bg-key-face text-ink",
         brand: "bg-brand text-on-key [--keycap-edge:var(--brand-edge)]",
         action: "bg-action text-on-key [--keycap-edge:var(--action-edge)]",
-        loss: "bg-loss text-on-key [--keycap-edge:var(--loss-edge)]",
+        danger: "bg-danger text-on-key [--keycap-edge:var(--danger-edge)]",
       },
       size: {
         sm: "min-h-11 gap-2.5 rounded-md px-4 text-base [--keycap-depth:4px]",

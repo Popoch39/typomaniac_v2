@@ -10,7 +10,7 @@ export function CreateDuelButton() {
         {isPending ? "Creating…" : "Create a Duel"}
       </Keycap>
       {failure && (
-        <p role="alert" className="m-0 text-ink">
+        <p role="alert" className="m-0 text-danger">
           {failure}
         </p>
       )}

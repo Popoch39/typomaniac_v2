@@ -10,7 +10,7 @@ export function SignInWithDiscordButton() {
         {isPending ? "Redirecting…" : "Sign in with Discord"}
       </Keycap>
       {failure && (
-        <p role="alert" className="m-0 text-ink">
+        <p role="alert" className="m-0 text-danger">
           {failure}
         </p>
       )}

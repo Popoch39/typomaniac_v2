@@ -4,7 +4,9 @@ import { BackHomeLink } from "./BackHomeLink.tsx";
 export function RouteError() {
   return (
     <main>
-      <p role="alert">Something went wrong on this page.</p>
+      <p role="alert" className="text-danger">
+        Something went wrong on this page.
+      </p>
       <BackHomeLink />
     </main>
   );

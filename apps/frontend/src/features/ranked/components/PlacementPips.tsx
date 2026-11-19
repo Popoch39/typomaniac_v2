@@ -11,7 +11,7 @@ const outcomeLabel = { win: "won", loss: "lost", draw: "drawn" } as const;
 
 const outcomeKey = {
   win: "bg-action text-on-key [--keycap-edge:var(--action-edge)]",
-  loss: "bg-loss text-on-key [--keycap-edge:var(--loss-edge)]",
+  loss: "bg-danger text-on-key [--keycap-edge:var(--danger-edge)]",
   draw: "bg-key-face text-ink",
 } as const;
 

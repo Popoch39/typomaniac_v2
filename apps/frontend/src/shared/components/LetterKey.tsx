@@ -10,7 +10,7 @@ const letterKeyVariants = cva(
         neutral: "bg-key-face text-ink",
         brand: "bg-brand text-on-key [--keycap-edge:var(--brand-edge)]",
         action: "bg-action text-on-key [--keycap-edge:var(--action-edge)]",
-        loss: "bg-loss text-on-key [--keycap-edge:var(--loss-edge)]",
+        danger: "bg-danger text-on-key [--keycap-edge:var(--danger-edge)]",
       },
       size: {
         sm: "size-11 rounded-md text-xl [--keycap-depth:4px]",

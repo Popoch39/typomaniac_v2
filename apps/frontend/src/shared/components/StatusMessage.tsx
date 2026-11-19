@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { cn } from "../lib/utils.ts";
 
 interface StatusMessageProps {
   role: "status" | "alert";
@@ -15,7 +16,10 @@ export function StatusMessage({ role, icon: Icon, message }: StatusMessageProps)
     <p
       role={role}
       title={message}
-      className="flex items-center gap-2 text-sm group-data-[collapsible=icon]:justify-center"
+      className={cn(
+        "flex items-center gap-2 text-sm group-data-[collapsible=icon]:justify-center",
+        role === "alert" && "text-danger",
+      )}
     >
       <Icon
         aria-hidden="true"
