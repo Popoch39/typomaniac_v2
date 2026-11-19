@@ -1,8 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import type { Standing } from "@repo/ranked-engine";
+import type { OrnamentChoice, Standing } from "@repo/ranked-engine";
 import { createApp } from "../src/app.ts";
 import { user } from "../src/db/schema.ts";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { leaderboardTop, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -31,11 +31,14 @@ const createLeaderboard = async () => {
     await saveStanding(testDb.db, id, standing);
     return id;
   };
+  // Stored directly, as the Peak Tier that the PUT route checks plays no part in what is listed.
+  const chooseOrnament = (playerId: string, choice: OrnamentChoice) =>
+    testDb.db.update(user).set({ ornament: choice }).where(eq(user.id, playerId));
   const read = (cookie?: string) =>
     app.handle(
       new Request("http://localhost/api/leaderboard", { headers: cookie ? { cookie } : {} }),
     );
-  return { db: testDb.db, auth, addPlayer, read };
+  return { db: testDb.db, auth, addPlayer, chooseOrnament, read };
 };
 
 test("a Guest reads the ranked Players by Tier, Division and LP, with their Nickname, Avatar and Rank", async () => {
@@ -76,30 +79,35 @@ test("a Guest reads the ranked Players by Tier, Division and LP, with their Nick
         nickname: "master",
         avatarUrl: "https://cdn.example.com/master.png",
         rank: { tier: "master", lp: 15 },
+        ornament: { tier: "master", division: null },
       },
       {
         position: 2,
         nickname: "goldTop",
         avatarUrl: null,
         rank: { tier: "gold", division: 1, lp: 0 },
+        ornament: { tier: "gold", division: 1 },
       },
       {
         position: 3,
         nickname: "goldHigh",
         avatarUrl: null,
         rank: { tier: "gold", division: 3, lp: 60 },
+        ornament: { tier: "gold", division: 3 },
       },
       {
         position: 4,
         nickname: "goldLow",
         avatarUrl: null,
         rank: { tier: "gold", division: 3, lp: 10 },
+        ornament: { tier: "gold", division: 3 },
       },
       {
         position: 5,
         nickname: "silver",
         avatarUrl: null,
         rank: { tier: "silver", division: 1, lp: 80 },
+        ornament: { tier: "silver", division: 1 },
       },
     ],
     own: null,
@@ -182,10 +190,45 @@ test("a signed-in ranked Player gets their own position, in the top 100 or below
     nickname: null,
     avatarUrl: "https://cdn.example.com/below.png",
     rank: { tier: "bronze", division: 4, lp: 0 },
+    ornament: { tier: "bronze", division: 4 },
   });
   // 50 Players hold more LP; at equal LP and MMR, the order between the two is the stable last key.
   expect(inTopBody.own).toMatchObject({ rank: gold(50) });
   expect([51, 52]).toContain((inTopBody.own as { position: number }).position);
+});
+
+test("each Player wears the Ornament they chose, in the list and in their own place below it", async () => {
+  const { auth, db, addPlayer, chooseOrnament, read } = await createLeaderboard();
+  await addPlayer("auto", { mmr: 1500, duelsPlayed: 30, rank: gold(90) });
+  const pinned = await addPlayer("pinned", { mmr: 1500, duelsPlayed: 30, rank: gold(80) });
+  await chooseOrnament(pinned, "silver");
+  const bare = await addPlayer("bare", { mmr: 1500, duelsPlayed: 30, rank: gold(70) });
+  await chooseOrnament(bare, "none");
+  const plate = await addPlayer("plate", { mmr: 1500, duelsPlayed: 30, rank: gold(60) });
+  await chooseOrnament(plate, "unranked");
+  const silver = (lp: number) => ({ tier: "silver", division: 2, lp }) as const;
+  for (let lp = 0; lp < 96; lp += 1)
+    await addPlayer(`filler${lp}`, { mmr: 1500, duelsPlayed: 30, rank: silver(lp) });
+  const below = await signInPlayer(auth);
+  await saveStanding(db, below.player.id, {
+    mmr: 1500,
+    duelsPlayed: 30,
+    rank: { tier: "bronze", division: 2, lp: 0 },
+  });
+  await chooseOrnament(below.player.id, "bronze");
+
+  const { players, own } = (await (await read(below.cookie)).json()) as {
+    players: { nickname: string; ornament: unknown }[];
+    own: { position: number; ornament: unknown };
+  };
+
+  expect(players.slice(0, 4).map(({ nickname, ornament }) => ({ nickname, ornament }))).toEqual([
+    { nickname: "auto", ornament: { tier: "gold", division: 2 } },
+    { nickname: "pinned", ornament: { tier: "silver", division: null } },
+    { nickname: "bare", ornament: null },
+    { nickname: "plate", ornament: { tier: "unranked", division: null } },
+  ]);
+  expect(own).toMatchObject({ position: 101, ornament: { tier: "bronze", division: null } });
 });
 
 test("a Player outside the top 100 among equal Standings gets the position the order gives them", async () => {
