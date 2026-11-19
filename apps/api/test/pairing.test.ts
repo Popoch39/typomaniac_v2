@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import type { MatchmakerTickOptions } from "@repo/queue";
-import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
+import type { PairingSide, QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import { createApp } from "../src/app.ts";
 import { readDuel } from "../src/modules/duel/service.ts";
 import { proposePairing, readQueueEntry, tickMatchmaker } from "../src/modules/queue/service.ts";
@@ -41,8 +41,8 @@ const openQueue = async (instances = 1) => {
     if (queued.type !== "queued") throw new Error(`Expected queued, got ${queued.type}`);
     return { ...socket, queuedAt: queued.queuedAt };
   };
-  const signIn = async (mmr?: number) => {
-    const { player, cookie, nickname } = await signInPlayerWithNickname(auth, origin);
+  const signIn = async (mmr?: number, { image }: { image?: string } = {}) => {
+    const { player, cookie, nickname } = await signInPlayerWithNickname(auth, origin, { image });
     if (mmr !== undefined)
       await saveStanding(testDb.db, player.id, { mmr, duelsPlayed: 0, rank: null });
     return { id: player.id, nickname, cookie };
@@ -98,28 +98,47 @@ test("a tick proposes the pair the matchmaking engine gives: the two closest Pla
   expect(await far.staysSilent(50)).toBe(true);
 });
 
-test("both Players receive the proposal with the time left to accept, and nothing in it identifies the Opponent", async () => {
+test("both Players receive the proposal with the time left to accept, and each side's Nickname, Avatar, Rank and worn Ornament", async () => {
   const queue = await openQueue();
-  const players = [await queue.signIn(), await queue.signIn()];
-  const sockets = [];
-  for (const player of players) sockets.push(await queue.enter(player));
+  const ada = await queue.signIn(undefined, { image: "https://avatars.example/ada.png" });
+  const bob = await queue.signIn();
+  await saveStanding(testDb.db, ada.id, {
+    mmr: 1200,
+    duelsPlayed: 12,
+    rank: { tier: "gold", division: 2, lp: 40 },
+  });
+  const adaSocket = await queue.enter(ada);
+  const bobSocket = await queue.enter(bob);
 
   await queue.tick();
 
-  for (const socket of sockets) {
-    const proposal = await nextProposal(socket);
-    expect(proposal).toEqual({
-      type: "proposed",
-      pairingId: expect.any(String),
-      acceptWithinMs: expect.any(Number),
-    });
-    expect(proposal.acceptWithinMs).toBeGreaterThan(9000);
-    expect(proposal.acceptWithinMs).toBeLessThanOrEqual(10_000);
-    for (const { id, nickname } of players) {
-      expect(JSON.stringify(proposal)).not.toContain(id);
-      expect(JSON.stringify(proposal)).not.toContain(nickname);
-    }
-  }
+  const adaSide: PairingSide = {
+    nickname: ada.nickname,
+    avatarUrl: "https://avatars.example/ada.png",
+    rank: { tier: "gold", division: 2, lp: 40 },
+    ornament: { tier: "gold", division: 2 },
+  };
+  // Bob never played ranked: Unranked, wearing the Unranked plate by default.
+  const bobSide: PairingSide = {
+    nickname: bob.nickname,
+    avatarUrl: null,
+    rank: null,
+    ornament: { tier: "unranked", division: null },
+  };
+  const adaProposal = await nextProposal(adaSocket);
+  expect(adaProposal).toEqual({
+    type: "proposed",
+    pairingId: expect.any(String),
+    acceptWithinMs: expect.any(Number),
+    players: { self: adaSide, opponent: bobSide },
+  });
+  expect(adaProposal.acceptWithinMs).toBeGreaterThan(9000);
+  expect(adaProposal.acceptWithinMs).toBeLessThanOrEqual(10_000);
+  expect(await nextProposal(bobSocket)).toEqual({
+    ...adaProposal,
+    acceptWithinMs: expect.any(Number),
+    players: { self: bobSide, opponent: adaSide },
+  });
 });
 
 test("a Player who left between the snapshot and the proposal is not paired, and the other keeps waiting", async () => {

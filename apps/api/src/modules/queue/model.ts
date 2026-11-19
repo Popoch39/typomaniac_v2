@@ -6,6 +6,50 @@ const rankedDuelUnfinished = t.Object({
   duelId: t.String(),
 });
 
+const lp = t.Integer();
+
+// The shapes the `standing` and `ornament` modules answer with, written again since a model is not
+// imported across modules. `null` for an Unranked Player.
+const rank = t.Union([
+  t.Object({
+    tier: t.Union([
+      t.Literal("bronze"),
+      t.Literal("silver"),
+      t.Literal("gold"),
+      t.Literal("platinum"),
+      t.Literal("diamond"),
+    ]),
+    division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
+    lp,
+  }),
+  t.Object({ tier: t.Literal("master"), lp }),
+  t.Null(),
+]);
+
+// `null` for a bare Avatar.
+const ornament = t.Union([
+  t.Object({
+    tier: t.Union([
+      t.Literal("unranked"),
+      t.Literal("bronze"),
+      t.Literal("silver"),
+      t.Literal("gold"),
+      t.Literal("platinum"),
+      t.Literal("diamond"),
+      t.Literal("master"),
+    ]),
+    division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4), t.Null()]),
+  }),
+  t.Null(),
+]);
+
+const pairingSide = t.Object({
+  nickname: t.String(),
+  avatarUrl: t.Union([t.String(), t.Null()]),
+  rank,
+  ornament,
+});
+
 export const RootGet = {
   Response: {
     // The instant the Player entered the Queue, `null` when they are not queued.
@@ -25,6 +69,7 @@ export const Socket = {
         type: t.Literal("proposed"),
         pairingId: t.String(),
         acceptWithinMs: t.Number(),
+        players: t.Object({ self: pairingSide, opponent: pairingSide }),
       }),
       t.Object({ type: t.Literal("requeued"), queuedAt: t.Number(), serverAt: t.Number() }),
       t.Object({

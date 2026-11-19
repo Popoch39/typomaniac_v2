@@ -3,7 +3,20 @@ import type { QueueClientMessage, QueueServerMessage } from "../src/index.ts";
 
 const serverMessages: QueueServerMessage[] = [
   { type: "queued", queuedAt: 1000, serverAt: 1500 },
-  { type: "proposed", pairingId: "pairing", acceptWithinMs: 10_000 },
+  {
+    type: "proposed",
+    pairingId: "pairing",
+    acceptWithinMs: 10_000,
+    players: {
+      self: {
+        nickname: "ada",
+        avatarUrl: "https://avatars.example/ada.png",
+        rank: { tier: "gold", division: 2, lp: 40 },
+        ornament: { tier: "gold", division: 2 },
+      },
+      opponent: { nickname: "bob", avatarUrl: null, rank: null, ornament: null },
+    },
+  },
   { type: "requeued", queuedAt: 1000, serverAt: 12_000 },
   { type: "removed", reason: "replaced" },
   { type: "removed", reason: "notAccepted" },
