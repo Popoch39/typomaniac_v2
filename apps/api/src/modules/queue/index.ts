@@ -5,8 +5,7 @@ import { Elysia, status } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { createProtection } from "../auth/index.ts";
-import type { Auth } from "../auth/service.ts";
+import { type Protection } from "../auth/index.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
 import { mayReconnect } from "../lifecycle/closeCode.ts";
@@ -40,7 +39,7 @@ export type QueueOptions = {
 
 export const createQueueRoutes = (
   db: Db,
-  auth: Auth,
+  protection: Protection,
   rateLimiter: RateLimiter,
   redis: Redis,
   logger: Logger,
@@ -74,7 +73,7 @@ export const createQueueRoutes = (
 
   return (
     new Elysia({ prefix: "/api/queue" })
-      .use(createProtection(auth, rateLimiter))
+      .use(protection)
       .use(websocket())
       // A stopped instance refreshes no entry any more, as if it had crashed.
       .onStop(refreshes.stop)

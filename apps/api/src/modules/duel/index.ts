@@ -12,8 +12,7 @@ import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { createProtection, personOf } from "../auth/index.ts";
-import type { Auth } from "../auth/service.ts";
+import { type Protection, personOf } from "../auth/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
@@ -57,7 +56,7 @@ export type DuelOptions = {
 
 export const createDuelRoutes = (
   db: Db,
-  auth: Auth,
+  protection: Protection,
   rateLimiter: RateLimiter,
   redis: Redis,
   logger: Logger,
@@ -110,7 +109,7 @@ export const createDuelRoutes = (
 
   return (
     new Elysia({ prefix: "/api/duels" })
-      .use(createProtection(auth, rateLimiter))
+      .use(protection)
       .use(websocket())
       .onStart(() => {
         sweeper = setInterval(runSweep, sweepIntervalMs);

@@ -89,6 +89,9 @@ export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
   });
 };
 
+/** The protection options, built once by `createApp` and `.use()`d by each module of routes. */
+export type Protection = ReturnType<typeof createProtection>;
+
 // Better Auth's routes, on its own basePath (/api/auth), given the client IP as the API resolves it.
 export const createAuthRoutes = (auth: Auth, rateLimiter: RateLimiter) =>
   new Elysia().all(
