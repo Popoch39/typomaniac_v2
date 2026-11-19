@@ -9,7 +9,12 @@ export const RootPost = {
 };
 
 const seat = t.Union([t.Literal(0), t.Literal(1)]);
-const participant = t.Object({ seat, name: t.String(), connected: t.Boolean() });
+const participant = t.Object({
+  seat,
+  name: t.String(),
+  avatarUrl: t.Union([t.String(), t.Null()]),
+  connected: t.Boolean(),
+});
 
 export const IdGet = {
   Params: duelParams,
