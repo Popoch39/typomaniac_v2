@@ -1,9 +1,11 @@
 import type { Ornament } from "@repo/ranked-engine";
 import type { AvatarPlayer } from "../../../shared/hooks/useAvatar.ts";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
-import { useTierPromotionTiles } from "../hooks/useTierPromotionTiles.ts";
+import { cn } from "../../../shared/lib/utils.ts";
+import { type ShatteredTier, useTierPromotionTiles } from "../hooks/useTierPromotionTiles.ts";
 
 interface TierPromotionTilesProps {
+  tier: ShatteredTier;
   player: AvatarPlayer;
   oldOrnament: NonNullable<Ornament>;
   newOrnament: NonNullable<Ornament>;
@@ -16,12 +18,13 @@ interface TierPromotionTilesProps {
  * clipped copy of the whole Ornamented Avatar. The new tiles float with the new Ornament they cover.
  */
 export function TierPromotionTiles({
+  tier,
   player,
   oldOrnament,
   newOrnament,
   avatarClassName,
 }: TierPromotionTilesProps) {
-  const { oldTileStyles, newTileStyles } = useTierPromotionTiles();
+  const { oldTileStyles, newTileStyles, floatClassName } = useTierPromotionTiles(tier);
 
   return (
     <div aria-hidden="true" className="absolute inset-0 motion-reduce:hidden">
@@ -40,7 +43,7 @@ export function TierPromotionTiles({
           />
         </div>
       ))}
-      <div className="absolute inset-0 rank-up-float [--rank-up-float-at:2.7s]">
+      <div className={cn("absolute inset-0 rank-up-float", floatClassName)}>
         {newTileStyles.map((style, index) => (
           <div
             key={index}

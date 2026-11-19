@@ -1,5 +1,3 @@
-/** When the Platinum grid starts to blink, with the rings and the burst, in seconds. */
-const GRID_AT = 1.32;
 /** Between two steps out from the Ornament, in seconds. */
 const STEP = 0.06;
 /** How far apart two steps are, in px. */
@@ -22,15 +20,16 @@ export type GridSquare = {
 };
 
 /**
- * The squares of the Platinum grid, each blinking a step later the farther its centre is from the
- * Ornament, as the canvas staggers them.
+ * The squares of a grid over the whole stage starting to blink at `at` seconds, each a step later the
+ * farther its centre is from the Ornament, as the canvas staggers them.
  */
-export const PLATINUM_GRID: readonly GridSquare[] = Array.from(
-  { length: ROWS * COLUMNS },
-  (_, index) => {
+export const blinkingGrid = (at: number): readonly GridSquare[] =>
+  Array.from({ length: ROWS * COLUMNS }, (_, index) => {
     const x = OFFSET + (index % COLUMNS) * PITCH;
     const y = OFFSET + Math.floor(index / COLUMNS) * PITCH;
     const distance = Math.hypot(x + SIZE / 2 - CENTRE_X, y + SIZE / 2 - CENTRE_Y);
-    return { x, y, delay: GRID_AT + Math.round(distance / STEP_DISTANCE) * STEP };
-  },
-);
+    return { x, y, delay: at + Math.round(distance / STEP_DISTANCE) * STEP };
+  });
+
+/** The Platinum grid, blinking with the rings and the burst. */
+export const PLATINUM_GRID = blinkingGrid(1.32);

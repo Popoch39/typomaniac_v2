@@ -1,14 +1,15 @@
 import type { CSSProperties } from "react";
-import { cn } from "../../../shared/lib/utils.ts";
 import type { Ray } from "../scene/platinumRays.ts";
 
 interface TierPromotionRaysProps {
   style: CSSProperties;
   rays: readonly Ray[];
+  /** The fill of every other, fainter ray. */
+  faintClassName: string;
 }
 
 /** Rays of the Tier colour turning behind the Ornament, centred on it at (520, 260) of the stage. */
-export function TierPromotionRays({ style, rays }: TierPromotionRaysProps) {
+export function TierPromotionRays({ style, rays, faintClassName }: TierPromotionRaysProps) {
   return (
     <svg
       width="1800"
@@ -21,10 +22,7 @@ export function TierPromotionRays({ style, rays }: TierPromotionRaysProps) {
         <polygon
           key={points}
           points={points}
-          className={cn(
-            "fill-(--rank-up-tier)",
-            isFaint ? "[fill-opacity:0.07]" : "[fill-opacity:0.13]",
-          )}
+          className={isFaint ? faintClassName : "fill-(--rank-up-tier) [fill-opacity:0.13]"}
         />
       ))}
     </svg>

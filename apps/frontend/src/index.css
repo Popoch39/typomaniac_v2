@@ -855,6 +855,107 @@
   }
 }
 
+/* A pixel star blinks off and on, again and again; its duration and delay come from the star. */
+@utility rank-up-star {
+  animation: rank-up-star steps(1) infinite backwards;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-star {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Master: the old Ornament jitters longer, under four rings, until it shatters into tiles. */
+@utility rank-up-master-old {
+  animation: rank-up-hold-out 1.3s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility rank-up-master-jitter {
+  animation: rank-up-jitter 0.06s steps(1) 0.35s 16;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The whole new Ornament shows once its tiles have assembled. */
+@utility rank-up-master-new {
+  animation: rank-up-hold-in 2.35s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* A side key of the Master scene goes down once at --press-at, then again every 3.2s from --idle-at. */
+@utility rank-up-key-press {
+  animation:
+    rank-up-key-press 0.26s ease both,
+    rank-up-key-idle 3.2s ease infinite;
+  animation-delay: var(--press-at), var(--idle-at);
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-key-press {
+  0% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(8px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes rank-up-key-idle {
+  0% {
+    transform: none;
+  }
+  5% {
+    transform: translateY(8px);
+  }
+  10% {
+    transform: none;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* The lit face of a side key, shown from the moment it is pressed. */
+@utility rank-up-key-light {
+  animation: rank-up-hold-in var(--press-at) steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 @keyframes ornament-blink {
   0% {
     fill: var(--ornament-tier);

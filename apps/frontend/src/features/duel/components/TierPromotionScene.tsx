@@ -4,6 +4,7 @@ import { useTierPromotionScene } from "../hooks/useTierPromotionScene.ts";
 import { TierPromotionContinue } from "./TierPromotionContinue.tsx";
 import { TierPromotionEffects } from "./TierPromotionEffects.tsx";
 import { TierPromotionHero } from "./TierPromotionHero.tsx";
+import { TierPromotionSideKeys } from "./TierPromotionSideKeys.tsx";
 import { TierPromotionTitle } from "./TierPromotionTitle.tsx";
 
 const TIER_COLOURS: Readonly<Record<PromotedTier, string>> = {
@@ -53,6 +54,7 @@ export function TierPromotionScene() {
           style={shakeStyle ?? undefined}
         >
           <TierPromotionEffects tier={promotion.tier} />
+          {promotion.tier === "master" && <TierPromotionSideKeys />}
           <TierPromotionHero player={player} promotion={promotion} />
           <TierPromotionTitle promotion={promotion} timings={timings} />
         </div>

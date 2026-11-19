@@ -7,6 +7,15 @@ import {
   DIAMOND_RINGS,
 } from "../scene/diamondBursts.ts";
 import { DIAMOND_RAIN, type Drop } from "../scene/diamondRain.ts";
+import {
+  MASTER_BURST_AT,
+  MASTER_BURSTS,
+  MASTER_INWARD_RINGS,
+  MASTER_RINGS,
+} from "../scene/masterBursts.ts";
+import { MASTER_GRID } from "../scene/masterGrid.ts";
+import { MASTER_RAIN, MASTER_STARS, type Star } from "../scene/masterRain.ts";
+import { MASTER_RAYS, MASTER_RAYS_SPIN } from "../scene/masterRays.ts";
 import { GOLD_BURST_AT, GOLD_BURSTS, GOLD_RINGS } from "../scene/goldBursts.ts";
 import { type GridSquare, PLATINUM_GRID } from "../scene/platinumGrid.ts";
 import { PLATINUM_BURST_AT, PLATINUM_BURSTS, PLATINUM_RINGS } from "../scene/platinumBursts.ts";
@@ -32,15 +41,20 @@ type TierEffects = {
   /** Each ring, after `at`, in seconds. */
   readonly rings: readonly number[];
   readonly bursts: readonly Burst[];
-  /** Rays that fade in at `at` and turn once every `spin` seconds. */
-  readonly rays?: { readonly spin: number; readonly rays: readonly Ray[] };
+  /** Rays that fade in at `at` and turn once every `spin` seconds; the faint ones in `faintFill`. */
+  readonly rays?: {
+    readonly spin: number;
+    readonly rays: readonly Ray[];
+    readonly faintFill?: "tier" | "action";
+  };
   readonly grid?: readonly GridSquare[];
   /** Rings closing on the old Ornament, each from the opening, in seconds. */
   readonly inwardRings?: readonly number[];
   readonly rain?: readonly Drop[];
+  readonly stars?: readonly Star[];
 };
 
-const TIER_EFFECTS: Readonly<Partial<Record<PromotedTier, TierEffects>>> = {
+const TIER_EFFECTS: Readonly<Record<PromotedTier, TierEffects>> = {
   silver: { at: SILVER_BURST_AT, rings: [0], bursts: SILVER_BURSTS },
   gold: { at: GOLD_BURST_AT, rings: GOLD_RINGS, bursts: GOLD_BURSTS },
   platinum: {
@@ -59,7 +73,22 @@ const TIER_EFFECTS: Readonly<Partial<Record<PromotedTier, TierEffects>>> = {
     inwardRings: DIAMOND_INWARD_RINGS,
     rain: DIAMOND_RAIN,
   },
+  master: {
+    at: MASTER_BURST_AT,
+    rings: MASTER_RINGS,
+    bursts: MASTER_BURSTS,
+    rays: { spin: MASTER_RAYS_SPIN, rays: MASTER_RAYS, faintFill: "action" },
+    grid: MASTER_GRID,
+    inwardRings: MASTER_INWARD_RINGS,
+    rain: MASTER_RAIN,
+    stars: MASTER_STARS,
+  },
 };
+
+const FAINT_RAY_FILLS = {
+  tier: "fill-(--rank-up-tier) [fill-opacity:0.07]",
+  action: "fill-action [fill-opacity:0.08]",
+} as const;
 
 const raysStyle = (at: number, spin: number): CustomStyle => ({
   "--rays-at": `${at}s`,
@@ -68,12 +97,10 @@ const raysStyle = (at: number, spin: number): CustomStyle => ({
 
 /**
  * The rings and the burst particles a Tier's scene throws out of the Ornament, with the rain, the rays,
- * the grid and the rings closing in behind them; none yet for Master.
+ * the grid, the stars and the rings closing in behind them.
  */
 export function useTierPromotionEffects(tier: PromotedTier) {
-  const effects = TIER_EFFECTS[tier];
-  if (effects === undefined) return null;
-  const { at, rings, bursts, rays, grid, inwardRings, rain } = effects;
+  const { at, rings, bursts, rays, grid, inwardRings, rain, stars } = TIER_EFFECTS[tier];
   return {
     rain: (rain ?? []).map(({ x, size, duration, delay, fill }) => ({
       fillClassName: BURST_FILLS[fill],
@@ -91,10 +118,17 @@ export function useTierPromotionEffects(tier: PromotedTier) {
         : {
             style: raysStyle(at, rays.spin),
             rays: rays.rays,
+            faintClassName: FAINT_RAY_FILLS[rays.faintFill ?? "tier"],
           },
     gridSquareStyles: (grid ?? []).map(({ x, y, delay }): CSSProperties => ({
       left: `${x}px`,
       top: `${y}px`,
+      animationDelay: `${delay}s`,
+    })),
+    starStyles: (stars ?? []).map(({ x, y, duration, delay }): CSSProperties => ({
+      left: `${x}px`,
+      top: `${y}px`,
+      animationDuration: `${duration}s`,
       animationDelay: `${delay}s`,
     })),
     inwardRingStyles: (inwardRings ?? []).map((delay): CSSProperties => ({

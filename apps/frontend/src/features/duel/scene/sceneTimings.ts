@@ -12,7 +12,7 @@ export type SceneTimings = {
   readonly shake: { readonly at: number; readonly duration: number } | null;
 };
 
-// From the canvas board of each Tier; Master shares Silver's until its own effects land.
+// From the canvas board of each Tier.
 const SILVER: SceneTimings = {
   titleAt: 1.45,
   letterStep: 0.1,
@@ -45,10 +45,18 @@ const DIAMOND: SceneTimings = {
   shake: { at: 1.35, duration: 0.5 },
 };
 
+const MASTER: SceneTimings = {
+  titleAt: 2,
+  letterStep: 0.08,
+  lineAt: 2.7,
+  continueAt: 3.55,
+  shake: { at: 1.45, duration: 0.6 },
+};
+
 export const SCENE_TIMINGS: Readonly<Record<PromotedTier, SceneTimings>> = {
   silver: SILVER,
   gold: GOLD,
   platinum: PLATINUM,
   diamond: DIAMOND,
-  master: SILVER,
+  master: MASTER,
 };

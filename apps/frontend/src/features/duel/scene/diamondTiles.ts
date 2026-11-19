@@ -4,6 +4,8 @@ export const DIAMOND_ASSEMBLE_AT = 1.3;
 
 const SIDE = 3;
 
+export type TileScatter = Omit<Tile, "clipPath">;
+
 export type Tile = {
   /** The part of the Ornament the tile shows, as a CSS `clip-path`. */
   readonly clipPath: string;
@@ -17,7 +19,7 @@ export type Tile = {
 };
 
 /** Row by row, the scatter of each tile as placed on the canvas. */
-const SCATTER: readonly Omit<Tile, "clipPath">[] = [
+const SCATTER: readonly TileScatter[] = [
   { x: -330, y: -333, rotate: -14, delay: 0.09 },
   { x: -54, y: -466, rotate: 27, delay: 0.01 },
   { x: 322, y: -222, rotate: 19, delay: 0.01 },
@@ -32,10 +34,14 @@ const SCATTER: readonly Omit<Tile, "clipPath">[] = [
 // Thirds rounded to two decimals, as the canvas writes them.
 const third = (count: number) => `${Number(((count * 100) / SIDE).toFixed(2))}%`;
 
-/** The nine tiles the Diamond scene cuts the Ornament into, a 3 by 3 grid. */
-export const DIAMOND_TILES: readonly Tile[] = SCATTER.map((scatter, index) => {
-  const row = Math.floor(index / SIDE);
-  const column = index % SIDE;
-  const clipPath = `inset(${third(row)} ${third(SIDE - 1 - column)} ${third(SIDE - 1 - row)} ${third(column)})`;
-  return { clipPath, ...scatter };
-});
+/** Cuts the Ornament into a 3 by 3 grid of tiles, row by row, each with its scatter. */
+export const cutIntoTiles = (scatter: readonly TileScatter[]): readonly Tile[] =>
+  scatter.map((tileScatter, index) => {
+    const row = Math.floor(index / SIDE);
+    const column = index % SIDE;
+    const clipPath = `inset(${third(row)} ${third(SIDE - 1 - column)} ${third(SIDE - 1 - row)} ${third(column)})`;
+    return { clipPath, ...tileScatter };
+  });
+
+/** The nine tiles the Diamond scene cuts the Ornament into. */
+export const DIAMOND_TILES = cutIntoTiles(SCATTER);

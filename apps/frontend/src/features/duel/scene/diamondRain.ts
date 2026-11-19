@@ -8,7 +8,7 @@ export type Drop = {
   readonly duration: number;
   /** Its first fall, from the opening of the scene, in seconds. */
   readonly delay: number;
-  readonly fill: Exclude<BurstFill, "action">;
+  readonly fill: BurstFill;
 };
 
 /** The twenty-six drops of the pixel rain of the Diamond scene, as placed on the canvas. */

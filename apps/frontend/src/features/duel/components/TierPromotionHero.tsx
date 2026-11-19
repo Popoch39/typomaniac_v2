@@ -28,7 +28,6 @@ const SILVER: HeroMotion = {
   newInner: "",
 };
 
-// Master shares Silver's until its own scene lands.
 const HERO_MOTIONS: Readonly<Record<PromotedTier, HeroMotion>> = {
   silver: SILVER,
   gold: {
@@ -43,15 +42,20 @@ const HERO_MOTIONS: Readonly<Record<PromotedTier, HeroMotion>> = {
     new: "rank-up-slam",
     newInner: "rank-up-float [--rank-up-float-at:2.6s]",
   },
-  // The tiles do the motion; the whole Ornaments only hold until the old shatters and the new is
-  // assembled.
+  // The tiles do the motion, for Diamond and Master; the whole Ornaments only hold until the old
+  // shatters and the new is assembled.
   diamond: {
     old: "rank-up-diamond-old",
     oldInner: "rank-up-diamond-jitter",
     new: "rank-up-diamond-new",
     newInner: "rank-up-float [--rank-up-float-at:2.7s]",
   },
-  master: SILVER,
+  master: {
+    old: "rank-up-master-old",
+    oldInner: "rank-up-master-jitter",
+    new: "rank-up-master-new",
+    newInner: "rank-up-float [--rank-up-float-at:2.9s]",
+  },
 };
 
 /** The Participant's Avatar in the Ornament of their old Rank, turned into the one of their new Rank. */
@@ -82,8 +86,9 @@ export function TierPromotionHero({ player, promotion }: TierPromotionHeroProps)
           />
         </div>
       </div>
-      {promotion.tier === "diamond" && (
+      {(promotion.tier === "diamond" || promotion.tier === "master") && (
         <TierPromotionTiles
+          tier={promotion.tier}
           player={player}
           oldOrnament={promotion.oldOrnament}
           newOrnament={promotion.newOrnament}
