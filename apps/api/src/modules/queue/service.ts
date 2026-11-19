@@ -1,9 +1,11 @@
+import type { PairingSide } from "@repo/matchmaking-engine";
 import type { EntryHolder } from "@repo/queue";
 import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { draftRankedDuel } from "../duel/service.ts";
-import { readNicknames } from "../player/service.ts";
+import { readWornOrnaments } from "../ornament/service.ts";
+import { readPublicPlayers } from "../player/service.ts";
 import { readStanding } from "../standing/service.ts";
 
 // The Queue's keys and atomic steps live in `@repo/queue`, which the matchmaker uses too. This file
@@ -24,8 +26,8 @@ export type { DuelCreation, EntryHolder, PairingChange } from "@repo/queue";
 
 /**
  * Records that the Player accepts the Pairing at `now`, as `acceptPairing` answers. The ranked Duel
- * the second acceptance creates is drafted ahead of that step, and shows each Player by Nickname and
- * by Rank as they stand now.
+ * the second acceptance creates is drafted ahead of that step, and shows each Player by Nickname,
+ * Avatar, Ornament and Rank as they stand now.
  */
 export const acceptPairingAsPlayer = async (
   db: Db,
@@ -39,12 +41,19 @@ export const acceptPairingAsPlayer = async (
 ) => {
   const pairing = await readPairing(redis, pairingId);
   if (!pairing) return "gone";
-  const nicknames = await readNicknames(db, pairing.playerIds);
+  const players = await readPublicPlayers(db, pairing.playerIds);
+  const ornaments = await readWornOrnaments(db, pairing.playerIds);
   const [first, second] = await Promise.all(
     pairing.playerIds.map(async (pairedId) => {
-      const nickname = nicknames.get(pairedId);
-      if (nickname === undefined) return null;
-      return { playerId: pairedId, nickname, rank: (await readStanding(db, pairedId)).rank };
+      const player = players.get(pairedId);
+      if (player === undefined) return null;
+      const ornament = ornaments.get(pairedId) ?? null;
+      return {
+        playerId: pairedId,
+        ...player,
+        ornament,
+        rank: (await readStanding(db, pairedId)).rank,
+      };
     }),
   );
   if (!first || !second) return "gone";
@@ -56,6 +65,35 @@ export const acceptPairingAsPlayer = async (
       connectMs: duelConnectMs,
     }),
   });
+};
+
+/**
+ * The Pairing as the Player is shown it: their own side and the Opponent's, each by Nickname,
+ * Avatar, Rank and worn Ornament as they stand now. `null` once the Pairing is no longer theirs.
+ */
+export const readPairingSides = async (
+  db: Db,
+  redis: Redis,
+  { pairingId, playerId }: { readonly pairingId: string; readonly playerId: string },
+): Promise<{ self: PairingSide; opponent: PairingSide } | null> => {
+  const pairing = await readPairing(redis, pairingId);
+  if (!pairing?.playerIds.includes(playerId)) return null;
+  const opponentId = pairing.playerIds.find((pairedId) => pairedId !== playerId);
+  if (opponentId === undefined) return null;
+  const playerIds = [playerId, opponentId];
+  const [players, ornaments, [selfRank = null, opponentRank = null]] = await Promise.all([
+    readPublicPlayers(db, playerIds),
+    readWornOrnaments(db, playerIds),
+    Promise.all(playerIds.map(async (pairedId) => (await readStanding(db, pairedId)).rank)),
+  ]);
+  const sideOf = (pairedId: string, rank: PairingSide["rank"]): PairingSide | null => {
+    const player = players.get(pairedId);
+    if (player === undefined) return null;
+    return { ...player, rank, ornament: ornaments.get(pairedId) ?? null };
+  };
+  const self = sideOf(playerId, selfRank);
+  const opponent = sideOf(opponentId, opponentRank);
+  return self && opponent ? { self, opponent } : null;
 };
 
 type Refreshed = EntryHolder & {

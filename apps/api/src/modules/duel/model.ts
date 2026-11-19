@@ -9,7 +9,27 @@ export const RootPost = {
 };
 
 const seat = t.Union([t.Literal(0), t.Literal(1)]);
-const participant = t.Object({ seat, name: t.String(), connected: t.Boolean() });
+const participant = t.Object({
+  seat,
+  name: t.String(),
+  avatarUrl: t.Nullable(t.String()),
+  // The Ornament `wornOrnament` gives, `null` for a bare Avatar.
+  ornament: t.Nullable(
+    t.Object({
+      tier: t.Union([
+        t.Literal("unranked"),
+        t.Literal("bronze"),
+        t.Literal("silver"),
+        t.Literal("gold"),
+        t.Literal("platinum"),
+        t.Literal("diamond"),
+        t.Literal("master"),
+      ]),
+      division: t.Nullable(t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)])),
+    }),
+  ),
+  connected: t.Boolean(),
+});
 
 export const IdGet = {
   Params: duelParams,
@@ -73,21 +93,22 @@ const lp = t.Integer();
 
 // The shape the `standing` module answers with, written again since a model is not imported across
 // modules. `null` for an Unranked Player.
-const rank = t.Union([
-  t.Object({
-    tier: t.Union([
-      t.Literal("bronze"),
-      t.Literal("silver"),
-      t.Literal("gold"),
-      t.Literal("platinum"),
-      t.Literal("diamond"),
-    ]),
-    division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
-    lp,
-  }),
-  t.Object({ tier: t.Literal("master"), lp }),
-  t.Null(),
-]);
+const rank = t.Nullable(
+  t.Union([
+    t.Object({
+      tier: t.Union([
+        t.Literal("bronze"),
+        t.Literal("silver"),
+        t.Literal("gold"),
+        t.Literal("platinum"),
+        t.Literal("diamond"),
+      ]),
+      division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)]),
+      lp,
+    }),
+    t.Object({ tier: t.Literal("master"), lp }),
+  ]),
+);
 
 // Every field a Player may see of what a ranked Duel did to a Standing. The MMR is hidden (ADR
 // 0006): left out here, it is stripped from whatever the end carries.
@@ -118,10 +139,10 @@ export const IdSocket = {
         seat,
         round,
         rounds: list(t.Object(finishedRound)),
-        startAt: t.Union([t.Number(), t.Null()]),
-        words: t.Union([list(t.String()), t.Null()]),
+        startAt: t.Nullable(t.Number()),
+        words: t.Nullable(list(t.String())),
         participants: list(participant),
-        ranks: t.Union([pair(rank), t.Null()]),
+        ranks: t.Nullable(pair(rank)),
         journals: pair(list(gameEvent)),
       }),
       t.Object({ type: t.Literal("presence"), participant }),
@@ -136,13 +157,13 @@ export const IdSocket = {
         type: t.Literal("roundEnd"),
         round,
         ...finishedRound,
-        nextStartAt: t.Union([t.Number(), t.Null()]),
+        nextStartAt: t.Nullable(t.Number()),
       }),
       t.Object({
         type: t.Literal("end"),
         outcomes: pair(outcome),
         rounds: list(t.Object(finishedRound)),
-        ranked: t.Union([pair(rankedEnd), t.Null()]),
+        ranked: t.Nullable(pair(rankedEnd)),
       }),
     ]),
     404: notFound,

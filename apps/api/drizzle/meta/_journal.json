@@ -71,6 +71,13 @@
       "when": 1795083305022,
       "tag": "0009_duel_participant_player_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795086213124,
+      "tag": "0010_ornament",
+      "breakpoints": true
     }
   ]
 }

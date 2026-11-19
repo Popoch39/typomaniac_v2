@@ -36,8 +36,8 @@ test("a drawn Round adds to neither side of the Round score", () => {
 });
 
 const participants = [
-  { seat: 0, name: "ada", connected: true },
-  { seat: 1, name: "Guest 4821", connected: false },
+  { seat: 0, name: "ada", avatarUrl: null, ornament: null, connected: true },
+  { seat: 1, name: "Guest 4821", avatarUrl: null, ornament: null, connected: false },
 ] as const;
 
 test("a finished Round is shown with the Participant's own Outcome, and both Results with their Points, their own first", () => {

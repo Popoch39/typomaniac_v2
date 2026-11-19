@@ -1,10 +1,16 @@
 import { create } from "zustand";
 
-/** Where the Opponent's caret sits in the Participant's own text, with the Opponent's name. */
+/** Who the Opponent is, as their caret shows them: their Avatar, or their name's initial without one. */
+export type CaretOpponent = {
+  readonly name: string;
+  readonly avatarUrl: string | null;
+};
+
+/** Where the Opponent's caret sits in the Participant's own text, with the Opponent. */
 export type OpponentCaret = {
   readonly wordIndex: number;
   readonly letterIndex: number;
-  readonly name: string;
+  readonly opponent: CaretOpponent;
 };
 
 type OpponentCaretState = {

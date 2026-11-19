@@ -4,6 +4,7 @@ import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
 import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
+import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
 import { createQueueRoutes, type QueueOptions } from "./modules/queue/index.ts";
 import { createStandingRoutes } from "./modules/standing/index.ts";
@@ -26,6 +27,7 @@ export const createApp = (
     .mount(auth.handler)
     .get("/health", () => "ok")
     .use(createPlayerRoutes(db, auth))
+    .use(createOrnamentRoutes(db, auth))
     .use(createStandingRoutes(db, auth))
     .use(createDuelRoutes(db, auth, redis, duelOptions))
     .use(

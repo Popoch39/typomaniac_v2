@@ -1,7 +1,5 @@
-import type { Rank, Tier } from "@repo/ranked-engine";
+import { type Rank, TIERS } from "@repo/ranked-engine";
 import { divisionNumeral, tierName } from "../standing/rankName.ts";
-
-const TIERS: readonly Tier[] = ["bronze", "silver", "gold", "platinum", "diamond", "master"];
 
 /** The six Tiers, the Player's own marked with their Division; none while they are Unranked. */
 export function useTierLadder(rank: Rank | null) {

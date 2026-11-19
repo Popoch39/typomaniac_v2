@@ -1,4 +1,5 @@
 import type { ServerMessage } from "@repo/duel-engine";
+import { isTierChoice } from "@repo/ranked-engine";
 
 /** Whether a value read from JSON has the expected shape. */
 type Check = (value: unknown) => boolean;
@@ -30,8 +31,22 @@ const hasFields = (value: unknown, checks: Record<string, Check>) =>
 
 const isNumbers = isListOf(isNumber);
 
+const isOrnament: Check = (value) =>
+  hasFields(value, {
+    tier: (tier) => tier === "unranked" || isTierChoice(tier),
+    // `null` for the Unranked plate, a Master Ornament or a pinned Tier, but never left out.
+    division: (division) => division === null || [1, 2, 3, 4].includes(Number(division)),
+  });
+
 const isParticipant: Check = (value) =>
-  hasFields(value, { seat: isSeat, name: isString, connected: isBoolean });
+  hasFields(value, {
+    seat: isSeat,
+    name: isString,
+    // `null` for a Guest, but never left out.
+    avatarUrl: (avatarUrl) => avatarUrl !== undefined && isNullOr(isString)(avatarUrl),
+    ornament: (ornament) => ornament !== undefined && isNullOr(isOrnament)(ornament),
+    connected: isBoolean,
+  });
 
 const isGameEvent: Check = (value) => {
   if (!isRecord(value)) return false;
@@ -74,10 +89,7 @@ const isFinishedRound: Check = (value) =>
 const isRank: Check = (value) => {
   if (!isRecord(value) || !Number.isInteger(value.lp)) return false;
   if (value.tier === "master") return true;
-  return (
-    ["bronze", "silver", "gold", "platinum", "diamond"].includes(String(value.tier)) &&
-    [1, 2, 3, 4].includes(Number(value.division))
-  );
+  return isTierChoice(value.tier) && [1, 2, 3, 4].includes(Number(value.division));
 };
 
 const isRankedEnd: Check = (value) =>

@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { SidebarMenu, SidebarMenuItem } from "../../../shared/components/ui/sidebar.tsx";
-import { PlayerAvatar } from "../../auth/components/PlayerAvatar.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import { PlayerStandingLine } from "./PlayerStandingLine.tsx";
 import { SidebarSignOutButton } from "./SidebarSignOutButton.tsx";
 
@@ -19,7 +19,14 @@ export function PlayerIdentity({ player }: PlayerIdentityProps) {
           to="/profile"
           className="key-travel flex min-w-0 items-center gap-3 rounded-lg border-2 border-key-outline bg-surface-raised p-2.5 pb-3 text-ink no-underline active:translate-y-[3px] motion-reduce:active:translate-y-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
         >
-          <PlayerAvatar player={player} isOwn />
+          {/* On the icon rail the chip shrinks to fit the rail's 48px. */}
+          <OrnamentedAvatar
+            player={player}
+            ornament={player.ornament}
+            size="sm"
+            isOwn
+            className="group-data-[collapsible=icon]:[zoom:0.75]"
+          />
           <span className="flex min-w-0 flex-col gap-0.5 group-data-[collapsible=icon]:sr-only">
             <span className="truncate font-extrabold">
               <PlayerNickname player={player} />

@@ -59,6 +59,16 @@ The Division's index of LP-1, exported so that a stored Rank can be ordered with
 | LADDER-1 | A Rank's ladder index is the number of Divisions below its own: 0 for Bronze IV, 1 for Bronze III, up to 19 for Diamond I. Master is 20, whatever the LP held.                  |
 | LADDER-2 | A ladder index and the LP held give back the Rank: the Tier and Division at that index, or Master, without a Division, at 20. An index off the ladder is refused with an error. |
 
+## Ornament
+
+The Ornament a Player wears around their Avatar, drawn for a Tier. It changes no rule above.
+
+| Id         | Rule                                                                                                                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ORNAMENT-1 | Auto wears the Rank's Tier and Division, Master without a Division, and the Unranked plate while Unranked. None wears no Ornament. The Unranked plate or a pinned Tier is worn without a Division, even when the pinned Tier is the current one. |
+| ORNAMENT-2 | Auto, None and the Unranked plate are open to every Player. A Tier's Ornament is unlocked when the Tier is at or below the Peak Tier, and locked without a Peak Tier.                                                                            |
+| ORNAMENT-3 | The Peak Tier is the Tier of the highest ladder index a Player has reached; Master at 20.                                                                                                                                                        |
+
 ## Promotion and demotion
 
 | Id      | Rule                                                                                                                                                                                                                                                                                                                                                                                                            |

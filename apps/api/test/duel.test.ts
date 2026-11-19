@@ -9,6 +9,7 @@ import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-
 import { and, count, eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
 import { duel, duelGame, duelParticipant, duelRound, user } from "../src/db/schema.ts";
+import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
@@ -30,8 +31,8 @@ afterAll(async () => {
   await testDb.drop();
 });
 
-const signInPlayerWithNickname = async (nickname: string) => {
-  const { cookie } = await signInPlayer(auth);
+const signInPlayerWithNickname = async (nickname: string, image?: string) => {
+  const { cookie } = await signInPlayer(auth, { image });
   const response = await fetch(`${origin}/api/me/nickname`, {
     method: "PUT",
     headers: { "content-type": "application/json", cookie },
@@ -46,6 +47,9 @@ const createDuel = (cookie?: string) =>
 
 const duelSocketUrl = (duelId: string) =>
   `${origin.replace(/^http/, "ws")}/api/duels/${duelId}/socket`;
+
+// What a Player who never played ranked wears by default.
+const unrankedPlate = { tier: "unranked", division: null } as const;
 
 const uniqueNickname = () => `p_${crypto.randomUUID().slice(0, 8)}`;
 
@@ -68,7 +72,9 @@ test("a Player with a Nickname creates a Duel and takes its first seat, alone an
     rounds: [],
     startAt: null,
     words: null,
-    participants: [{ seat: 0, name: nickname, connected: true }],
+    participants: [
+      { seat: 0, name: nickname, avatarUrl: null, ornament: unrankedPlate, connected: true },
+    ],
     ranks: null,
     journals: [[], []],
   });
@@ -93,13 +99,19 @@ test("a second Player joins by the link and both see each other's name", async (
     type: "state",
     seat: 1,
     participants: [
-      { seat: 0, name: creatorName, connected: true },
-      { seat: 1, name: opponentName, connected: true },
+      { seat: 0, name: creatorName, avatarUrl: null, ornament: unrankedPlate, connected: true },
+      { seat: 1, name: opponentName, avatarUrl: null, ornament: unrankedPlate, connected: true },
     ],
   });
   expect(presence).toEqual({
     type: "presence",
-    participant: { seat: 1, name: opponentName, connected: true },
+    participant: {
+      seat: 1,
+      name: opponentName,
+      avatarUrl: null,
+      ornament: unrankedPlate,
+      connected: true,
+    },
   });
   expect(creatorState).toMatchObject({ type: "state", seat: 0 });
 });
@@ -146,7 +158,9 @@ test("a Player opening a Duel twice gets their own seat back, never its other se
   expect(state).toMatchObject({
     type: "state",
     seat: 0,
-    participants: [{ seat: 0, name: nickname, connected: true }],
+    participants: [
+      { seat: 0, name: nickname, avatarUrl: null, ornament: unrankedPlate, connected: true },
+    ],
   });
 });
 
@@ -178,8 +192,82 @@ test("a Guest creates a Duel under a generated display name, which the Player wh
     type: "state",
     seat: 1,
     participants: [
-      { seat: 0, name: guestName, connected: true },
-      { seat: 1, name: playerName, connected: true },
+      { seat: 0, name: guestName, avatarUrl: null, connected: true },
+      { seat: 1, name: playerName, avatarUrl: null, ornament: unrankedPlate, connected: true },
+    ],
+  });
+});
+
+test("each Participant carries their Avatar, none for a Guest", async () => {
+  const created = await createDuel();
+  const guestCookie = guestCookieOf(created);
+  const { id } = (await created.json()) as { id: string };
+  const playerName = uniqueNickname();
+  const avatarUrl = "https://avatars.githubusercontent.com/u/1?v=4";
+  const playerCookie = await signInPlayerWithNickname(playerName, avatarUrl);
+
+  const guest = await openSocket(duelSocketUrl(id), guestCookie);
+  await guest.next();
+  const player = await openSocket(duelSocketUrl(id), playerCookie);
+  const playerState = await player.next();
+  const presence = await guest.next();
+  guest.close();
+  player.close();
+
+  expect(playerState).toMatchObject({
+    type: "state",
+    participants: [
+      { seat: 0, avatarUrl: null },
+      { seat: 1, name: playerName, avatarUrl },
+    ],
+  });
+  expect(presence).toEqual({
+    type: "presence",
+    participant: { seat: 1, name: playerName, avatarUrl, ornament: unrankedPlate, connected: true },
+  });
+});
+
+test("each Participant carries the Ornament they wore as they took their seat, none for a Guest", async () => {
+  const created = await createDuel();
+  const guestCookie = guestCookieOf(created);
+  const { id } = (await created.json()) as { id: string };
+  const playerName = uniqueNickname();
+  const playerCookie = await signInPlayerWithNickname(playerName);
+
+  const guest = await openSocket(duelSocketUrl(id), guestCookie);
+  await guest.next();
+  const player = await openSocket(duelSocketUrl(id), playerCookie);
+  const playerState = await player.next();
+  const presence = await guest.next();
+  guest.close();
+  player.close();
+  // Ranked meanwhile: the Duel keeps the Ornament the seat was taken with.
+  const [seated] = await testDb.db.select().from(user).where(eq(user.nickname, playerName));
+  await saveStanding(testDb.db, seated?.id ?? "", {
+    mmr: 1400,
+    duelsPlayed: 12,
+    rank: { tier: "gold", division: 2, lp: 30 },
+  });
+  const back = await openSocket(duelSocketUrl(id), playerCookie);
+  const stateAfterRanking = await back.next();
+  back.close();
+
+  expect(playerState).toMatchObject({
+    type: "state",
+    participants: [
+      { seat: 0, ornament: null },
+      { seat: 1, name: playerName, ornament: unrankedPlate },
+    ],
+  });
+  expect(presence).toMatchObject({
+    type: "presence",
+    participant: { seat: 1, name: playerName, ornament: unrankedPlate },
+  });
+  expect(stateAfterRanking).toMatchObject({
+    type: "state",
+    participants: [
+      { seat: 0, ornament: null },
+      { seat: 1, ornament: unrankedPlate },
     ],
   });
 });
@@ -199,7 +287,12 @@ test("a Guest without a cookie joins by the link and is handed their cookie with
   expect(handshake.status).toBe(101);
   expect(arrived).toMatchObject({
     type: "presence",
-    participant: { seat: 1, name: expect.stringMatching(/^Guest \d{4}$/), connected: true },
+    participant: {
+      seat: 1,
+      name: expect.stringMatching(/^Guest \d{4}$/),
+      avatarUrl: null,
+      connected: true,
+    },
   });
   expect(guestCookie).toStartWith("guest=");
 });
@@ -254,7 +347,13 @@ test("a Participant whose old socket still holds their seat takes it back from a
     expect(state).toMatchObject({ type: "state", seat: 0 });
     expect(back).toEqual({
       type: "presence",
-      participant: { seat: 0, name: creatorName, connected: true },
+      participant: {
+        seat: 0,
+        name: creatorName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        connected: true,
+      },
     });
     expect(silent).toBe(true);
   } finally {
@@ -362,7 +461,13 @@ test("a Player who closed their socket is shown away, then takes their own seat 
 
   expect(away).toEqual({
     type: "presence",
-    participant: { seat: 0, name: creatorName, connected: false },
+    participant: {
+      seat: 0,
+      name: creatorName,
+      avatarUrl: null,
+      ornament: unrankedPlate,
+      connected: false,
+    },
   });
   expect(state).toMatchObject({ type: "state", seat: 0 });
 });
@@ -387,7 +492,13 @@ test("two Players on two API instances sharing Redis see each other arrive", asy
 
     expect(presence).toEqual({
       type: "presence",
-      participant: { seat: 1, name: opponentName, connected: true },
+      participant: {
+        seat: 1,
+        name: opponentName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        connected: true,
+      },
     });
   } finally {
     await other.stop(true);
@@ -438,7 +549,13 @@ test("the state is the first message a socket receives, even when the Opponent's
     // Held back until the state, not lost.
     expect(received).toContainEqual({
       type: "presence",
-      participant: { seat: 1, name: opponentName, connected: true },
+      participant: {
+        seat: 1,
+        name: opponentName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        connected: true,
+      },
     });
     expect(received.map(({ type }) => type)).toContain("countdown");
   } finally {
@@ -461,7 +578,9 @@ test("a Player reads who sits in a Duel, and is told when it does not exist", as
 
   expect(found.status).toBe(200);
   expect(await found.json()).toEqual({
-    participants: [{ seat: 0, name: creatorName, connected: true }],
+    participants: [
+      { seat: 0, name: creatorName, avatarUrl: null, ornament: unrankedPlate, connected: true },
+    ],
   });
   expect(missing.status).toBe(404);
   expect(await missing.json()).toEqual({ code: "DUEL_NOT_FOUND" });
@@ -691,7 +810,13 @@ test("a Participant who comes back on another API instance resumes the same Game
 
     expect(away).toEqual({
       type: "presence",
-      participant: { seat: 0, name: creatorName, connected: false },
+      participant: {
+        seat: 0,
+        name: creatorName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        connected: false,
+      },
     });
     expect(state).toMatchObject({
       type: "state",
@@ -709,7 +834,13 @@ test("a Participant who comes back on another API instance resumes the same Game
     });
     expect(back).toEqual({
       type: "presence",
-      participant: { seat: 0, name: creatorName, connected: true },
+      participant: {
+        seat: 0,
+        name: creatorName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        connected: true,
+      },
     });
     expect(relayed).toEqual({
       type: "opponentEvent",

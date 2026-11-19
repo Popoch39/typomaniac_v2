@@ -9,6 +9,9 @@
   "scripts": {
     "test": "bun test"
   },
+  "dependencies": {
+    "@repo/ranked-engine": "*"
+  },
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@types/bun": "^1.4.4",

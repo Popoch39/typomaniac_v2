@@ -7,7 +7,7 @@ import { PlayerProfile } from "./PlayerProfile.tsx";
 export function ProfilePage() {
   return (
     <Page>
-      <PageHeader title="Profile" lead="Your Nickname and your Rank." />
+      <PageHeader title="Profile" lead="Your Nickname, your Rank and your Ornament." />
       <SignedInPlayerGate
         guest={
           <SignInPrompt explanation="Profiles are for signed-in Players. Sign in to see yours." />

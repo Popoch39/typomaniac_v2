@@ -1,6 +1,7 @@
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
+import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { type PairingChange, pairingChannel } from "./service.ts";
+import { type PairingChange, pairingChannel, readPairingSides } from "./service.ts";
 
 type Follower = {
   readonly playerId: string;
@@ -9,14 +10,20 @@ type Follower = {
 };
 
 // Tells the Player's socket of the change, and closes it once the change takes them out of the Queue.
-const deliver = (follower: Follower, change: PairingChange, now: number) => {
+const deliver = async (db: Db, redis: Redis, follower: Follower, change: PairingChange) => {
   const { send } = follower;
   if (change.type === "proposed") {
-    const { pairingId, expiresAt } = change;
-    return send({ type: "proposed", pairingId, acceptWithinMs: Math.max(0, expiresAt - now) });
+    const { pairingId, expiresAt, playerId } = change;
+    const players = await readPairingSides(db, redis, { pairingId, playerId });
+    // Only once the Pairing is resolved: both sides entered the Queue with a Nickname (`nicknameChosen`),
+    // which is never cleared, nor is a Player deleted, so neither side can lack one. The change that
+    // resolved it follows, and tells the Player what became of them.
+    if (players === null) return;
+    const acceptWithinMs = Math.max(0, expiresAt - Date.now());
+    return send({ type: "proposed", pairingId, acceptWithinMs, players });
   }
   if (change.type === "requeued")
-    return send({ type: "requeued", queuedAt: change.queuedAt, serverAt: now });
+    return send({ type: "requeued", queuedAt: change.queuedAt, serverAt: Date.now() });
   if (change.type === "removed") send({ type: "removed", reason: "notAccepted" });
   else send({ type: "paired", duelId: change.duelId });
   // Either way the Queue is left: for good, or for the Duel.
@@ -27,15 +34,24 @@ const deliver = (follower: Follower, change: PairingChange, now: number) => {
  * Hands the Pairing changes the matchmaker and the other API instances publish to the sockets this
  * instance holds. Each instance follows the channel while it holds a Queue socket.
  */
-export const createPairingFeed = (redis: Redis) => {
+export const createPairingFeed = (db: Db, redis: Redis) => {
   const local = new Set<Follower>();
+  // The last delivery to each socket: a proposal waits for its reads, and the changes that follow
+  // it wait their turn, so that a socket gets them in the order they were published.
+  const deliveries = new WeakMap<Follower, Promise<void>>();
   const channel = pairingChannel(redis);
   let following: Promise<unknown> | null = null;
 
   const listener = (raw: string) => {
     const change = JSON.parse(raw) as PairingChange;
     for (const follower of local) {
-      if (follower.playerId === change.playerId) deliver(follower, change, Date.now());
+      if (follower.playerId !== change.playerId) continue;
+      const delivered = (deliveries.get(follower) ?? Promise.resolve())
+        .then(() => deliver(db, redis, follower, change))
+        .catch((error: unknown) =>
+          console.error(`Could not tell ${follower.playerId} of the Pairing change`, error),
+        );
+      deliveries.set(follower, delivered);
     }
   };
 

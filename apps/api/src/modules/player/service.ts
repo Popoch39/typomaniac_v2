@@ -48,14 +48,16 @@ export const saveNickname = async (
   }
 };
 
-/** The Nickname of each of the Players who chose one, by Player id. */
-export const readNicknames = async (db: Db, playerIds: readonly string[]) => {
+/** The Players who may appear publicly, those who chose a Nickname, by id, with their Nickname and Avatar. */
+export const readPublicPlayers = async (db: Db, playerIds: readonly string[]) => {
   const players = await db
-    .select({ id: user.id, nickname: user.nickname })
+    .select({ id: user.id, nickname: user.nickname, avatarUrl: user.image })
     .from(user)
     .where(inArray(user.id, [...playerIds]));
   return new Map(
-    players.flatMap(({ id, nickname }) => (nickname === null ? [] : [[id, nickname] as const])),
+    players.flatMap(({ id, nickname, avatarUrl }) =>
+      nickname === null ? [] : [[id, { nickname, avatarUrl }] as const],
+    ),
   );
 };
 

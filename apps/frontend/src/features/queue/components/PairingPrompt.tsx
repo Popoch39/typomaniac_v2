@@ -1,15 +1,16 @@
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { usePairingPrompt } from "../hooks/usePairingPrompt.ts";
 import { AcceptCountdown } from "./AcceptCountdown.tsx";
+import { PairingSides } from "./PairingSides.tsx";
 import { QueueStatusLine } from "./QueueStatusLine.tsx";
 
-// The Opponent stays hidden until the Duel: nothing here says who they are.
 export function PairingPrompt() {
-  const { timeLeft, drainedShare, isAccepted, accept } = usePairingPrompt();
+  const { players, timeLeft, drainedShare, isAccepted, accept } = usePairingPrompt();
 
   return (
     <div className="flex flex-1 flex-col gap-5">
       <p className="m-0 type-card-title text-action">Opponent found</p>
+      {players && <PairingSides players={players} />}
       {isAccepted ? (
         <QueueStatusLine message="Accepted. Waiting for your Opponent…" />
       ) : (

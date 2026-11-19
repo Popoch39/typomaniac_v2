@@ -1,3 +1,4 @@
+import { PlayerAvatar } from "./PlayerAvatar.tsx";
 import { useOpponentCaret } from "../hooks/useOpponentCaret.ts";
 import { caretClassName } from "../lib/caretClassName.ts";
 
@@ -7,17 +8,18 @@ type OpponentCaretProps = {
 };
 
 export function OpponentCaret({ wordIndex, letterIndex }: OpponentCaretProps) {
-  const name = useOpponentCaret(wordIndex, letterIndex);
-  if (name === null) return null;
+  const opponent = useOpponentCaret(wordIndex, letterIndex);
+  if (opponent === null) return null;
 
   return (
-    // Drawn like the Participant's own caret, and positioned so that the Opponent's name can sit above it.
+    // Drawn like the Participant's own caret, and positioned so that the Opponent's Avatar can sit above it.
     <span className={`${caretClassName} relative bg-opponent`}>
-      {/* Lowered by the name's descent so its letters fit in the line's top leading: a full 10px box above
-          the caret would reach into the line above and be cut off by the word list on the first line. */}
-      <span className="absolute bottom-[calc(100%-2px)] left-0 text-[10px] leading-none whitespace-nowrap text-opponent">
-        {name}
-      </span>
+      {/* Lowered onto the caret's top so that it fits in the line's top leading, about 10px above the caret: a
+          full 16px above it would reach into the line above and be cut off by the word list on the first line. */}
+      <PlayerAvatar
+        player={{ nickname: opponent.name, avatarUrl: opponent.avatarUrl }}
+        className="absolute bottom-[calc(100%-7px)] left-1/2 size-4 -translate-x-1/2 rounded-full text-[8px] [--keycap-border:1px] [--keycap-depth:1px]"
+      />
     </span>
   );
 }

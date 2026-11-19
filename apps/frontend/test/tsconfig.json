@@ -25,6 +25,8 @@
     "../src/features/duel/points",
     "../src/features/duel/rank",
     "../src/features/duel/round",
+    "../src/features/ornament/art",
+    "../src/features/ornament/picker",
     "../src/features/ranked/standing",
     "../src/features/queue/clock",
     "../src/features/queue/message",

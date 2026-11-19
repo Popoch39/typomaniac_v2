@@ -1,12 +1,13 @@
 import type { RankedConfig } from "./config.ts";
+import { TIERS } from "./tier.ts";
 import type { Division, DivisionTier, LadderDivision, Rank } from "./types.ts";
 
 type DivisionRank = Extract<Rank, { division: Division }>;
 
-const TIERS: DivisionTier[] = ["bronze", "silver", "gold", "platinum", "diamond"];
+const DIVISION_TIERS = TIERS.filter((tier): tier is DivisionTier => tier !== "master");
 
 /** Divisions from Bronze IV to Diamond I: a Division's index is its number of steps above Bronze IV. */
-const LADDER = TIERS.flatMap((tier) =>
+const LADDER = DIVISION_TIERS.flatMap((tier) =>
   ([4, 3, 2, 1] as const).map((division) => ({ tier, division })),
 );
 

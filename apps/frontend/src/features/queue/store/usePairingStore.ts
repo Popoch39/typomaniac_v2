@@ -1,3 +1,4 @@
+import type { PairingSide } from "@repo/matchmaking-engine";
 import { create } from "zustand";
 import { eventTime } from "../../game/clock/eventTime.ts";
 import { type AcceptWindow, acceptSecondsLeft } from "../clock/acceptSecondsLeft.ts";
@@ -6,13 +7,19 @@ import { sendToQueue } from "../socket/queueSocket.ts";
 type PairingState = {
   /** The Pairing proposed to the Player, `null` when none awaits their answer. */
   readonly pairingId: string | null;
+  /** Both sides of the proposed Pairing, `null` when none awaits the Player's answer. */
+  readonly players: { readonly self: PairingSide; readonly opponent: PairingSide } | null;
   /** Whole seconds left to accept, refreshed while the Pairing is proposed. */
   readonly secondsLeft: number;
   /** Whole seconds there were to accept when the Pairing was proposed, what the countdown drains from. */
   readonly acceptSeconds: number;
   /** Whether the Player accepted and now waits for the Opponent. */
   readonly isAccepted: boolean;
-  readonly propose: (pairingId: string, window: AcceptWindow) => void;
+  readonly propose: (
+    pairingId: string,
+    players: NonNullable<PairingState["players"]>,
+    window: AcceptWindow,
+  ) => void;
   readonly accept: () => void;
   readonly close: () => void;
 };
@@ -29,6 +36,7 @@ function stopCountdownTimer() {
 
 const initialState = {
   pairingId: null,
+  players: null,
   secondsLeft: 0,
   acceptSeconds: 0,
   isAccepted: false,
@@ -36,11 +44,12 @@ const initialState = {
 
 export const usePairingStore = create<PairingState>()((set, get) => ({
   ...initialState,
-  propose: (pairingId, window) => {
+  propose: (pairingId, players, window) => {
     stopCountdownTimer();
     const refresh = () => set({ secondsLeft: acceptSecondsLeft(window, eventTime()) });
     set({
       pairingId,
+      players,
       isAccepted: false,
       acceptSeconds: acceptSecondsLeft(window, window.receivedAt),
     });
