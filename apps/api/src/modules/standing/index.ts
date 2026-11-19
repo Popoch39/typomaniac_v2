@@ -2,12 +2,13 @@ import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
 import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
+import type { RateLimiter } from "../rate-limit/index.ts";
 import * as StandingModel from "./model.ts";
 import { readLeaderboard, readOwnStanding } from "./service.ts";
 
-export const createStandingRoutes = (db: Db, auth: Auth) =>
+export const createStandingRoutes = (db: Db, auth: Auth, rateLimiter: RateLimiter) =>
   new Elysia({ prefix: "/api" })
-    .use(createProtection(auth))
+    .use(createProtection(auth, rateLimiter))
     .get(
       "/me/standing",
       { signedIn: true, response: StandingModel.MeStandingGet.Response },

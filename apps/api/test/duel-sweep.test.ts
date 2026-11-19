@@ -329,7 +329,9 @@ test("a Custom Duel nobody joined still expires, and leaves no row and nothing t
 
     expect(read.status).toBe(404);
     expect(await testDb.db.select().from(duel).where(eq(duel.id, id))).toEqual([]);
-    expect(await redis.client.send("KEYS", [redis.name("*")])).toEqual([]);
+    // The rate limit counters of the requests above outlive the Duel by design: they expire with their own window.
+    const keys: string[] = await redis.client.send("KEYS", [redis.name("*")]);
+    expect(keys.filter((key) => !key.startsWith(redis.name("rate-limit", "")))).toEqual([]);
   } finally {
     await stop();
   }

@@ -15,6 +15,7 @@ import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
+import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
@@ -55,6 +56,7 @@ export type DuelOptions = {
 export const createDuelRoutes = (
   db: Db,
   auth: Auth,
+  rateLimiter: RateLimiter,
   redis: Redis,
   logger: Logger,
   lifecycle: Lifecycle,
@@ -99,7 +101,7 @@ export const createDuelRoutes = (
 
   return (
     new Elysia({ prefix: "/api/duels" })
-      .use(createProtection(auth))
+      .use(createProtection(auth, rateLimiter))
       .use(websocket())
       .onStart(() => {
         sweeper = setInterval(runSweep, sweepIntervalMs);
@@ -113,7 +115,14 @@ export const createDuelRoutes = (
       .post(
         "/",
         { participant: true, response: { 201: DuelModel.RootPost.Response } },
-        async ({ status }) => status(201, { id: await createDuel(redis, "custom", expiryMs) }),
+        async ({ identity, request, server, set, status }) => {
+          // Per IP as well: a Guest who drops their cookie becomes a new Participant.
+          const refused =
+            (await rateLimiter.check("duelPerParticipant", identity.id, set)) ??
+            (await rateLimiter.check("duelPerIp", rateLimiter.clientIp(request, server), set));
+          if (refused) return refused;
+          return status(201, { id: await createDuel(redis, "custom", expiryMs) });
+        },
       )
       // Lets a client tell why its upgrade was refused, which a browser WebSocket never shows.
       .get(

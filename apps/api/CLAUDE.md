@@ -48,7 +48,7 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
 - Le schéma vit dans `src/db/schema.ts` (`drizzle-orm/pg-core`). Après chaque changement : `bun run db:generate`, puis commit du dossier `drizzle/` généré.
 - Schémas d'API : TypeBox 1.x (`t` d'Elysia) écrits à la main. `drizzle-orm/typebox`, cité par `.agents/skills/elysiajs/references/drizzle.md`, n'existe qu'en Drizzle 1.0 ; ne pas installer `drizzle-typebox` (TypeBox 0.x, incompatible avec Elysia 2).
-- `src/app.ts` exporte `createApp(db, auth, redis, logger)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
+- `src/app.ts` exporte `createApp(db, auth, redis, logger, ...)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
 - Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis, getLogger("api"))`.
 
 ## Redis
@@ -73,7 +73,7 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
 
 - `/health` est la sonde de vie : `ok` tant que le process répond, même sans Postgres ni Redis, pour qu'une panne de base ne le fasse pas redémarrer en boucle.
 - `/ready` (`src/modules/lifecycle/`) répond 200 quand un `select 1` sur Postgres et un `PING` sur Redis répondent tous deux dans `READY_TIMEOUT_MS` (1 s), 503 sinon, et 503 dès que l'arrêt a commencé.
-- `createLifecycle()` (`src/modules/lifecycle/service.ts`) porte l'état d'arrêt de l'instance et ses sockets ouverts. `createApp(..., devOptions, lifecycle)` le reçoit en dernier argument (un neuf par défaut) et le passe aux modules `duel` et `queue` : tout socket fait `lifecycle.hold(ws.id, ws)` au début de `open` (et s'arrête là s'il est refusé) et `lifecycle.release(ws.id)` au début de `close`. Un nouveau module de sockets doit faire de même, sinon l'arrêt le coupe sans code 1012.
+- `createLifecycle()` (`src/modules/lifecycle/service.ts`) porte l'état d'arrêt de l'instance et ses sockets ouverts. `createApp(..., devOptions, lifecycle)` le reçoit en 8ᵉ argument (un neuf par défaut) et le passe aux modules `duel` et `queue` : tout socket fait `lifecycle.hold(ws.id, ws)` au début de `open` (et s'arrête là s'il est refusé) et `lifecycle.release(ws.id)` au début de `close`. Un nouveau module de sockets doit faire de même, sinon l'arrêt le coupe sans code 1012.
 - Sur SIGTERM ou SIGINT, `src/index.ts` arrête l'instance, chaque étape loguée :
   1. `lifecycle.beginStopping()` : `/ready` répond 503, un nouveau socket est fermé aussitôt en 1012.
   2. `lifecycle.closeSockets()` ferme chaque socket Duel et Queue en 1012 (« service restart ») et attend qu'ils soient fermés : le `close` d'Elysia lance le handler de fermeture avant d'envoyer la trame, que `app.stop()` couperait.
@@ -85,15 +85,23 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
 
 - Dans les tests : `createApp(..., undefined, undefined, undefined, lifecycle)` puis `lifecycle.beginStopping()` / `closeSockets()` (`test/ready.test.ts`, `test/shutdown.test.ts`) ; le vrai signal se teste en `Bun.spawn` (`test/startup.test.ts`). `closed` des sockets de `test/helpers/socket.ts` rend le code de fermeture.
 
+## Rate limit
+
+Voir `docs/adr/0013-rate-limits-keyed-on-identity-then-ip-behind-trust-proxy.md`. `src/modules/rate-limit/` compte en fenêtre fixe dans Redis (clés `rate-limit:*`, `consumeWindow`, partagé avec le rate limit de Better Auth).
+
+- `createApp` crée le `RateLimiter` et le passe à chaque module (`create<Module>Routes(db, auth, rateLimiter, ...)`) et à `createProtection(auth, rateLimiter)`. Limites par défaut : `RATE_LIMITS` ; `rateLimitOptions` (9ᵉ argument de `createApp`, après `lifecycle`) les abaisse en test et porte `trustProxy`.
+- Dans un handler : `const refused = await rateLimiter.check("<limite>", key, set); if (refused) return refused;` répond 429 `{ code: "RATE_LIMITED" }` avec `Retry-After` et logue un warning. Clé : l'id du Player ou du Guest, plus `rateLimiter.clientIp(request, server)` pour une route ouverte aux Guests. Une clé `null` ne compte rien : seul `app.handle()` n'a pas d'IP, donc les tests de limites par IP font `.listen(0)` (`test/rate-limit.test.ts`).
+- IP client : adresse du socket ; `X-Forwarded-For` (le plus à gauche) seulement avec `TRUST_PROXY=enabled` (`src/modules/rate-limit/config.ts`).
+
 ## Auth
 
 Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-auth/adapters/drizzle`, provider `pg`). Ses routes répondent sous `/api/auth` (santé : `GET /api/auth/ok`).
 
 - `src/modules/auth/service.ts` exporte `createAuth(db, config)`, une fabrique : il n'y a pas d'instance globale à importer. `src/index.ts` lit la config avec `requireAuthConfig()` (`src/modules/auth/config.ts`, qui refuse de démarrer sans `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `DISCORD_CLIENT_ID` ou `DISCORD_CLIENT_SECRET`), fabrique l'instance et l'injecte dans `createApp(db, auth)`.
-- Rate limit de Better Auth : `createAuth(db, config, { redis })` le branche, ses compteurs dans Redis sous le namespace de l'API (clés `auth-rate-limit:*`, fenêtre fixe, un `EVAL` atomique), pour qu'il tienne entre instances. Il passe par `rateLimit.customStorage`, pas par `secondaryStorage` de Better Auth, qui sortirait aussi les sessions et l'état OAuth de Postgres. Actif en production seulement (défaut de Better Auth, `enabled` le force) ; limites par défaut de Better Auth (3 / 10 s sur `/sign-in/*`, 100 / 10 s ailleurs, par IP lue dans `X-Forwarded-For`), surchargées par `customRules`. Au-delà : 429. Sans troisième argument, le rate limit est coupé.
+- Rate limit de Better Auth : `createAuth(db, config, { redis })` le branche, ses compteurs dans Redis sous le namespace de l'API (clés `auth-rate-limit:*`, fenêtre fixe, un `EVAL` atomique), pour qu'il tienne entre instances. Il passe par `rateLimit.customStorage`, pas par `secondaryStorage` de Better Auth, qui sortirait aussi les sessions et l'état OAuth de Postgres. Actif en production seulement (défaut de Better Auth, `enabled` le force) ; limites par défaut de Better Auth (3 / 10 s sur `/sign-in/*`, 100 / 10 s ailleurs, par IP), surchargées par `customRules`. Au-delà : 429. Sans troisième argument, le rate limit est coupé.
 - Dans les tests : `createTestAuth(testDb.db)` (`test/helpers/auth.ts`) fabrique une instance sur la base du fichier de test, sans rate limit ; `createTestAuth(testDb.db, { redis, enabled: true, customRules })` l'active avec des limites abaissées (`test/auth-rate-limit.test.ts`).
 - L'adaptateur retrouve ses tables dans le schéma passé à Drizzle par `openDatabase`, sous les noms d'export `user`, `session`, `account`, `verification` de `src/db/schema.ts`. Ne pas les renommer.
-- L'intégration à Elysia suit `.agents/skills/elysiajs/references/better-auth.md` (`.mount(auth.handler)`, macro pour les routes protégées), pas la doc de Better Auth, écrite pour Elysia 1.
+- L'intégration à Elysia suit `.agents/skills/elysiajs/references/better-auth.md` (macro pour les routes protégées), pas la doc de Better Auth, écrite pour Elysia 1. Ses routes passent par `createAuthRoutes` (`src/modules/auth/index.ts`, `parse: "none"` comme un `.mount`) plutôt que `.mount(auth.handler)` : un mount ne voit pas le socket, et Better Auth doit recevoir l'IP client résolue par l'API dans l'en-tête `CLIENT_IP_HEADER` (toujours réécrit), seul en-tête qu'il lit (`advanced.ipAddress.ipAddressHeaders`).
 - Deux niveaux de protection, en option de route (`createProtection(auth)`, `src/modules/auth/index.ts`), qui donnent `player` et `session` au handler. En mettre une seule par route.
   - `signedIn: true`, « connecté » : 401 `{ code: "UNAUTHORIZED" }` sans session valide. `player.nickname` peut être `null`.
   - `nicknameChosen: true`, « Nickname choisi » : même 401 pour un Guest, 403 `{ code: "NICKNAME_REQUIRED" }` pour un Player sans Nickname. `player.nickname` est une chaîne. C'est le niveau des routes qui enregistrent ou affichent publiquement quelque chose.

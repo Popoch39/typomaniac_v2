@@ -9,6 +9,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { assignDefaultNickname } from "../player/service.ts";
+import { consumeWindow } from "../rate-limit/service.ts";
 import type { AuthConfig } from "./config.ts";
 
 // A Player is one email address: whoever gets a provider to present an address they do not own
@@ -26,30 +27,26 @@ export const refuseUnverifiedEmail = ({
         errorDescription: "Verify your email address with the provider, then sign in again.",
       };
 
-// Increments the counter and starts its window in one step, so a crash between the two cannot
-// leave a counter that never expires.
-const consumeScript = `
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
-return { count, redis.call('TTL', KEYS[1]) }
-`;
-
 // Counted in Redis rather than in Better Auth's per-process memory, so the limit holds whichever
 // API instance a request reaches. Plugged in as the rate limit's own storage and not as Better
 // Auth's secondaryStorage, which would also move sessions and OAuth state out of Postgres.
 const createRedisRateLimitStorage = (redis: Redis): BetterAuthRateLimitStorage => ({
   consume: async (key, { window, max }) => {
-    const [count, secondsLeft]: [number, number] = await redis.client.send("EVAL", [
-      consumeScript,
-      "1",
+    const { count, secondsLeft } = await consumeWindow(
+      redis,
       redis.name("auth-rate-limit", key),
-      String(window),
-    ]);
+      window,
+    );
     return count <= max
       ? { allowed: true, retryAfter: null }
       : { allowed: false, retryAfter: secondsLeft };
   },
 });
+
+// Better Auth reads the client IP from headers only. The API resolves it as for its own limits
+// (socket address, or X-Forwarded-For behind TRUST_PROXY) and hands it over in this header, which
+// it always overwrites so a client can never set it.
+export const CLIENT_IP_HEADER = "x-typomaniac-client-ip";
 
 // enabled left out keeps Better Auth's default: on in production only.
 export type AuthRateLimit = { redis: Redis } & Pick<
@@ -106,6 +103,7 @@ export const createAuth = (db: Db, config: AuthConfig, rateLimit?: AuthRateLimit
     // The one attachment path that skips validateUserInfo (linking by id token), and manual linking
     // is not offered anyway.
     disabledPaths: ["/link-social"],
+    advanced: { ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] } },
     rateLimit: rateLimit
       ? {
           enabled: rateLimit.enabled,
