@@ -26,11 +26,7 @@ export function LeaderboardRanking({ leaderboard }: LeaderboardRankingProps) {
             own={leaderboard.own}
             around={leaderboard.around}
           />
-          <LeaderboardPagination
-            page={leaderboard.page}
-            pageCount={leaderboard.pageCount}
-            players={leaderboard.players}
-          />
+          <LeaderboardPagination leaderboard={leaderboard} />
         </>
       )}
     </section>
