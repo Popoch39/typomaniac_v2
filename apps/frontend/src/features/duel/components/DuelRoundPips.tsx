@@ -1,13 +1,5 @@
-import { cn } from "../../../shared/lib/utils.ts";
 import { useDuelRoundPips } from "../hooks/useDuelRoundPips.ts";
-
-const pipColours = {
-  won: "bg-action",
-  lost: "bg-opponent",
-  drawn: "bg-ink-subtle",
-  current: "border-brand bg-surface-plate",
-  upcoming: "bg-surface-plate",
-} as const;
+import { DuelRoundPip } from "./DuelRoundPip.tsx";
 
 export function DuelRoundPips() {
   const roundPips = useDuelRoundPips();
@@ -21,10 +13,8 @@ export function DuelRoundPips() {
       </span>
       <ol aria-label="Rounds" className="m-0 flex list-none gap-2 p-0">
         {roundPips.pips.map(({ number, state, label }) => (
-          <li
-            key={number}
-            className={cn("size-3.5 rounded-[4px] border-2 border-key-outline", pipColours[state])}
-          >
+          <li key={number} className="flex">
+            <DuelRoundPip state={state} />
             <span className="sr-only">{label}</span>
           </li>
         ))}

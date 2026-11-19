@@ -1,15 +1,13 @@
 import { DUEL_GAME_CONFIG } from "@repo/duel-engine";
 import { useGameStore } from "../../game/store/useGameStore.ts";
 import { bothWpmHistories } from "../chart/bothWpmHistories.ts";
-import { type ChartPoint, wpmChart } from "../chart/wpmChart.ts";
+import { asPolyline } from "../chart/asPolyline.ts";
+import { wpmChart } from "../chart/wpmChart.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 import { useDuelLivePoints } from "./useDuelLivePoints.ts";
 
 // The sparkline's plot: 308px for the whole Round, 20px of WPM between its margins.
 const SPARKLINE_BOX = { width: 308, height: 20, seconds: DUEL_GAME_CONFIG.seconds };
-
-const asPolyline = (points: readonly ChartPoint[]) =>
-  points.map(({ x, y }) => `${x},${y}`).join(" ");
 
 /** Both Participants' live WPM and Accuracy, the Participant's own first, and the WPM sparkline. */
 export function useDuelLiveFooter() {
