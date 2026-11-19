@@ -1,7 +1,5 @@
-import type { LeaderboardPlayer } from "./useLeaderboard.ts";
-
 /** The Positions a page of the table holds, as "positions a to b"; null for an empty page. */
-export function usePagePositions(players: LeaderboardPlayer[]) {
+export function pagePositions(players: readonly { position: number }[]) {
   const first = players.at(0);
   const last = players.at(-1);
   if (first === undefined || last === undefined) return null;

@@ -7,7 +7,7 @@ import {
   TableRow,
 } from "../../../shared/components/ui/table.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
-import { usePagePositions } from "../hooks/usePagePositions.ts";
+import { pagePositions } from "../page/pagePositions.ts";
 import { AroundYouRows } from "./AroundYouRows.tsx";
 import { LeaderboardRow } from "./LeaderboardRow.tsx";
 
@@ -20,7 +20,7 @@ interface LeaderboardTableProps {
 
 // On a narrow screen the table scrolls sideways inside its box rather than squeezing its columns.
 export function LeaderboardTable({ players, own, around }: LeaderboardTableProps) {
-  const positions = usePagePositions(players);
+  const positions = pagePositions(players);
 
   return (
     <div className="w-full overflow-hidden rounded-[20px] border-3 border-key-outline bg-surface-card">

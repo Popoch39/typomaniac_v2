@@ -1,6 +1,6 @@
 import { TableBody, TableCell, TableRow } from "../../../shared/components/ui/table.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
-import { useAroundYouCaption } from "../hooks/useAroundYouCaption.ts";
+import { aroundYouCaption } from "../own/aroundYouCaption.ts";
 import { LeaderboardRow } from "./LeaderboardRow.tsx";
 
 interface AroundYouRowsProps {
@@ -10,7 +10,7 @@ interface AroundYouRowsProps {
 
 // A second body of the same table, so that its columns line up with the page above it.
 export function AroundYouRows({ around, own }: AroundYouRowsProps) {
-  const caption = useAroundYouCaption(around);
+  const caption = aroundYouCaption(around);
 
   return (
     <TableBody aria-label="Around you">

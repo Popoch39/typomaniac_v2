@@ -1,10 +1,10 @@
 import { pageKeyLabel } from "../page/pageKeyLabel.ts";
+import { pagePositions } from "../page/pagePositions.ts";
 import { paginationWindow } from "../page/paginationWindow.ts";
 import type { Leaderboard } from "./useLeaderboard.ts";
-import { usePagePositions } from "./usePagePositions.ts";
 
 export function useLeaderboardPagination({ page, pageCount, players, own }: Leaderboard) {
-  const positions = usePagePositions(players);
+  const positions = pagePositions(players);
   const ownPosition = own?.position ?? null;
   return {
     summary: `Page ${page} of ${pageCount}${positions === null ? "" : ` · ${positions}`}`,

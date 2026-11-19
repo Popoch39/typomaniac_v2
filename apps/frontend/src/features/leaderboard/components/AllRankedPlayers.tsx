@@ -1,5 +1,5 @@
 import type { Leaderboard } from "../hooks/useLeaderboard.ts";
-import { useRankedCount } from "../hooks/useRankedCount.ts";
+import { rankedCount } from "../page/rankedCount.ts";
 import { LeaderboardPagination } from "./LeaderboardPagination.tsx";
 import { LeaderboardTable } from "./LeaderboardTable.tsx";
 
@@ -9,7 +9,7 @@ interface AllRankedPlayersProps {
 
 // While the Podium holds every ranked Player, there is no table to page through.
 export function AllRankedPlayers({ leaderboard }: AllRankedPlayersProps) {
-  const count = useRankedCount(leaderboard.total);
+  const count = rankedCount(leaderboard.total);
 
   return (
     <section aria-labelledby="all-players-title" className="flex flex-col gap-5">
