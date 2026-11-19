@@ -40,8 +40,17 @@ test("there is no live head before the Game has started", () => {
 });
 
 test("an Opponent whose Game has not started has no live head", () => {
-  expect(bothWpmHistories(play(started(0)), play(), 1500).heads).toEqual([
-    { seconds: 1.5, wpm: 0 },
+  expect(bothWpmHistories(play(started(0), typed(400, "cat ")), play(), 1500).heads).toEqual([
+    { seconds: 1.5, wpm: 32 },
     null,
+  ]);
+});
+
+test("a side that has started but typed nothing yet has no live head", () => {
+  const opponent = play(started(5000), typed(5500, "cat dog "));
+
+  expect(bothWpmHistories(play(started(0)), opponent, 1500).heads).toEqual([
+    null,
+    { seconds: 1.5, wpm: 64 },
   ]);
 });
