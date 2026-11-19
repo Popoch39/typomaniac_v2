@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
 import { DUEL_GAME_CONFIG, getAverageMultiplier, getCurrentMultiplier } from "../src/index.ts";
+import { perfectGame } from "./helpers/game.ts";
 
 const WORDS = ["cat", "dog", "owl", "bee", "elk", "yak", "ant", "cow", "pig", "hen"];
 
@@ -78,21 +79,8 @@ test("MULTIPLIER-8: a validated word reopened to correct its mistake stays imper
 
 test("MULTIPLIER-9: on a perfect Game, a 40 WPM Participant reaches nearly the Multiplier of a 100 WPM one", () => {
   // Five characters a word, space included, typed in 30 seconds: 20 words at 40 WPM, 50 at 100 WPM.
-  const perfect = (wordCount: number) =>
-    applyEvent(
-      createGame(
-        DUEL_GAME_CONFIG,
-        Array.from({ length: 60 }, () => "four"),
-      ),
-      {
-        type: "insert",
-        at: 0,
-        text: "four ".repeat(wordCount),
-      },
-    );
-
-  expect(getAverageMultiplier(perfect(20))).toBeCloseTo(1.085, 10);
-  expect(getAverageMultiplier(perfect(50))).toBeCloseTo(1.094, 10);
+  expect(getAverageMultiplier(perfectGame(20))).toBeCloseTo(1.085, 10);
+  expect(getAverageMultiplier(perfectGame(50))).toBeCloseTo(1.094, 10);
 });
 
 test("MULTIPLIER-10: the current Multiplier is the one the Streak has reached, up to 1.10", () => {
@@ -108,4 +96,18 @@ test("MULTIPLIER-11: a mistake brings the current Multiplier back to 1 at once, 
   expect(getCurrentMultiplier(typed("cat dog ox"))).toBe(1);
   // A word that has no mistake yet leaves the Streak where it was.
   expect(getCurrentMultiplier(typed("cat dog ow"))).toBeCloseTo(1.02, 10);
+});
+
+test("MULTIPLIER-12: a validated word whose input is not its Target word is not a Perfect word", () => {
+  // The typing engine leaves an incorrect Keystroke on any such word: this Game is built by hand
+  // so that the rule does not rest on that alone.
+  const played = typed("cat dog owl ");
+  const game: Game = {
+    ...played,
+    inputs: played.inputs.map((input, index) => (index === 1 ? "dxg " : input)),
+  };
+
+  // 1, then 1 for `dxg`, then a new Streak from 1.
+  expect(getAverageMultiplier(game)).toBe(1);
+  expect(getCurrentMultiplier(game)).toBe(1);
 });

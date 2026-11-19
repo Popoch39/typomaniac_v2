@@ -1,13 +1,20 @@
 import type { Game } from "@repo/typing-engine";
 import { MAX_MULTIPLIER, MULTIPLIER_STEP } from "./constants.ts";
 
-/** The indexes of the words holding an incorrect Keystroke: none of them can be a Perfect word. */
+/**
+ * The indexes of the words holding an incorrect Keystroke, and of the validated words whose input
+ * is not their Target word: none of them can be a Perfect word.
+ */
 function imperfectWordIndexes(game: Game): ReadonlySet<number> {
   // A Keystroke stays in the journal once corrected, and a Missed letter is a separator typed on a
   // letter: both leave an incorrect Keystroke on the word, which then can never be perfect.
-  return new Set(
-    game.keystrokes.filter((keystroke) => !keystroke.correct).map(({ wordIndex }) => wordIndex),
-  );
+  const mistyped = game.keystrokes
+    .filter((keystroke) => !keystroke.correct)
+    .map(({ wordIndex }) => wordIndex);
+  const inexact = game.targetWords
+    .slice(0, game.activeWordIndex)
+    .flatMap((target, index) => (game.inputs[index] === target ? [] : [index]));
+  return new Set([...mistyped, ...inexact]);
 }
 
 /** What a word weighs once its Streak counts `streak` Perfect words, itself included. */

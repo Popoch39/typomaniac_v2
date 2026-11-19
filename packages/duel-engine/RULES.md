@@ -44,6 +44,7 @@ What a Game of a Duel is worth (ADR 0012, ADR 0013). Points are computed from WP
 | POINTS-4 | Live stats give Points by the same rule as a Result.                                                                    |
 | POINTS-5 | Points are multiplied by the average Multiplier, and rounded once, at the end.                                          |
 | POINTS-6 | A perfect 90 WPM Game (984 Points) beats 100 WPM at 95 % (903 Points); a perfect 70 WPM Game (764 Points) does not.     |
+| POINTS-7 | A seat's Points in a finished Round come from its Result and the Multiplier the server judged it with.                  |
 
 ## Outcome of a Round
 
