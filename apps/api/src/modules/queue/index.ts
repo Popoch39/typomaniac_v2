@@ -43,7 +43,7 @@ export const createQueueRoutes = (
   }: QueueOptions = {},
 ) => {
   const evictions = createEvictions(redis);
-  const pairings = createPairingFeed(redis);
+  const pairings = createPairingFeed(db, redis);
   const refreshes = createEntryRefreshes(redis, {
     expiryMs: entryExpiryMs,
     intervalMs: refreshMs,

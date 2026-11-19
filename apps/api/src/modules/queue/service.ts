@@ -1,3 +1,4 @@
+import type { PairingSide } from "@repo/matchmaking-engine";
 import type { EntryHolder } from "@repo/queue";
 import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
 import type { Db } from "../../db/client.ts";
@@ -64,6 +65,35 @@ export const acceptPairingAsPlayer = async (
       connectMs: duelConnectMs,
     }),
   });
+};
+
+/**
+ * The Pairing as the Player is shown it: their own side and the Opponent's, each by Nickname,
+ * Avatar, Rank and worn Ornament as they stand now. `null` once the Pairing is no longer theirs.
+ */
+export const readPairingSides = async (
+  db: Db,
+  redis: Redis,
+  { pairingId, playerId }: { readonly pairingId: string; readonly playerId: string },
+): Promise<{ self: PairingSide; opponent: PairingSide } | null> => {
+  const pairing = await readPairing(redis, pairingId);
+  if (!pairing?.playerIds.includes(playerId)) return null;
+  const opponentId = pairing.playerIds.find((pairedId) => pairedId !== playerId);
+  if (opponentId === undefined) return null;
+  const playerIds = [playerId, opponentId];
+  const [players, ornaments, [selfRank = null, opponentRank = null]] = await Promise.all([
+    readNicknamesAndAvatars(db, playerIds),
+    readWornOrnaments(db, playerIds),
+    Promise.all(playerIds.map(async (pairedId) => (await readStanding(db, pairedId)).rank)),
+  ]);
+  const sideOf = (pairedId: string, rank: PairingSide["rank"]): PairingSide | null => {
+    const player = players.get(pairedId);
+    if (player === undefined) return null;
+    return { ...player, rank, ornament: ornaments.get(pairedId) ?? null };
+  };
+  const self = sideOf(playerId, selfRank);
+  const opponent = sideOf(opponentId, opponentRank);
+  return self && opponent ? { self, opponent } : null;
 };
 
 type Refreshed = EntryHolder & {
