@@ -19,7 +19,8 @@ export function useDuelLiveFooter() {
   const live = useDuelLivePoints();
   const self = { ...live.self, name: live.self.name ?? "" };
   const opponent = { ...live.opponent, name: live.opponent.name ?? "" };
-  const chart = wpmChart(bothWpmHistories(game, opponentGame, readAt), SPARKLINE_BOX);
+  const { histories, heads } = bothWpmHistories(game, opponentGame, readAt);
+  const chart = wpmChart(histories, SPARKLINE_BOX, heads);
   return {
     self,
     opponent,
