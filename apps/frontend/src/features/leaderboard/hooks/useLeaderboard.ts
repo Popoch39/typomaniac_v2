@@ -15,7 +15,7 @@ export type LeaderboardPlayer = Leaderboard["podium"][number];
  */
 export function useLeaderboard() {
   const { page } = useSearch({ from: "/_shell/leaderboard" });
-  const { data, isPending, error } = useQuery({
+  const { data, isPending, isPlaceholderData, error } = useQuery({
     ...leaderboardQueryOptions(page),
     placeholderData: keepPreviousData,
   });
@@ -23,6 +23,9 @@ export function useLeaderboard() {
     leaderboard: data ?? null,
     isPending,
     failure: error === null ? null : describeApiError(error),
-    replacingPage: data === undefined ? null : pageToReplace(page, data.page),
+    replacingPage:
+      data === undefined
+        ? null
+        : pageToReplace(page, { page: data.page, isPlaceholder: isPlaceholderData }),
   };
 }
