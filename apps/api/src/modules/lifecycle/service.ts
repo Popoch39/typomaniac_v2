@@ -1,13 +1,10 @@
 import { sql } from "drizzle-orm";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
+import { CloseCode } from "./closeCode.ts";
 
 /** How long Postgres and Redis have to answer a readiness check before the instance counts as not ready. */
 export const READY_TIMEOUT_MS = 1000;
-
-// "Service restart": the socket closed because the instance stops, not for anything its client
-// did, so the client may come back.
-const SERVICE_RESTART = 1012;
 
 export const isReady = async (db: Db, redis: Redis, timeoutMs = READY_TIMEOUT_MS) => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -51,7 +48,7 @@ export const createLifecycle = () => {
      */
     hold: (id: string, socket: Socket) => {
       if (stopping) {
-        socket.close(SERVICE_RESTART, "service restart");
+        socket.close(CloseCode.serviceRestart, "service restart");
         return false;
       }
       open.set(id, socket);
@@ -67,7 +64,7 @@ export const createLifecycle = () => {
      */
     closeSockets: async () => {
       const held = [...open.values()];
-      for (const socket of held) socket.close(SERVICE_RESTART, "service restart");
+      for (const socket of held) socket.close(CloseCode.serviceRestart, "service restart");
       while (held.some((socket) => socket.readyState !== CLOSED)) await Bun.sleep(1);
       return held.length;
     },

@@ -10,6 +10,7 @@ import { personOf } from "../http/index.ts";
 import type { Auth } from "../auth/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
+import { mayReconnect } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
@@ -23,9 +24,11 @@ import {
   leaveQueue,
   QUEUE_ENTRY_EXPIRY_MS,
   readQueueEntry,
+  refreshQueueEntry,
 } from "./service.ts";
 
 export type QueueOptions = {
+  /** How long an entry outlives its last refresh, and a socket that dropped: its time to be reclaimed. */
   readonly entryExpiryMs?: number;
   /** How often this instance refreshes the entries of its sockets; several times per expiry. */
   readonly refreshMs?: number;
@@ -145,7 +148,10 @@ export const createQueueRoutes = (
           present.delete(ws.id);
           refreshes.release(presence);
           await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
-          await leaveQueue(redis, presence);
+          // A drop or a restart is followed by a reconnection, which reclaims the entry with its
+          // instant of entry and its Pairing: it is kept for a full expiry, then expires unclaimed.
+          if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
+          else await leaveQueue(redis, presence);
         },
         // A failing handler of an open socket, which only has an id once upgraded; the app's error
         // hook answers it after this one.

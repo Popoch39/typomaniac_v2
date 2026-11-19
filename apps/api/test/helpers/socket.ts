@@ -32,7 +32,15 @@ export const openSocketOf = async <Received, Sent>(url: string, cookie: string) 
     await Bun.sleep(ms);
     return received.length === 0;
   };
-  return { next, send, staysSilent, closed, close: () => socket.close() };
+  return {
+    next,
+    send,
+    staysSilent,
+    closed,
+    close: () => socket.close(),
+    // Cuts the connection without a close frame, as a lost network does: the server sees 1006.
+    drop: () => socket.terminate(),
+  };
 };
 
 /** The socket of a Duel. */

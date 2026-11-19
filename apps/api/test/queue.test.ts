@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
+import { createLifecycle } from "../src/modules/lifecycle/service.ts";
 import { readQueueEntry } from "../src/modules/queue/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer, signInPlayerWithNickname } from "./helpers/auth.ts";
@@ -38,6 +39,73 @@ const hasLeft = async (cookie: string) => {
   }
   return false;
 };
+
+// An instance whose sockets a test closes with 1012, as its stop does.
+const startStoppingInstance = (queueOptions?: { entryExpiryMs: number }) => {
+  const lifecycle = createLifecycle();
+  const app = createApp(
+    testDb.db,
+    auth,
+    testRedis.redis,
+    getLogger("api"),
+    undefined,
+    queueOptions,
+    undefined,
+    lifecycle,
+  ).listen(0);
+  return { app, lifecycle, origin: `http://localhost:${app.server?.port}` };
+};
+
+test("a Player in the Queue keeps their place when their instance restarts and they reconnect to another one", async () => {
+  const stopping = startStoppingInstance();
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
+  const first = await openQueueSocket(cookie, stopping.origin);
+  const entered = await first.next();
+  if (entered.type !== "queued") throw new Error(`Expected queued, got ${entered.type}`);
+
+  stopping.lifecycle.beginStopping();
+  await stopping.lifecycle.closeSockets();
+  expect(await first.closed).toBe(1012);
+  await stopping.app.stop(true);
+  expect(await queuedAtOf(cookie)).toBe(entered.queuedAt);
+  const again = await openQueueSocket(cookie);
+
+  expect(await again.next()).toMatchObject({ type: "queued", queuedAt: entered.queuedAt });
+  again.close();
+  expect(await hasLeft(cookie)).toBe(true);
+});
+
+test("a Player whose connection dropped reclaims their place, with their instant of entry, on reconnecting", async () => {
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
+  const first = await openQueueSocket(cookie);
+  const entered = await first.next();
+  if (entered.type !== "queued") throw new Error(`Expected queued, got ${entered.type}`);
+
+  first.drop();
+  await first.closed;
+  await Bun.sleep(50);
+  expect(await queuedAtOf(cookie)).toBe(entered.queuedAt);
+  const again = await openQueueSocket(cookie);
+
+  expect(await again.next()).toMatchObject({ type: "queued", queuedAt: entered.queuedAt });
+  again.close();
+  expect(await hasLeft(cookie)).toBe(true);
+});
+
+test("a Player whose socket closed with 1012 and who does not come back in time leaves the Queue", async () => {
+  const stopping = startStoppingInstance({ entryExpiryMs: 150 });
+  const { cookie } = await signInPlayerWithNickname(auth, origin);
+  const socket = await openQueueSocket(cookie, stopping.origin);
+  await socket.next();
+
+  stopping.lifecycle.beginStopping();
+  await stopping.lifecycle.closeSockets();
+  await stopping.app.stop(true);
+  expect(await queuedAtOf(cookie)).not.toBeNull();
+  await Bun.sleep(300);
+
+  expect(await queuedAtOf(cookie)).toBeNull();
+});
 
 test("a Player with a Nickname who opens the Queue socket is told they are queued, with their instant of entry", async () => {
   const { cookie } = await signInPlayerWithNickname(auth, origin);

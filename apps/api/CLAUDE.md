@@ -82,7 +82,7 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
   4. Fermeture de Redis puis de Postgres.
   5. Sortie 0.
 
-  Les sockets se ferment avant `app.stop()` : Elysia 2 y coupe (`terminate`) tout socket encore ouvert, que le client verrait en 1006 au lieu de 1012. Un minuteur de 10 s force la sortie 1 si une étape bloque. Aucun Duel n'est perdu : son état est dans Redis (ADR 0007), le Participant qui se reconnecte sur une autre instance reprend son siège et rejoue son journal.
+  Les sockets se ferment avant `app.stop()` : Elysia 2 y coupe (`terminate`) tout socket encore ouvert, que le client verrait en 1006 au lieu de 1012. Un minuteur de 10 s force la sortie 1 si une étape bloque. Aucun Duel n'est perdu : son état est dans Redis (ADR 0007), le Participant qui se reconnecte sur une autre instance reprend son siège et rejoue son journal. Aucune place dans la Queue non plus : un socket de Queue fermé en 1012 ou 1006 (`mayReconnect`, `src/modules/lifecycle/closeCode.ts`) garde son entrée une expiration (`entryExpiryMs`), que la reconnexion reprend avec son `queuedAt` ; toute autre fermeture la retire.
 
 - Dans les tests : `createApp(..., undefined, undefined, undefined, lifecycle)` puis `lifecycle.beginStopping()` / `closeSockets()` (`test/ready.test.ts`, `test/shutdown.test.ts`) ; le vrai signal se teste en `Bun.spawn` (`test/startup.test.ts`). `closed` des sockets de `test/helpers/socket.ts` rend le code de fermeture.
 
