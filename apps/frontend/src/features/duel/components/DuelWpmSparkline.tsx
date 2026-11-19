@@ -1,4 +1,5 @@
 import type { ChartPoint } from "../chart/wpmChart.ts";
+import { DuelWpmCurve } from "./DuelWpmCurve.tsx";
 
 interface DuelWpmSparklineProps {
   sparkline: {
@@ -25,28 +26,8 @@ export function DuelWpmSparkline({ sparkline }: DuelWpmSparklineProps) {
       <line x1={0} y1={31} x2={308} y2={31} strokeWidth={2} className="stroke-key-face" />
       {/* The curves run from 7px under the top to 4px over the baseline, leaving room for their markers. */}
       <g transform="translate(0 7)">
-        {sparkline.curves.map(({ polyline, last, className }) => (
-          <g key={className} className={className}>
-            <polyline
-              points={polyline}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            {last && (
-              <rect
-                x={last.x - 4}
-                y={last.y - 4}
-                width={8}
-                height={8}
-                fill="currentColor"
-                strokeWidth={2}
-                className="stroke-key-outline"
-              />
-            )}
-          </g>
+        {sparkline.curves.map((curve) => (
+          <DuelWpmCurve key={curve.className} curve={curve} />
         ))}
       </g>
     </svg>

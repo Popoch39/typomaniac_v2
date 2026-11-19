@@ -14,8 +14,8 @@ export function DuelEnd() {
       <h1>{end.outcome}</h1>
       <DuelRankedEnd />
       <DuelBackToRanked />
-      {rounds.map(({ number, title, sides }) => (
-        <DuelRoundResults key={number} title={title} sides={sides} />
+      {rounds.map(({ number, caption, sides }) => (
+        <DuelRoundResults key={number} title={caption} sides={sides} />
       ))}
     </section>
   );
