@@ -2,6 +2,7 @@ import type { AvatarPlayer } from "../../../shared/hooks/useAvatar.ts";
 import { cn } from "../../../shared/lib/utils.ts";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { PromotedTier, TierPromotion } from "../rank/tierPromotion.ts";
+import { TierPromotionTiles } from "./TierPromotionTiles.tsx";
 
 interface TierPromotionHeroProps {
   player: AvatarPlayer;
@@ -27,7 +28,7 @@ const SILVER: HeroMotion = {
   newInner: "",
 };
 
-// The louder Tiers share Silver's until their own scene lands.
+// Master shares Silver's until its own scene lands.
 const HERO_MOTIONS: Readonly<Record<PromotedTier, HeroMotion>> = {
   silver: SILVER,
   gold: {
@@ -42,7 +43,14 @@ const HERO_MOTIONS: Readonly<Record<PromotedTier, HeroMotion>> = {
     new: "rank-up-slam",
     newInner: "rank-up-float [--rank-up-float-at:2.6s]",
   },
-  diamond: SILVER,
+  // The tiles do the motion; the whole Ornaments only hold until the old shatters and the new is
+  // assembled.
+  diamond: {
+    old: "rank-up-diamond-old",
+    oldInner: "rank-up-diamond-jitter",
+    new: "rank-up-diamond-new",
+    newInner: "rank-up-float [--rank-up-float-at:2.7s]",
+  },
   master: SILVER,
 };
 
@@ -74,6 +82,14 @@ export function TierPromotionHero({ player, promotion }: TierPromotionHeroProps)
           />
         </div>
       </div>
+      {promotion.tier === "diamond" && (
+        <TierPromotionTiles
+          player={player}
+          oldOrnament={promotion.oldOrnament}
+          newOrnament={promotion.newOrnament}
+          avatarClassName={CANVAS_SIZE}
+        />
+      )}
       {promotion.tier === "silver" && (
         <div
           aria-hidden="true"

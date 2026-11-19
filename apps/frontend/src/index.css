@@ -714,6 +714,147 @@
   }
 }
 
+/* Diamond: rings close on the old Ornament as it jitters, until it shatters into tiles. */
+@utility rank-up-inward-ring {
+  animation: rank-up-inward-ring 0.7s cubic-bezier(0.6, 0, 0.9, 0.4) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-inward-ring {
+  0% {
+    transform: scale(3.2) rotate(45deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  92% {
+    transform: scale(0.55) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.5) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+@utility rank-up-diamond-old {
+  animation: rank-up-hold-out 1.2s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-hold-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility rank-up-diamond-jitter {
+  animation: rank-up-jitter 0.07s steps(1) 0.3s 13;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The whole new Ornament shows once its tiles have assembled. */
+@utility rank-up-diamond-new {
+  animation: rank-up-hold-in 2.2s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-hold-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* A tile flies off to (--tile-x, --tile-y), turning by --tile-rotate, as it fades. */
+@utility rank-up-shatter {
+  animation: rank-up-shatter 0.9s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-shatter {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tile-x), var(--tile-y)) rotate(var(--tile-rotate));
+    opacity: 0;
+  }
+}
+
+/* A tile flies in from (--tile-x, --tile-y) to its place in the new Ornament. */
+@utility rank-up-assemble {
+  animation: rank-up-assemble 0.75s cubic-bezier(0.2, 0.95, 0.25, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-assemble {
+  0% {
+    transform: translate(var(--tile-x), var(--tile-y)) rotate(var(--tile-rotate));
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A pixel of rain falls past the bottom of the stage, again and again; its column, duration and delay
+   come from the drop. */
+@utility rank-up-rain {
+  animation: rank-up-rain linear infinite backwards;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-rain {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(730px);
+    opacity: 1;
+  }
+}
+
 @keyframes ornament-blink {
   0% {
     fill: var(--ornament-tier);

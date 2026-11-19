@@ -2,21 +2,31 @@ import { cn } from "../../../shared/lib/utils.ts";
 import { useTierPromotionEffects } from "../hooks/useTierPromotionEffects.ts";
 import type { PromotedTier } from "../rank/tierPromotion.ts";
 import { TierPromotionGrid } from "./TierPromotionGrid.tsx";
+import { TierPromotionRain } from "./TierPromotionRain.tsx";
 import { TierPromotionRays } from "./TierPromotionRays.tsx";
 
 interface TierPromotionEffectsProps {
   tier: PromotedTier;
 }
 
-// Centred on the Ornament, at (520, 260) of the stage; the grid and the rays sit behind the rings.
+// Centred on the Ornament, at (520, 260) of the stage; the rain, the grid and the rays sit behind the
+// rings.
 export function TierPromotionEffects({ tier }: TierPromotionEffectsProps) {
   const effects = useTierPromotionEffects(tier);
   if (effects === null) return null;
 
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 motion-reduce:hidden">
+      <TierPromotionRain drops={effects.rain} />
       <TierPromotionGrid squareStyles={effects.gridSquareStyles} />
       {effects.rays !== null && <TierPromotionRays {...effects.rays} />}
+      {effects.inwardRingStyles.map((style, index) => (
+        <span
+          key={index}
+          className="absolute top-[260px] left-[520px] -mt-[110px] -ml-[110px] size-[220px] rounded-[20px] border-4 border-(--rank-up-tier) opacity-0 shadow-[0_0_0_3px_var(--key-outline)] rank-up-inward-ring"
+          style={style}
+        />
+      ))}
       {effects.ringStyles.map((style, index) => (
         <span
           key={index}
