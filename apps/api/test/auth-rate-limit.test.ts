@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import type { Redis } from "../src/redis/client.ts";
 import { createTestAuth } from "./helpers/auth.ts";
@@ -19,6 +20,7 @@ const createLimitedApp = (redis: Redis) =>
       customRules: { "/sign-in/*": { window: 60, max: 2 } },
     }),
     redis,
+    getLogger("api"),
   );
 
 const startSignIn = (app: ReturnType<typeof createApp>) =>

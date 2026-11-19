@@ -1,9 +1,13 @@
+import { getLogger, setupLogger } from "@repo/logger";
 import { createApp } from "./app.ts";
 import { migrateDatabase, openDatabase, requireDatabaseUrl } from "./db/client.ts";
 import { requireAuthConfig } from "./modules/auth/config.ts";
 import { createAuth } from "./modules/auth/service.ts";
 import { readDevOptions } from "./modules/dev/config.ts";
 import { openRedis, requireRedisUrl } from "./redis/client.ts";
+
+await setupLogger();
+const logger = getLogger("api");
 
 // Resolved from the working directory: inside a compiled binary, import.meta.dir is a virtual path.
 const migrationsFolder = process.env.MIGRATIONS_DIR ?? "./drizzle";
@@ -23,9 +27,11 @@ export const app = createApp(
   db,
   createAuth(db, authConfig, { redis }),
   redis,
+  logger,
   undefined,
   undefined,
   devOptions,
 );
 
 app.listen(Number(process.env.PORT ?? 3000));
+logger.info("API listening on port {port}", { port: app.server?.port });

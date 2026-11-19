@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { DUEL_WORD_COUNT, type ServerMessage, START_WINDOW_MS } from "@repo/duel-engine";
 import type { GameEvent } from "@repo/typing-engine";
 import { eq } from "drizzle-orm";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import type { Db } from "../src/db/client.ts";
 import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
@@ -24,7 +25,7 @@ type App = ReturnType<typeof createApp>;
 const createInstances = async (count: number, options: DuelOptions, db: Db = testDb.db) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: count }, () =>
-    createApp(db, auth, testRedis.redis, options).listen(0),
+    createApp(db, auth, testRedis.redis, getLogger("api"), options).listen(0),
   );
   return {
     apps,
@@ -122,7 +123,8 @@ test("a Duel whose two Participants left after its first Start is played to its 
 
     // The sweeps an instance would run, at the instants each step of the Duel falls due.
     const relay = createRelay(redis);
-    const sweep = (now: number) => sweepDuels(testDb.db, redis, relay, delays, now);
+    const sweep = (now: number) =>
+      sweepDuels(testDb.db, redis, relay, delays, now, getLogger("api.duel"));
     const starts = [countdown.startAt, countdown.startAt + 40_000, countdown.startAt + 80_000];
     const [first = 0, second = 0, third = 0] = starts;
     // Not yet 2 seconds past the deadline: nothing is closed.
@@ -188,7 +190,11 @@ test("with two instances sweeping the same Redis at the same instants, each Roun
     const { duelId, sockets, countdown } = await startDuel(app);
     const relays = [createRelay(redis), createRelay(redis)];
     const sweep = (now: number) =>
-      Promise.all(relays.map((relay) => sweepDuels(testDb.db, redis, relay, delays, now)));
+      Promise.all(
+        relays.map((relay) =>
+          sweepDuels(testDb.db, redis, relay, delays, now, getLogger("api.duel")),
+        ),
+      );
     const first = countdown.startAt;
     for (const startAt of [first, first + 40_000, first + 80_000]) {
       await sweep(startAt - 3000);

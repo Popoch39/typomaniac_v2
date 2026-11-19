@@ -1,3 +1,4 @@
+import type { Logger } from "@repo/logger";
 import type { PairingSide } from "@repo/matchmaking-engine";
 import type { EntryHolder } from "@repo/queue";
 import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
@@ -108,6 +109,7 @@ type Refreshed = EntryHolder & {
  */
 export const createEntryRefreshes = (
   redis: Redis,
+  logger: Logger,
   { expiryMs, intervalMs }: { readonly expiryMs: number; readonly intervalMs: number },
 ) => {
   const held = new Set<Refreshed>();
@@ -120,7 +122,10 @@ export const createEntryRefreshes = (
   const refreshAll = () => {
     for (const refreshed of held)
       refresh(refreshed).catch((error: unknown) =>
-        console.error(`Could not refresh the Queue entry of ${refreshed.playerId}`, error),
+        logger.error("Could not refresh the Queue entry of {playerId}", {
+          playerId: refreshed.playerId,
+          error,
+        }),
       );
   };
   const stop = () => {

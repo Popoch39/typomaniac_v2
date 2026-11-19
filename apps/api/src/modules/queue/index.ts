@@ -1,4 +1,5 @@
 import { RANKED_CONNECT_MS } from "@repo/duel-engine";
+import type { Logger } from "@repo/logger";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { Elysia, status } from "elysia";
 import { websocket } from "elysia/websocket";
@@ -35,6 +36,7 @@ export const createQueueRoutes = (
   db: Db,
   auth: Auth,
   redis: Redis,
+  logger: Logger,
   {
     entryExpiryMs = QUEUE_ENTRY_EXPIRY_MS,
     refreshMs = entryExpiryMs / 3,
@@ -43,8 +45,8 @@ export const createQueueRoutes = (
   }: QueueOptions = {},
 ) => {
   const evictions = createEvictions(redis);
-  const pairings = createPairingFeed(db, redis);
-  const refreshes = createEntryRefreshes(redis, {
+  const pairings = createPairingFeed(db, redis, logger);
+  const refreshes = createEntryRefreshes(redis, logger, {
     expiryMs: entryExpiryMs,
     intervalMs: refreshMs,
   });

@@ -14,6 +14,7 @@ COPY packages/duel-engine/package.json ./packages/duel-engine/
 COPY packages/ranked-engine/package.json ./packages/ranked-engine/
 COPY packages/matchmaking-engine/package.json ./packages/matchmaking-engine/
 COPY packages/redis/package.json ./packages/redis/
+COPY packages/logger/package.json ./packages/logger/
 COPY packages/queue/package.json ./packages/queue/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 RUN bun install --frozen-lockfile --filter matchmaker
@@ -21,6 +22,7 @@ RUN bun install --frozen-lockfile --filter matchmaker
 # The workspace packages the matchmaker imports are compiled from their sources: each one must be copied whole.
 COPY packages/matchmaking-engine ./packages/matchmaking-engine
 COPY packages/redis ./packages/redis
+COPY packages/logger ./packages/logger
 COPY packages/queue ./packages/queue
 COPY apps/matchmaker ./apps/matchmaker
 ENV NODE_ENV=production

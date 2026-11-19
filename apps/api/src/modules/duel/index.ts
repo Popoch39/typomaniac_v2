@@ -6,6 +6,7 @@ import {
   ROUND_PAUSE_MS,
   type ServerMessage,
 } from "@repo/duel-engine";
+import type { Logger } from "@repo/logger";
 import { applyEvent, type Game } from "@repo/typing-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
@@ -54,6 +55,7 @@ export const createDuelRoutes = (
   db: Db,
   auth: Auth,
   redis: Redis,
+  logger: Logger,
   {
     expiryMs = DUEL_EXPIRY_MS,
     countdownMs = COUNTDOWN_MS,
@@ -86,8 +88,8 @@ export const createDuelRoutes = (
   let sweeper: ReturnType<typeof setInterval> | undefined;
   let sweep: Promise<void> | undefined;
   const runSweep = () => {
-    sweep ??= sweepDuels(db, redis, relay, delays, Date.now())
-      .catch((error: unknown) => console.error("Could not sweep the Duels", error))
+    sweep ??= sweepDuels(db, redis, relay, delays, Date.now(), logger)
+      .catch((error: unknown) => logger.error("Could not sweep the Duels", { error }))
       .finally(() => {
         sweep = undefined;
       });
@@ -273,7 +275,11 @@ export const createDuelRoutes = (
           if (ends)
             await endRound(db, redis, relay, ws.params.id, round, delays, Date.now()).catch(
               (error: unknown) =>
-                console.error(`Could not end Round ${round} of Duel ${ws.params.id}`, error),
+                logger.error("Could not end Round {round} of Duel {duelId}", {
+                  round,
+                  duelId: ws.params.id,
+                  error,
+                }),
             );
         },
         async close(ws) {

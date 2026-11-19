@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { DUEL_GAME_CONFIG, type Outcome } from "@repo/duel-engine";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { duel, duelParticipant } from "../src/db/schema.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
@@ -14,7 +15,7 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
 const readStanding = (cookie?: string) =>
   app.handle(
