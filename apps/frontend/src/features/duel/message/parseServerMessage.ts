@@ -30,12 +30,23 @@ const hasFields = (value: unknown, checks: Record<string, Check>) =>
 
 const isNumbers = isListOf(isNumber);
 
+const isOrnament: Check = (value) =>
+  hasFields(value, {
+    tier: (tier) =>
+      ["unranked", "bronze", "silver", "gold", "platinum", "diamond", "master"].includes(
+        String(tier),
+      ),
+    // `null` for the Unranked plate, a Master Ornament or a pinned Tier, but never left out.
+    division: (division) => division === null || [1, 2, 3, 4].includes(Number(division)),
+  });
+
 const isParticipant: Check = (value) =>
   hasFields(value, {
     seat: isSeat,
     name: isString,
     // `null` for a Guest, but never left out.
     avatarUrl: (avatarUrl) => avatarUrl !== undefined && isNullOr(isString)(avatarUrl),
+    ornament: (ornament) => ornament !== undefined && isNullOr(isOrnament)(ornament),
     connected: isBoolean,
   });
 

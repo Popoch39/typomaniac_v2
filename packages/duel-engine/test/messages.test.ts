@@ -25,13 +25,22 @@ const serverMessages: ServerMessage[] = [
     startAt: 9000,
     words: ["cat", "dog"],
     participants: [
-      { seat: 0, name: "ada", avatarUrl: "https://cdn.example.com/ada.png", connected: true },
-      { seat: 1, name: "Guest-4821", avatarUrl: null, connected: true },
+      {
+        seat: 0,
+        name: "ada",
+        avatarUrl: "https://cdn.example.com/ada.png",
+        ornament: { tier: "gold", division: 2 },
+        connected: true,
+      },
+      { seat: 1, name: "Guest-4821", avatarUrl: null, ornament: null, connected: true },
     ],
     ranks: [{ tier: "gold", division: 2, lp: 40 }, null],
     journals: [[{ type: "start", at: 0 }], []],
   },
-  { type: "presence", participant: { seat: 0, name: "ada", avatarUrl: null, connected: false } },
+  {
+    type: "presence",
+    participant: { seat: 0, name: "ada", avatarUrl: null, ornament: null, connected: false },
+  },
   { type: "countdown", round: 1, startAt: 4000, words: ["cat", "dog"] },
   { type: "opponentEvent", event: { type: "insert", at: 4200, text: "c" } },
   {

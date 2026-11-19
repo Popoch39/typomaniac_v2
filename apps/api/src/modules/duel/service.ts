@@ -15,7 +15,7 @@ import {
   type ServerMessage,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
-import type { Rank } from "@repo/ranked-engine";
+import type { Ornament, Rank } from "@repo/ranked-engine";
 import {
   applyEvent,
   createGame,
@@ -48,15 +48,21 @@ export type Identity = {
   readonly playerId: string | null;
   /** `null` for a Guest or a Player without a picture. */
   readonly avatarUrl: string | null;
+  /** `null` for a Guest or a Player who wears none. */
+  readonly ornament: Ornament;
 };
 
 export type DuelKind = "custom" | "ranked";
 
-/** A Player a seat of a ranked Duel is held for, shown by their Nickname, their Avatar and their Rank. */
+/**
+ * A Player a seat of a ranked Duel is held for, shown by their Nickname, their Avatar, their Ornament
+ * and their Rank.
+ */
 export type RankedSeat = {
   readonly playerId: string;
   readonly nickname: string;
   readonly avatarUrl: string | null;
+  readonly ornament: Ornament;
   /** The Rank as the Duel is created, `null` while the Player is Unranked. */
   readonly rank: Rank | null;
 };
@@ -166,11 +172,12 @@ export const draftRankedDuel = (
 ) => {
   const duelId = crypto.randomUUID();
   const seats: Record<string, string> = Object.fromEntries(
-    players.flatMap(({ playerId, nickname, avatarUrl, rank }, seat) => [
+    players.flatMap(({ playerId, nickname, avatarUrl, ornament, rank }, seat) => [
       [`holder${seat}`, playerId],
       [`name${seat}`, nickname],
       [`player${seat}`, playerId],
       [`rank${seat}`, JSON.stringify(rank)],
+      [`ornament${seat}`, JSON.stringify(ornament)],
       // Left out without a picture: Redis holds no `null`.
       ...(avatarUrl === null ? [] : [[`avatar${seat}`, avatarUrl]]),
     ]),
@@ -204,6 +211,7 @@ for seat = 0, 1 do
     redis.call('HSET', KEYS[1], 'holder' .. seat, ARGV[1], 'name' .. seat, ARGV[2], 'connected' .. seat, '1')
     if ARGV[3] ~= '' then redis.call('HSET', KEYS[1], 'player' .. seat, ARGV[3]) end
     if ARGV[4] ~= '' then redis.call('HSET', KEYS[1], 'avatar' .. seat, ARGV[4]) end
+    redis.call('HSET', KEYS[1], 'ornament' .. seat, ARGV[5])
     return tostring(seat)
   end
 end
@@ -223,6 +231,7 @@ export const claimSeat = async (
     identity.name,
     identity.playerId ?? "",
     identity.avatarUrl ?? "",
+    JSON.stringify(identity.ornament),
   );
   if (claimed === "0") return 0;
   if (claimed === "1") return 1;
@@ -311,7 +320,9 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     const name = fields[`name${seat}`];
     if (name === undefined) return [];
     const avatarUrl = fields[`avatar${seat}`] ?? null;
-    return [{ seat, name, avatarUrl, connected: fields[`connected${seat}`] === "1" }];
+    const ornament = JSON.parse(fields[`ornament${seat}`] ?? "null") as Ornament;
+    const connected = fields[`connected${seat}`] === "1";
+    return [{ seat, name, avatarUrl, ornament, connected }];
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);

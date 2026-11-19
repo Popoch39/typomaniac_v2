@@ -621,6 +621,21 @@ test("each Player of a ranked Duel is shown both Avatars, none for a Player with
   }
 });
 
+test("each Player of a ranked Duel is shown both Ornaments, the Unranked plate for an Unranked Player", async () => {
+  // At the MMR of a new Player, so that both are paired at once.
+  const { players } = await openRankedDuel([{ ...goldTwo(40), mmr: 1200 }]);
+  const bySeat = players
+    .map(({ seat: playerSeat }, index) => ({
+      seat: playerSeat,
+      ornament: index === 0 ? { tier: "gold", division: 2 } : { tier: "unranked", division: null },
+    }))
+    .toSorted((a, b) => a.seat - b.seat);
+  for (const { received } of players) {
+    const state = received.find((message) => isOfType(message, "state"));
+    expect(state).toMatchObject({ participants: bySeat });
+  }
+});
+
 test("each Player of a ranked Duel is shown both Ranks, Unranked as none, and a Custom Duel shows no Rank", async () => {
   // At the MMR of a new Player, so that both are paired at once.
   const ranked = await openRankedDuel([{ ...goldTwo(40), mmr: 1200 }]);

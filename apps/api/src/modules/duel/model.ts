@@ -13,6 +13,22 @@ const participant = t.Object({
   seat,
   name: t.String(),
   avatarUrl: t.Union([t.String(), t.Null()]),
+  // The Ornament `wornOrnament` gives, `null` for a bare Avatar.
+  ornament: t.Union([
+    t.Object({
+      tier: t.Union([
+        t.Literal("unranked"),
+        t.Literal("bronze"),
+        t.Literal("silver"),
+        t.Literal("gold"),
+        t.Literal("platinum"),
+        t.Literal("diamond"),
+        t.Literal("master"),
+      ]),
+      division: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4), t.Null()]),
+    }),
+    t.Null(),
+  ]),
   connected: t.Boolean(),
 });
 
