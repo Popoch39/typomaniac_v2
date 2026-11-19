@@ -1,14 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
-import { FindDuelIcon } from "../../queue/components/FindDuelIcon.tsx";
+import { FindDuelIcon } from "../../../shared/components/FindDuelIcon.tsx";
 import { useFindNextDuel } from "../hooks/useFindNextDuel.ts";
+import { DuelEndKeys } from "./DuelEndKeys.tsx";
 
 export function DuelRankedEndActions() {
   const findNextDuel = useFindNextDuel();
 
   return (
-    // Room under the keys for their edge.
-    <div className="flex items-center justify-center gap-5 pt-2 pb-[9px]">
+    <DuelEndKeys>
       <Keycap type="button" variant="brand" size="xl" onClick={findNextDuel}>
         <FindDuelIcon />
         Find a Duel
@@ -16,6 +16,6 @@ export function DuelRankedEndActions() {
       <Keycap asChild variant="neutral" size="lg">
         <Link to="/ranked">Back to Ranked</Link>
       </Keycap>
-    </div>
+    </DuelEndKeys>
   );
 }

@@ -1,5 +1,5 @@
 import { Keycap } from "../../../shared/components/Keycap.tsx";
-import { FindDuelIcon } from "./FindDuelIcon.tsx";
+import { FindDuelIcon } from "../../../shared/components/FindDuelIcon.tsx";
 
 interface EnterQueueButtonProps {
   enter: () => void;

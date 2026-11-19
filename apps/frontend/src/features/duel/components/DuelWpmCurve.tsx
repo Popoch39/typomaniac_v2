@@ -1,12 +1,7 @@
-import type { ChartPoint } from "../chart/wpmChart.ts";
+import type { DrawnCurve } from "../chart/drawnCurves.ts";
 
 interface DuelWpmCurveProps {
-  curve: {
-    readonly polyline: string;
-    readonly last: ChartPoint | null;
-    /** The Participant's colour, which the line and its marker take. */
-    readonly className: string;
-  };
+  curve: DrawnCurve;
 }
 
 export function DuelWpmCurve({ curve }: DuelWpmCurveProps) {

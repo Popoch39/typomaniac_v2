@@ -1,3 +1,5 @@
+import { type WpmScale, wpmY } from "./wpmY.ts";
+
 export type ChartPoint = {
   readonly x: number;
   readonly y: number;
@@ -12,8 +14,8 @@ export type WpmCurve = {
 export type WpmChart = {
   /** The Participant's own curve first, then the Opponent's. */
   readonly curves: readonly [WpmCurve, WpmCurve];
-  /** The WPM at the bottom and at the top of the chart; `null` when nothing is drawn. */
-  readonly scale: { readonly min: number; readonly max: number } | null;
+  /** `null` when nothing is drawn. */
+  readonly scale: WpmScale | null;
 };
 
 type ChartBox = {
@@ -36,18 +38,14 @@ export function wpmChart(
     const empty = { points: [], last: null };
     return { curves: [empty, empty], scale: null };
   }
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  // A flat scale has no height to spread over: its curves run through the middle.
-  const yOf = (wpm: number) =>
-    max === min ? height / 2 : height - ((wpm - min) / (max - min)) * height;
+  const scale = { min: Math.min(...values), max: Math.max(...values) };
   const curveOf = (history: readonly number[]): WpmCurve => {
     // A value is the WPM at the end of its second: the first sits one second along the axis.
     const points = history.map((wpm, index) => ({
       x: ((index + 1) * width) / seconds,
-      y: yOf(wpm),
+      y: wpmY(wpm, scale, height),
     }));
     return { points, last: points.at(-1) ?? null };
   };
-  return { curves: [curveOf(histories[0]), curveOf(histories[1])], scale: { min, max } };
+  return { curves: [curveOf(histories[0]), curveOf(histories[1])], scale };
 }

@@ -23,6 +23,7 @@
     "../src/features/duel/caret",
     "../src/features/duel/chart",
     "../src/features/duel/message",
+    "../src/features/duel/phase",
     "../src/features/duel/points",
     "../src/features/duel/rank",
     "../src/features/duel/round",
@@ -32,7 +33,8 @@
     "../src/features/queue/clock",
     "../src/features/queue/message",
     "../src/features/queue/refusal",
-    "../src/shared/api/describeApiError.ts"
+    "../src/shared/api/describeApiError.ts",
+    "../src/shared/lib/formatClock.ts"
   ],
   "references": [
     { "path": "../../../packages/typing-engine" },

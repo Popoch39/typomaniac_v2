@@ -1,33 +1,25 @@
-import type { Participant } from "@repo/duel-engine";
 import { cn } from "../../../shared/lib/utils.ts";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
+import type { BandSide } from "../hooks/useDuelBandSides.ts";
 
 interface DuelBandSideProps {
-  side: {
-    readonly participant: Participant | undefined;
-    readonly rankLine: string | null;
-    readonly isAway: boolean;
-    readonly points: number;
-    /** The Lead, only on the side of the one who holds it. */
-    readonly lead: number | null;
-  };
+  side: BandSide;
   isOwn?: boolean;
 }
 
-// Every slot keeps its box whatever it holds: the Rank line its line height, the Points and the Lead
-// fixed widths of monospaced figures, so the band never moves while the numbers change.
+// Every slot keeps its box whatever it holds: the Avatar its frame before the Participant arrives,
+// the name and the Rank line their line height, the Points and the Lead fixed widths of monospaced
+// figures, so the band never moves while the numbers change.
 export function DuelBandSide({ side, isOwn = false }: DuelBandSideProps) {
   return (
     <div className={cn("flex min-w-0 items-center gap-5", !isOwn && "flex-row-reverse")}>
-      {side.participant && (
-        <OrnamentedAvatar
-          player={{ nickname: side.participant.name, avatarUrl: side.participant.avatarUrl }}
-          ornament={side.participant.ornament}
-          size="md"
-          isOwn={isOwn}
-          className={cn(side.isAway && "opacity-50 grayscale")}
-        />
-      )}
+      <OrnamentedAvatar
+        player={side.player}
+        ornament={side.ornament}
+        size="md"
+        isOwn={isOwn}
+        className={cn(!side.isKnown && "invisible", side.isAway && "opacity-50 grayscale")}
+      />
       <div className={cn("flex min-w-0 flex-col gap-1.5", !isOwn && "items-end")}>
         <span
           className={cn(
@@ -35,7 +27,7 @@ export function DuelBandSide({ side, isOwn = false }: DuelBandSideProps) {
             isOwn ? "text-action" : "text-opponent",
           )}
         >
-          {side.participant?.name}
+          {side.name}
         </span>
         <span
           aria-live="polite"

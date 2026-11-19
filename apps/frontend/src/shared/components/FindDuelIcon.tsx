@@ -1,4 +1,4 @@
-import { StrokeIcon } from "../../../shared/components/StrokeIcon.tsx";
+import { StrokeIcon } from "./StrokeIcon.tsx";
 
 /** Crossed swords. */
 export function FindDuelIcon() {

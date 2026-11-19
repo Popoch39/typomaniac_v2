@@ -18,21 +18,13 @@ import { useGameStore } from "../../game/store/useGameStore.ts";
 import { standingQueryKey } from "../../ranked/api/standingQueryOptions.ts";
 import { opponentCaretPosition } from "../caret/opponentCaretPosition.ts";
 import { eventClockShift } from "../clock/eventClockShift.ts";
+import type { DuelPhase } from "../phase/duelPhase.ts";
 import { closeDuelSocket, openDuelSocket, sendToDuel } from "../socket/duelSocket.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 import { useDuelCountdownStore } from "./useDuelCountdownStore.ts";
 
 type DuelState = {
-  readonly phase:
-    | "connecting"
-    | "waiting"
-    | "countdown"
-    | "running"
-    /** Between two Rounds, or after the last one: the Round that just ended is shown. */
-    | "roundEnd"
-    | "finished"
-    | "refused"
-    | "disconnected";
+  readonly phase: DuelPhase;
   readonly seat: Seat | null;
   readonly participants: readonly Participant[];
   /** The Rank of each Player of a ranked Duel, indexed by seat; `null` for a Custom Duel. */

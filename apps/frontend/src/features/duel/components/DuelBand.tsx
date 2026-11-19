@@ -4,7 +4,6 @@ import { DuelBandSide } from "./DuelBandSide.tsx";
 
 export function DuelBand() {
   const sides = useDuelBandSides();
-  if (sides === null) return null;
 
   return (
     // The Participant always on the left, the Opponent mirrored on the right, whichever seat is held.

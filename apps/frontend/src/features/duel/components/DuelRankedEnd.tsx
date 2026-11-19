@@ -1,5 +1,5 @@
 import { cn } from "../../../shared/lib/utils.ts";
-import { LpBar } from "../../ranked/components/LpBar.tsx";
+import { LpBar } from "../../../shared/components/LpBar.tsx";
 import { useDuelRankedEnd } from "../hooks/useDuelRankedEnd.ts";
 import type { LpTone } from "../rank/rankedEndBlock.ts";
 

@@ -1,20 +1,18 @@
-import type { useDuelRoundDetails } from "../hooks/useDuelRoundDetails.ts";
+import type { DetailsChart } from "../chart/detailsChart.ts";
+import { DuelCaption } from "./DuelCaption.tsx";
 import { DuelWpmCurve } from "./DuelWpmCurve.tsx";
 
 interface DuelRoundChartProps {
   number: number;
-  chart: NonNullable<ReturnType<typeof useDuelRoundDetails>>["chart"];
+  chart: DetailsChart;
 }
 
 export function DuelRoundChart({ number, chart }: DuelRoundChartProps) {
   const { plot } = chart;
-  const bottom = plot.top + plot.height;
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <h2 className="m-0 font-mono text-xs font-bold tracking-[.16em] text-ink-subtle uppercase">
-        WPM · Round {number}
-      </h2>
+      <DuelCaption>WPM · Round {number}</DuelCaption>
       {/* A fixed height, whatever the width of its column, so the band below never moves. */}
       <svg
         role="img"
@@ -39,7 +37,7 @@ export function DuelRoundChart({ number, chart }: DuelRoundChartProps) {
             </g>
           ))}
           {chart.times.map(({ second, x }) => (
-            <text key={second} x={plot.left + x} y={bottom + 18} textAnchor="middle">
+            <text key={second} x={plot.left + x} y={chart.timeLabelY} textAnchor="middle">
               {second}s
             </text>
           ))}

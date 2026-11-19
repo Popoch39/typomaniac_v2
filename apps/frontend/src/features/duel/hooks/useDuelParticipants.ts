@@ -1,4 +1,4 @@
-import { rankLine } from "../rank/rankLine.ts";
+import { seatRankName } from "../rank/seatRankName.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 
 /**
@@ -12,7 +12,6 @@ export function useDuelParticipants() {
   const self = participants.find((participant) => participant.seat === seat);
   const opponent = participants.find((participant) => participant.seat !== seat);
   const opponentAway = opponent?.connected === false;
-  // Connected as far as the Rank goes: the waiting screen says the Opponent is away on its own line.
-  const opponentRank = opponent === undefined ? null : rankLine(ranks, opponent.seat, true);
+  const opponentRank = opponent === undefined ? null : seatRankName(ranks, opponent.seat);
   return { self, opponent, opponentAway, opponentRank };
 }

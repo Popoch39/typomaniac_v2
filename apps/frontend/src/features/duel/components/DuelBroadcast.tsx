@@ -1,4 +1,5 @@
-import { useDuelTitle } from "../hooks/useDuelTitle.ts";
+import { useDuelBroadcastBody } from "../hooks/useDuelBroadcastBody.ts";
+import type { BroadcastPhase } from "../phase/duelPhase.ts";
 import { DuelBand } from "./DuelBand.tsx";
 import { DuelCountdown } from "./DuelCountdown.tsx";
 import { DuelEnd } from "./DuelEnd.tsx";
@@ -6,12 +7,11 @@ import { DuelLiveRound } from "./DuelLiveRound.tsx";
 import { DuelRoundEnd } from "./DuelRoundEnd.tsx";
 
 interface DuelBroadcastProps {
-  phase: "countdown" | "running" | "roundEnd" | "finished";
+  phase: BroadcastPhase;
 }
 
 export function DuelBroadcast({ phase }: DuelBroadcastProps) {
-  // The last Round's end already shows the Duel's, so the server ending the Duel moves nothing.
-  const isDecided = useDuelTitle() !== null;
+  const body = useDuelBroadcastBody(phase);
 
   return (
     // Full width up to 1440px, its margins narrowing on smaller screens, so the band and the Target
@@ -20,11 +20,11 @@ export function DuelBroadcast({ phase }: DuelBroadcastProps) {
       <DuelBand />
       {/* The body fills what is left under the band, so a phase change never moves the band. */}
       <div className="flex grow flex-col gap-4">
-        {phase === "countdown" && <DuelCountdown />}
+        {body === "countdown" && <DuelCountdown />}
         {/* Mounted at the Start only: typing during the Countdown reaches no Game. */}
-        {phase === "running" && <DuelLiveRound />}
-        {phase === "roundEnd" && !isDecided && <DuelRoundEnd />}
-        {(phase === "finished" || (phase === "roundEnd" && isDecided)) && <DuelEnd />}
+        {body === "live" && <DuelLiveRound />}
+        {body === "roundEnd" && <DuelRoundEnd />}
+        {body === "duelEnd" && <DuelEnd />}
       </div>
     </main>
   );
