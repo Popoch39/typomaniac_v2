@@ -92,9 +92,11 @@ test("the request record names the Player when they are signed in", async () => 
   });
 });
 
-test("the health probe writes no request record", async () => {
-  const response = await app.handle(new Request("http://localhost/health"));
-  expect(response.status).toBe(200);
+test("the health and readiness probes write no request record", async () => {
+  const health = await app.handle(new Request("http://localhost/health"));
+  const ready = await app.handle(new Request("http://localhost/ready"));
+  expect(health.status).toBe(200);
+  expect(ready.status).toBe(200);
 
   expect(await httpRecords()).toEqual([]);
 });

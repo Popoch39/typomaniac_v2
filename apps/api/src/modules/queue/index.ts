@@ -9,6 +9,7 @@ import { createProtection } from "../auth/index.ts";
 import { personOf } from "../http/index.ts";
 import type { Auth } from "../auth/service.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
+import type { Lifecycle } from "../lifecycle/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
 import * as QueueModel from "./model.ts";
@@ -38,6 +39,7 @@ export const createQueueRoutes = (
   auth: Auth,
   redis: Redis,
   logger: Logger,
+  lifecycle: Lifecycle,
   {
     entryExpiryMs = QUEUE_ENTRY_EXPIRY_MS,
     refreshMs = entryExpiryMs / 3,
@@ -91,6 +93,7 @@ export const createQueueRoutes = (
           return refuseWhileInRankedDuel(player.id);
         },
         async open(ws) {
+          if (!lifecycle.hold(ws.id, ws)) return;
           const send = (message: QueueServerMessage) => ws.send(message);
           const presence: Presence = {
             playerId: ws.player.id,
@@ -127,6 +130,7 @@ export const createQueueRoutes = (
           );
         },
         async close(ws, code) {
+          lifecycle.release(ws.id);
           logger.info("Player {playerId} closed their Queue socket ({code})", {
             playerId: ws.player.id,
             code,

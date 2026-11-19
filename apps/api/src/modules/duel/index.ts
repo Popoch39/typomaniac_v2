@@ -15,6 +15,7 @@ import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
 import { personOf } from "../http/index.ts";
 import type { Auth } from "../auth/service.ts";
+import type { Lifecycle } from "../lifecycle/service.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
@@ -57,6 +58,7 @@ export const createDuelRoutes = (
   auth: Auth,
   redis: Redis,
   logger: Logger,
+  lifecycle: Lifecycle,
   {
     expiryMs = DUEL_EXPIRY_MS,
     countdownMs = COUNTDOWN_MS,
@@ -151,6 +153,7 @@ export const createDuelRoutes = (
         // Hands a new Guest their cookie with the handshake, the only response a socket gets.
         upgrade: ({ set }) => set.headers,
         async open(ws) {
+          if (!lifecycle.hold(ws.id, ws)) return;
           const duel = await readDuel(redis, ws.params.id);
           const seat = duel?.holderIds.indexOf(ws.identity.id);
           const self = duel?.participants.find((participant) => participant.seat === seat);
@@ -289,6 +292,7 @@ export const createDuelRoutes = (
             );
         },
         async close(ws, code) {
+          lifecycle.release(ws.id);
           const seating = seated.get(ws.id);
           logger.info("Socket on Duel {duelId} closed ({code})", {
             duelId: ws.params.id,
