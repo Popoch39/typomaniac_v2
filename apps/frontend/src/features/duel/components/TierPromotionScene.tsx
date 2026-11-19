@@ -20,8 +20,16 @@ const TIER_COLOURS: Readonly<Record<PromotedTier, string>> = {
  * underneath. The 1040 × 680 stage is centred and scaled down to fit the viewport.
  */
 export function TierPromotionScene() {
-  const { promotion, timings, player, isContinueReady, onContinueShown, onContinue, onKeyDown } =
-    useTierPromotionScene();
+  const {
+    promotion,
+    timings,
+    shakeStyle,
+    player,
+    isContinueReady,
+    onContinueShown,
+    onContinue,
+    onKeyDown,
+  } = useTierPromotionScene();
   if (promotion === null || timings === null) return null;
 
   return (
@@ -39,9 +47,15 @@ export function TierPromotionScene() {
           TIER_COLOURS[promotion.tier],
         )}
       >
-        <TierPromotionEffects tier={promotion.tier} />
-        <TierPromotionHero player={player} promotion={promotion} />
-        <TierPromotionTitle promotion={promotion} timings={timings} />
+        {/* The shake moves the Ornament, its effects and the title, never the keys at the edges. */}
+        <div
+          className={cn("absolute inset-0", shakeStyle !== null && "rank-up-shake")}
+          style={shakeStyle ?? undefined}
+        >
+          <TierPromotionEffects tier={promotion.tier} />
+          <TierPromotionHero player={player} promotion={promotion} />
+          <TierPromotionTitle promotion={promotion} timings={timings} />
+        </div>
         <p className="absolute top-7 left-10 m-0 text-ink-subtle type-eyebrow">Rank up</p>
         <TierPromotionContinue
           isReady={isContinueReady}

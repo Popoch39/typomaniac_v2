@@ -22,12 +22,12 @@ test("a promotion from Bronze I to Silver IV is the Silver Tier promotion, title
   });
 });
 
-test("a promotion from Silver I to Gold IV is the Gold Tier promotion, titled by the Tier name in keys", () => {
+test("a promotion from Silver I to Gold IV is the Gold Tier promotion, titled by the Tier name in keys over the Rank name", () => {
   expect(tierPromotion(promotedTo({ tier: "gold", division: 4, lp: 3 }))).toEqual({
     tier: "gold",
     oldOrnament: { tier: "silver", division: 1 },
     newOrnament: { tier: "gold", division: 4 },
-    title: { kind: "keys", letters: ["G", "o", "l", "d"] },
+    title: { kind: "keys", letters: ["G", "o", "l", "d"], name: "Gold IV" },
     line: "Promoted from Silver I",
     announcement: "Promoted to Gold IV",
   });
@@ -38,7 +38,11 @@ test("a promotion from Gold I to Platinum IV is the Platinum Tier promotion", ()
     tier: "platinum",
     oldOrnament: { tier: "gold", division: 1 },
     newOrnament: { tier: "platinum", division: 4 },
-    title: { kind: "keys", letters: ["P", "l", "a", "t", "i", "n", "u", "m"] },
+    title: {
+      kind: "keys",
+      letters: ["P", "l", "a", "t", "i", "n", "u", "m"],
+      name: "Platinum IV",
+    },
     line: "Promoted from Gold I",
     announcement: "Promoted to Platinum IV",
   });
@@ -49,7 +53,7 @@ test("a promotion from Platinum I to Diamond IV is the Diamond Tier promotion", 
     tier: "diamond",
     oldOrnament: { tier: "platinum", division: 1 },
     newOrnament: { tier: "diamond", division: 4 },
-    title: { kind: "keys", letters: ["D", "i", "a", "m", "o", "n", "d"] },
+    title: { kind: "keys", letters: ["D", "i", "a", "m", "o", "n", "d"], name: "Diamond IV" },
     line: "Promoted from Platinum I",
     announcement: "Promoted to Diamond IV",
   });
@@ -60,7 +64,7 @@ test("a promotion from Diamond I to Master is the Master Tier promotion, whose O
     tier: "master",
     oldOrnament: { tier: "diamond", division: 1 },
     newOrnament: { tier: "master", division: null },
-    title: { kind: "keys", letters: ["M", "a", "s", "t", "e", "r"] },
+    title: { kind: "keys", letters: ["M", "a", "s", "t", "e", "r"], name: "Master" },
     line: "Promoted from Diamond I",
     announcement: "Promoted to Master",
   });

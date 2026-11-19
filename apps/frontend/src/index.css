@@ -446,6 +446,162 @@
   }
 }
 
+/* Gold: the old Ornament jitters, then flips out edge on. */
+@utility rank-up-gold-old {
+  animation: rank-up-flip-out 0.3s cubic-bezier(0.55, 0, 0.9, 0.4) 0.7s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-flip-out {
+  0% {
+    opacity: 1;
+    transform: rotateY(0deg);
+  }
+  99% {
+    opacity: 1;
+    transform: rotateY(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: rotateY(90deg);
+  }
+}
+
+@utility rank-up-jitter {
+  animation: rank-up-jitter 0.1s steps(1) 7;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-jitter {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-3px, 1px);
+  }
+  50% {
+    transform: translate(3px, -1px);
+  }
+  75% {
+    transform: translate(-2px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* The new Ornament flips in from edge on, overshooting before it settles. */
+@utility rank-up-flip-in {
+  animation: rank-up-flip-in 0.55s cubic-bezier(0.2, 1.6, 0.45, 1) 1s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-flip-in {
+  from {
+    transform: rotateY(-90deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
+}
+
+/* Once landed, the new Ornament floats for as long as the scene stays open. */
+@utility rank-up-float {
+  animation: rank-up-float 3.2s ease-in-out 2.2s infinite;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* The screen shake as the new Ornament lands; its delay and duration come from the Tier's timings. */
+@utility rank-up-shake {
+  animation: rank-up-shake linear both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-shake {
+  0% {
+    transform: translate(0, 0);
+  }
+  12% {
+    transform: translate(-9px, 5px);
+  }
+  25% {
+    transform: translate(8px, -6px);
+  }
+  37% {
+    transform: translate(-6px, -3px);
+  }
+  50% {
+    transform: translate(5px, 4px);
+  }
+  62% {
+    transform: translate(-3px, 2px);
+  }
+  75% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* A letter of a title spelled in keys drops in, bounces once and settles. */
+@utility rank-up-drop {
+  animation: rank-up-drop 0.5s cubic-bezier(0.5, 0, 0.75, 0) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-drop {
+  0% {
+    transform: translateY(-90px);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(7px);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 @keyframes ornament-blink {
   0% {
     fill: var(--ornament-tier);

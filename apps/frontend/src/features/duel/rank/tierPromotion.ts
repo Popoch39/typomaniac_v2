@@ -15,10 +15,13 @@ export type TierPromotion = {
   readonly tier: PromotedTier;
   readonly oldOrnament: NonNullable<Ornament>;
   readonly newOrnament: NonNullable<Ornament>;
-  /** Silver is titled by its Rank name, the louder Tiers by their name spelled in keys. */
+  /**
+   * Silver is titled by its Rank name, the louder Tiers by their name spelled in keys, with the Rank
+   * name on the line under it.
+   */
   readonly title:
     | { readonly kind: "name"; readonly name: string }
-    | { readonly kind: "keys"; readonly letters: readonly string[] };
+    | { readonly kind: "keys"; readonly letters: readonly string[]; readonly name: string };
   readonly line: string;
   readonly announcement: string;
 };
@@ -45,7 +48,7 @@ export function tierPromotion({ rankChange, rank }: RankedEnd): TierPromotion | 
     title:
       rank.tier === "silver"
         ? { kind: "name", name: rankName(rank) }
-        : { kind: "keys", letters: tierName(rank.tier).split("") },
+        : { kind: "keys", letters: tierName(rank.tier).split(""), name: rankName(rank) },
     line: `Promoted from ${rankName(oldRank)}`,
     announcement: `Promoted to ${rankName(rank)}`,
   };

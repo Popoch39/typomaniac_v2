@@ -1,4 +1,10 @@
-import { useState, useSyncExternalStore, type AnimationEvent, type KeyboardEvent } from "react";
+import {
+  type AnimationEvent,
+  type CSSProperties,
+  type KeyboardEvent,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { SCENE_TIMINGS } from "../scene/sceneTimings.ts";
 import { useTierPromotionStore } from "../store/useTierPromotionStore.ts";
 import { useDuelParticipants } from "./useDuelParticipants.ts";
@@ -26,9 +32,18 @@ export function useTierPromotionScene() {
   );
   const [hasEntered, setHasEntered] = useState(false);
   const isContinueReady = isMotionReduced || hasEntered;
+  const timings = promotion === null ? null : SCENE_TIMINGS[promotion.tier];
+  const shake = timings?.shake ?? null;
   return {
     promotion,
-    timings: promotion === null ? null : SCENE_TIMINGS[promotion.tier],
+    timings,
+    shakeStyle:
+      shake === null
+        ? null
+        : ({
+            animationDelay: `${shake.at}s`,
+            animationDuration: `${shake.duration}s`,
+          } satisfies CSSProperties),
     player: { nickname: self?.name ?? null, avatarUrl: self?.avatarUrl ?? null },
     isContinueReady,
     // Only the appearance of Continue itself, not an animation bubbling from inside it.

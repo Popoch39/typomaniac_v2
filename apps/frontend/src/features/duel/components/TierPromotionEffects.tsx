@@ -13,10 +13,13 @@ export function TierPromotionEffects({ tier }: TierPromotionEffectsProps) {
 
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 motion-reduce:hidden">
-      <span
-        className="absolute top-[260px] left-[520px] -mt-[110px] -ml-[110px] size-[220px] rounded-[20px] border-5 border-(--rank-up-tier) opacity-0 shadow-[0_0_0_3px_var(--key-outline),inset_0_0_0_3px_var(--key-outline)] rank-up-ring"
-        style={effects.ringStyle}
-      />
+      {effects.ringStyles.map((style, index) => (
+        <span
+          key={index}
+          className="absolute top-[260px] left-[520px] -mt-[110px] -ml-[110px] size-[220px] rounded-[20px] border-5 border-(--rank-up-tier) opacity-0 shadow-[0_0_0_3px_var(--key-outline),inset_0_0_0_3px_var(--key-outline)] rank-up-ring"
+          style={style}
+        />
+      ))}
       {effects.bursts.map(({ fillClassName, style }, index) => (
         <span
           key={index}

@@ -3,17 +3,35 @@ import type { PromotedTier } from "../rank/tierPromotion.ts";
 /** When, in seconds from the opening of the scene, each part of a Tier's entrance starts. */
 export type SceneTimings = {
   readonly titleAt: number;
+  /** Between the drops of two letters of a title spelled in keys. */
+  readonly letterStep: number;
   readonly lineAt: number;
   /** Once the entrance has played: a key still held from the Game cannot skip it. */
   readonly continueAt: number;
+  /** The screen shake when the new Ornament lands, none for Silver. */
+  readonly shake: { readonly at: number; readonly duration: number } | null;
 };
 
 // From the canvas board of each Tier; the louder Tiers share Silver's until their own effects land.
-const SILVER: SceneTimings = { titleAt: 1.45, lineAt: 1.55, continueAt: 2.4 };
+const SILVER: SceneTimings = {
+  titleAt: 1.45,
+  letterStep: 0.1,
+  lineAt: 1.55,
+  continueAt: 2.4,
+  shake: null,
+};
+
+const GOLD: SceneTimings = {
+  titleAt: 1.4,
+  letterStep: 0.1,
+  lineAt: 1.95,
+  continueAt: 2.8,
+  shake: { at: 1.05, duration: 0.38 },
+};
 
 export const SCENE_TIMINGS: Readonly<Record<PromotedTier, SceneTimings>> = {
   silver: SILVER,
-  gold: SILVER,
+  gold: GOLD,
   platinum: SILVER,
   diamond: SILVER,
   master: SILVER,
