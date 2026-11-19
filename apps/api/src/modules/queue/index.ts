@@ -6,6 +6,7 @@ import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
+import { personOf } from "../http/index.ts";
 import type { Auth } from "../auth/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
@@ -107,6 +108,7 @@ export const createQueueRoutes = (
             close: () => ws.close(),
           };
           present.set(ws.id, presence);
+          logger.info("Player {playerId} opened a Queue socket", { playerId: presence.playerId });
           refreshes.hold(presence);
           await Promise.all([evictions.hold(presence), pairings.follow(presence)]);
           const { mmr } = await readStanding(db, presence.playerId);
@@ -129,14 +131,24 @@ export const createQueueRoutes = (
             { now: Date.now(), duelExpiryMs, duelConnectMs },
           );
         },
-        async close(ws) {
+        async close(ws, code) {
           lifecycle.release(ws.id);
+          logger.info("Player {playerId} closed their Queue socket ({code})", {
+            playerId: ws.player.id,
+            code,
+          });
           const presence = present.get(ws.id);
           if (!presence) return;
           present.delete(ws.id);
           refreshes.release(presence);
           await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
           await leaveQueue(redis, presence);
+        },
+        // A failing handler of an open socket, which only has an id once upgraded; the app's error
+        // hook answers it after this one.
+        error(context) {
+          if (!("id" in context)) return;
+          logger.error("Queue socket failed", { ...personOf(context), error: context.error });
         },
       })
   );
