@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { isOrnamentUnlocked, wornOrnament } from "../src/index.ts";
+import { isOrnamentUnlocked, tierAtLadderIndex, wornOrnament } from "../src/index.ts";
 
 test("ORNAMENT-1: Auto wears the Unranked plate while Unranked", () => {
   expect(wornOrnament("auto", null)).toEqual({ tier: "unranked", division: null });
@@ -58,4 +58,12 @@ test("ORNAMENT-2: a Tier is unlocked up to the Peak Tier and locked above it", (
 
 test("ORNAMENT-2: no Tier is unlocked without a Peak Tier", () => {
   expect(isOrnamentUnlocked("bronze", null)).toBe(false);
+});
+
+test("ORNAMENT-3: the Peak Tier is the Tier of the highest ladder index reached", () => {
+  expect(tierAtLadderIndex(0)).toBe("bronze");
+  expect(tierAtLadderIndex(3)).toBe("bronze");
+  expect(tierAtLadderIndex(4)).toBe("silver");
+  expect(tierAtLadderIndex(19)).toBe("diamond");
+  expect(tierAtLadderIndex(20)).toBe("master");
 });
