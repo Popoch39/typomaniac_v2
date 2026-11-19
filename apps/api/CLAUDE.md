@@ -69,6 +69,22 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
 - Pas de `console.*` dans `src/`. Message à gabarit et propriétés : `logger.error("Could not advance Duel {duelId}", { duelId, error })`. Jamais de cookie, d'en-tête `authorization` ni de secret en propriété.
 - Dans les tests, sans `setupLogger` les loggers ne sortent rien. Pour lire les records : `await setupLogger({ sink: (record) => void records.push(record) })`, puis `resetLogger()` en `afterAll` (voir `test/logging.test.ts`).
 
+## Readiness et arrêt
+
+- `/health` est la sonde de vie : `ok` tant que le process répond, même sans Postgres ni Redis, pour qu'une panne de base ne le fasse pas redémarrer en boucle.
+- `/ready` (`src/modules/lifecycle/`) répond 200 quand un `select 1` sur Postgres et un `PING` sur Redis répondent tous deux dans `READY_TIMEOUT_MS` (1 s), 503 sinon, et 503 dès que l'arrêt a commencé.
+- `createLifecycle()` (`src/modules/lifecycle/service.ts`) porte l'état d'arrêt de l'instance et ses sockets ouverts. `createApp(..., devOptions, lifecycle)` le reçoit en dernier argument (un neuf par défaut) et le passe aux modules `duel` et `queue` : tout socket fait `lifecycle.hold(ws.id, ws)` au début de `open` (et s'arrête là s'il est refusé) et `lifecycle.release(ws.id)` au début de `close`. Un nouveau module de sockets doit faire de même, sinon l'arrêt le coupe sans code 1012.
+- Sur SIGTERM ou SIGINT, `src/index.ts` arrête l'instance, chaque étape loguée :
+  1. `lifecycle.beginStopping()` : `/ready` répond 503, un nouveau socket est fermé aussitôt en 1012.
+  2. `lifecycle.closeSockets()` ferme chaque socket Duel et Queue en 1012 (« service restart ») et attend qu'ils soient fermés : le `close` d'Elysia lance le handler de fermeture avant d'envoyer la trame, que `app.stop()` couperait.
+  3. `app.stop()` lance les hooks d'arrêt : le sweep des Duels en cours finit, les rafraîchissements de la Queue s'arrêtent.
+  4. Fermeture de Redis puis de Postgres.
+  5. Sortie 0.
+
+  Les sockets se ferment avant `app.stop()` : Elysia 2 y coupe (`terminate`) tout socket encore ouvert, que le client verrait en 1006 au lieu de 1012. Un minuteur de 10 s force la sortie 1 si une étape bloque. Aucun Duel n'est perdu : son état est dans Redis (ADR 0007), le Participant qui se reconnecte sur une autre instance reprend son siège et rejoue son journal.
+
+- Dans les tests : `createApp(..., undefined, undefined, undefined, lifecycle)` puis `lifecycle.beginStopping()` / `closeSockets()` (`test/ready.test.ts`, `test/shutdown.test.ts`) ; le vrai signal se teste en `Bun.spawn` (`test/startup.test.ts`). `closed` des sockets de `test/helpers/socket.ts` rend le code de fermeture.
+
 ## Auth
 
 Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-auth/adapters/drizzle`, provider `pg`). Ses routes répondent sous `/api/auth` (santé : `GET /api/auth/ok`).
