@@ -16,7 +16,7 @@ export function SidebarTitle() {
           tooltip="Typomaniac"
           className="group-data-[collapsible=icon]:p-1!"
         >
-          <Link to="/custom">
+          <Link to="/">
             <BrandMark className="size-6!" />
             <span className="font-heading text-base font-semibold text-foreground">Typomaniac</span>
           </Link>

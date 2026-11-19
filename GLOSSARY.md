@@ -49,7 +49,7 @@ The other Participant of a Duel, seen from one Participant.
 _Avoid_: enemy, rival, adversary
 
 **Points**:
-What a Participant's Game in a Duel is worth, an integer: `round(WPM × (Accuracy / 100)² × 10)`, so Accuracy counts twice. Nothing typed is worth 0 Points. Points belong to a Duel, not to a Game's measures: a solo Game has none.
+What a Participant's Game in a Duel is worth, an integer: `round(WPM × (Accuracy / 100)² × 10)`, so Accuracy counts twice. Nothing typed is worth 0 Points. Points belong to a Duel, not to a Game's measures: a Practice Game has none.
 _Avoid_: score, LP (reserved for ranked progression), Round score (reserved for Rounds won)
 
 **Outcome** (`Outcome`):
@@ -80,6 +80,10 @@ _Avoid_: expected word, word to type
 **Separator**:
 The space that ends a Target word and is typed like a letter.
 _Avoid_: trailing space, delimiter
+
+**Practice**:
+A Game played on its own, outside any Duel, to train; nothing is kept for it, and it is worth no Points.
+_Avoid_: training, solo mode, warm-up
 
 ### Events
 
