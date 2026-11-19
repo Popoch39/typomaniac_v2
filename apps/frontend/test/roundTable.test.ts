@@ -16,10 +16,14 @@ const resultOf = (wpm: number, accuracy: number, consistency: number) => ({
   history: { ...idle.history, wpm: [wpm - 10, wpm] },
 });
 
-test("the table compares WPM, Accuracy and Consistency, the Participant's own first, rounded", () => {
-  expect(roundTable(resultOf(103.6, 97.2, 81.5), resultOf(98, 94.8, 77))).toEqual([
+test("the table compares WPM, Accuracy, the Multiplier and Consistency, the Participant's own first, rounded", () => {
+  const own = { result: resultOf(103.6, 97.2, 81.5), multiplier: 1.07 };
+  const opponent = { result: resultOf(98, 94.8, 77), multiplier: 1 };
+
+  expect(roundTable(own, opponent)).toEqual([
     { label: "WPM", values: ["104", "98"] },
     { label: "Accuracy", values: ["97%", "95%"] },
+    { label: "Multiplier", values: ["×1.07", "×1.00"] },
     { label: "Consistency", values: ["82%", "77%"] },
   ]);
 });

@@ -18,30 +18,30 @@ This document lists every rule that `@repo/duel-engine` applies, with its identi
 
 What each validated word of a Game weighs in its Points (ADR 0013). The Multiplier is read from the Game, never from its Result, which does not hold what each word was.
 
-| Id           | Rule                                                                                                                        |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| MULTIPLIER-1 | A Perfect word weighs 1 when it starts a Streak, then 0.02 more than the Perfect word before it.                            |
-| MULTIPLIER-2 | From the sixth Perfect word in a row, a word weighs 1.10 and no more.                                                       |
-| MULTIPLIER-3 | A word with an incorrect Keystroke weighs 1 and ends the Streak.                                                            |
-| MULTIPLIER-4 | A mistake corrected before the word is validated still ends the Streak.                                                     |
-| MULTIPLIER-5 | A word validated with a Missed letter ends the Streak.                                                                      |
-| MULTIPLIER-6 | The word being typed when the clock stops is not counted.                                                                   |
-| MULTIPLIER-7 | A Game's Multiplier is the average over its validated words, 1 when it has none.                                            |
-| MULTIPLIER-8 | A validated word reopened to correct its mistake stays imperfect.                                                           |
+| Id           | Rule                                                                                                                       |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| MULTIPLIER-1 | A Perfect word weighs 1 when it starts a Streak, then 0.02 more than the Perfect word before it.                           |
+| MULTIPLIER-2 | From the sixth Perfect word in a row, a word weighs 1.10 and no more.                                                      |
+| MULTIPLIER-3 | A word with an incorrect Keystroke weighs 1 and ends the Streak.                                                           |
+| MULTIPLIER-4 | A mistake corrected before the word is validated still ends the Streak.                                                    |
+| MULTIPLIER-5 | A word validated with a Missed letter ends the Streak.                                                                     |
+| MULTIPLIER-6 | The word being typed when the clock stops is not counted.                                                                  |
+| MULTIPLIER-7 | A Game's Multiplier is the average over its validated words, 1 when it has none.                                           |
+| MULTIPLIER-8 | A validated word reopened to correct its mistake stays imperfect.                                                          |
 | MULTIPLIER-9 | On a perfect Game, 40 WPM averages ×1.085 and 100 WPM ×1.094: the Multiplier does not grow with the number of words typed. |
 
 ## Points
 
 What a Game of a Duel is worth (ADR 0012, ADR 0013). Points are computed from WPM, Accuracy and the average Multiplier, so a Result and Live stats give them alike.
 
-| Id       | Rule                                                                                                                |
-| -------- | ------------------------------------------------------------------------------------------------------------------- |
+| Id       | Rule                                                                                                                    |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
 | POINTS-1 | Points are WPM × (Accuracy / 100)² × 10 × M: 100 WPM at 93 % Accuracy is worth 865 Points, 90 WPM at 99 % is worth 882. |
-| POINTS-2 | Points are rounded to the nearest integer.                                                                          |
-| POINTS-3 | Nothing typed is worth 0 Points.                                                                                    |
-| POINTS-4 | Live stats give Points by the same rule as a Result.                                                                |
-| POINTS-5 | Points are multiplied by the average Multiplier, and rounded once, at the end.                                      |
-| POINTS-6 | A perfect 90 WPM Game (984 Points) beats 100 WPM at 95 % (903 Points); a perfect 70 WPM Game (764 Points) does not. |
+| POINTS-2 | Points are rounded to the nearest integer.                                                                              |
+| POINTS-3 | Nothing typed is worth 0 Points.                                                                                        |
+| POINTS-4 | Live stats give Points by the same rule as a Result.                                                                    |
+| POINTS-5 | Points are multiplied by the average Multiplier, and rounded once, at the end.                                          |
+| POINTS-6 | A perfect 90 WPM Game (984 Points) beats 100 WPM at 95 % (903 Points); a perfect 70 WPM Game (764 Points) does not.     |
 
 ## Outcome of a Round
 

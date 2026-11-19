@@ -79,11 +79,17 @@ test("MULTIPLIER-8: a validated word reopened to correct its mistake stays imper
 test("MULTIPLIER-9: on a perfect Game, a 40 WPM Participant reaches nearly the Multiplier of a 100 WPM one", () => {
   // Five characters a word, space included, typed in 30 seconds: 20 words at 40 WPM, 50 at 100 WPM.
   const perfect = (wordCount: number) =>
-    applyEvent(createGame(DUEL_GAME_CONFIG, Array.from({ length: 60 }, () => "four")), {
-      type: "insert",
-      at: 0,
-      text: "four ".repeat(wordCount),
-    });
+    applyEvent(
+      createGame(
+        DUEL_GAME_CONFIG,
+        Array.from({ length: 60 }, () => "four"),
+      ),
+      {
+        type: "insert",
+        at: 0,
+        text: "four ".repeat(wordCount),
+      },
+    );
 
   expect(getAverageMultiplier(perfect(20))).toBeCloseTo(1.085, 10);
   expect(getAverageMultiplier(perfect(50))).toBeCloseTo(1.094, 10);

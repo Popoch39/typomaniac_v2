@@ -17,5 +17,7 @@ export function bandPoints({
 }): readonly [number, number] {
   if (isLive) return [live.own, live.opponent];
   if (lastRound === undefined) return [0, 0];
-  return [getPoints(lastRound.results[seat]), getPoints(lastRound.results[opponentSeat(seat)])];
+  const pointsOf = (side: Seat) =>
+    getPoints({ ...lastRound.results[side], multiplier: lastRound.multipliers[side] });
+  return [pointsOf(seat), pointsOf(opponentSeat(seat))];
 }

@@ -10,9 +10,10 @@ const idle = getResult(
   ),
 );
 
-const wonBySeat0: FinishedRound = { results: [idle, idle], outcomes: ["win", "loss"] };
-const wonBySeat1: FinishedRound = { results: [idle, idle], outcomes: ["loss", "win"] };
-const drawn: FinishedRound = { results: [idle, idle], outcomes: ["draw", "draw"] };
+const both = { results: [idle, idle], multipliers: [1, 1] } as const;
+const wonBySeat0: FinishedRound = { ...both, outcomes: ["win", "loss"] };
+const wonBySeat1: FinishedRound = { ...both, outcomes: ["loss", "win"] };
+const drawn: FinishedRound = { ...both, outcomes: ["draw", "draw"] };
 
 const names = { self: "kaelen", opponent: "vexwyrm" };
 

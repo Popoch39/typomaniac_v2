@@ -12,7 +12,8 @@ const NOTHING_TYPED: LivePointsAndStats = { points: 0, wpm: 0, accuracy: 0 };
 
 function readLivePointsAndStats(game: Game, at: number): LivePointsAndStats {
   const { wpm, accuracy } = getLiveStats(game, at);
-  return { points: getPoints({ wpm, accuracy }), wpm, accuracy };
+  // Live Points weigh no Multiplier here: only the server's final Points, which do, decide (ADR 0013).
+  return { points: getPoints({ wpm, accuracy, multiplier: 1 }), wpm, accuracy };
 }
 
 /**

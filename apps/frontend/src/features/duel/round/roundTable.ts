@@ -1,4 +1,5 @@
 import type { Result } from "@repo/typing-engine";
+import { formatMultiplier } from "../points/formatMultiplier.ts";
 
 export type RoundTableRow = {
   readonly label: string;
@@ -6,13 +7,31 @@ export type RoundTableRow = {
   readonly values: readonly [string, string];
 };
 
+type TableSide = { readonly result: Result; readonly multiplier: number };
+
 const percent = (value: number) => `${Math.round(value)}%`;
 
-/** The rows of a finished Round's table: WPM, Accuracy and Consistency, the Participant's own first. */
-export function roundTable(own: Result, opponent: Result): readonly RoundTableRow[] {
+/**
+ * The rows of a finished Round's table: WPM, Accuracy, the average Multiplier and Consistency, the
+ * Participant's own first.
+ */
+export function roundTable(own: TableSide, opponent: TableSide): readonly RoundTableRow[] {
   return [
-    { label: "WPM", values: [String(Math.round(own.wpm)), String(Math.round(opponent.wpm))] },
-    { label: "Accuracy", values: [percent(own.accuracy), percent(opponent.accuracy)] },
-    { label: "Consistency", values: [percent(own.consistency), percent(opponent.consistency)] },
+    {
+      label: "WPM",
+      values: [String(Math.round(own.result.wpm)), String(Math.round(opponent.result.wpm))],
+    },
+    {
+      label: "Accuracy",
+      values: [percent(own.result.accuracy), percent(opponent.result.accuracy)],
+    },
+    {
+      label: "Multiplier",
+      values: [formatMultiplier(own.multiplier), formatMultiplier(opponent.multiplier)],
+    },
+    {
+      label: "Consistency",
+      values: [percent(own.result.consistency), percent(opponent.result.consistency)],
+    },
   ];
 }

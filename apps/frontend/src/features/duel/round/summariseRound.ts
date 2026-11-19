@@ -7,11 +7,15 @@ import {
 } from "@repo/duel-engine";
 import type { Result } from "@repo/typing-engine";
 
-/** One side of a finished Round: who played it, their Result and the Points it is worth. */
+/**
+ * One side of a finished Round: who played it, their Result, the average Multiplier the server
+ * judged it with and the Points they are worth.
+ */
 export type RoundSummarySide = {
   readonly seat: Seat;
   readonly name: string;
   readonly result: Result;
+  readonly multiplier: number;
   readonly points: number;
 };
 
@@ -35,7 +39,8 @@ export function summariseRound(
     seat: side,
     name: participants.find((participant) => participant.seat === side)?.name ?? "",
     result: round.results[side],
-    points: getPoints(round.results[side]),
+    multiplier: round.multipliers[side],
+    points: getPoints({ ...round.results[side], multiplier: round.multipliers[side] }),
   }));
   return { number, outcome: round.outcomes[seat], sides };
 }
