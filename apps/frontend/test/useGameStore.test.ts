@@ -48,6 +48,66 @@ test("an Event of a running Game moves the instant the Live stats are read at to
   expect(store.getState().readAt).toBe(start + 400);
 });
 
+test("the instant the Live stats are read at moves forward between two Ticks, without adding an Event", async () => {
+  const start = performance.timeOrigin + performance.now();
+  store.getState().setConfig({ mode: "time", seconds: 30 });
+  store.getState().applyEvent({ type: "start", at: start });
+  const startEvent = store.getState().lastEvent;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBeGreaterThan(start + 100);
+  expect(store.getState().lastEvent).toBe(startEvent);
+});
+
+test("a running Game loaded mid-Game has its Live stats read further on between two Ticks", async () => {
+  const start = performance.timeOrigin + performance.now() - 5000;
+  store
+    .getState()
+    .loadGame({ mode: "time", seconds: 30 }, loadedWords, [{ type: "start", at: start }]);
+  const loadedAt = store.getState().readAt;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBeGreaterThan(loadedAt + 100);
+});
+
+test("the instant the Live stats are read at stops moving once the Game is restarted", async () => {
+  store.getState().setConfig({ mode: "time", seconds: 30 });
+  store.getState().applyEvent({ type: "start", at: performance.timeOrigin + performance.now() });
+  store.getState().restart();
+  const restartedAt = store.getState().readAt;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBe(restartedAt);
+});
+
+test("the instant the Live stats are read at stops moving once the Game is finished", async () => {
+  store.getState().loadGame({ mode: "words", wordCount: 1 }, ["a"]);
+  const start = performance.timeOrigin + performance.now();
+  store.getState().applyEvent({ type: "start", at: start });
+  store.getState().applyEvent({ type: "insert", at: start + 50, text: "a" });
+  expect(store.getState().game.status).toBe("finished");
+  const finishedAt = store.getState().readAt;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBe(finishedAt);
+});
+
+test("an Event older than the instant the Live stats are read at does not move it back", async () => {
+  const start = performance.timeOrigin + performance.now();
+  store.getState().setConfig({ mode: "time", seconds: 30 });
+  store.getState().applyEvent({ type: "start", at: start });
+  await Bun.sleep(250);
+  const readAt = store.getState().readAt;
+
+  store.getState().applyEvent({ type: "insert", at: start + 10, text: "a" });
+
+  expect(store.getState().readAt).toBeGreaterThanOrEqual(readAt);
+});
+
 test("restarting keeps the Game's config", () => {
   store.getState().setConfig({ mode: "words", wordCount: 25 });
 
