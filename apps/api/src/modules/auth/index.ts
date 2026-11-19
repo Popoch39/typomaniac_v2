@@ -14,6 +14,25 @@ type Identity = {
 // One type for both branches, so that a route sees a single identity rather than their intersection.
 const withIdentity = (identity: Identity) => ({ identity });
 
+const idOf = (value: unknown) =>
+  typeof value === "object" && value !== null && "id" in value && typeof value.id === "string"
+    ? value.id
+    : undefined;
+
+// The person the macros below derived, as a log record names them: `player` or `identity`, which
+// a global hook or a socket's error hook only sees untyped. A Guest's identity has no Player id.
+export const personOf = (context: object) => {
+  const playerId = "player" in context ? idOf(context.player) : undefined;
+  if (playerId) return { playerId };
+  if (!("identity" in context)) return {};
+  const { identity } = context;
+  const id = idOf(identity);
+  if (!id || typeof identity !== "object" || identity === null) return {};
+  return "playerId" in identity && typeof identity.playerId === "string"
+    ? { playerId: identity.playerId }
+    : { guestId: id };
+};
+
 // Route options that guard a route. A separately defined route module must .use() this to get the options and their types.
 export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
   // Shared as a function rather than by nicknameChosen enabling signedIn: a macro's hooks do not see what another macro derived.

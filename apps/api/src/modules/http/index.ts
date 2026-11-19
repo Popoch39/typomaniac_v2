@@ -1,31 +1,12 @@
 import type { Logger } from "@repo/logger";
 import { Elysia, ElysiaError, ElysiaStatus, StatusMap } from "elysia";
 import { ElysiaWS } from "elysia/ws";
+import { personOf } from "../auth/index.ts";
 
 /** The probes, left out of the request log so that they do not flood it. */
 const UNLOGGED_PATHS = new Set(["/health", "/ready"]);
 
 type Tracked = { readonly requestId: string; readonly startedAt: number };
-
-const idOf = (value: unknown) =>
-  typeof value === "object" && value !== null && "id" in value && typeof value.id === "string"
-    ? value.id
-    : undefined;
-
-// The protection macros derive `player` or `identity` on the routes that know the person, which a
-// global hook only sees untyped. A Guest's identity has no Player id. Shared by the socket logs,
-// whose error hooks do not see those types either.
-export const personOf = (context: object) => {
-  const playerId = "player" in context ? idOf(context.player) : undefined;
-  if (playerId) return { playerId };
-  if (!("identity" in context)) return {};
-  const { identity } = context;
-  const id = idOf(identity);
-  if (!id || typeof identity !== "object" || identity === null) return {};
-  return "playerId" in identity && typeof identity.playerId === "string"
-    ? { playerId: identity.playerId }
-    : { guestId: id };
-};
 
 // Better Auth is mounted on a catch-all, whose pattern says nothing: its paths carry no id. A
 // socket route's refused upgrade is told no pattern: it is rebuilt from the params.
