@@ -3,6 +3,7 @@ import { DuelBroadcast } from "./DuelBroadcast.tsx";
 import { DuelDisconnected } from "./DuelDisconnected.tsx";
 import { DuelInviteLink } from "./DuelInviteLink.tsx";
 import { DuelParticipants } from "./DuelParticipants.tsx";
+import { DuelReconnecting } from "./DuelReconnecting.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
 
 export function DuelScreen() {
@@ -14,7 +15,12 @@ export function DuelScreen() {
     phase === "roundEnd" ||
     phase === "finished"
   ) {
-    return <DuelBroadcast phase={phase} />;
+    return (
+      <>
+        <DuelBroadcast phase={phase} />
+        <DuelReconnecting />
+      </>
+    );
   }
 
   return (
@@ -29,6 +35,7 @@ export function DuelScreen() {
         </>
       )}
       {phase === "disconnected" && <DuelDisconnected />}
+      <DuelReconnecting />
     </main>
   );
 }

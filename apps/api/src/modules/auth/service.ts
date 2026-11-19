@@ -1,6 +1,13 @@
-import { betterAuth, type ValidateUserInfoResult, type ValidateUserInfoSource } from "better-auth";
+import {
+  betterAuth,
+  type BetterAuthRateLimitOptions,
+  type BetterAuthRateLimitStorage,
+  type ValidateUserInfoResult,
+  type ValidateUserInfoSource,
+} from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Db } from "../../db/client.ts";
+import type { Redis } from "../../redis/client.ts";
 import { assignDefaultNickname } from "../player/service.ts";
 import type { AuthConfig } from "./config.ts";
 
@@ -19,8 +26,41 @@ export const refuseUnverifiedEmail = ({
         errorDescription: "Verify your email address with the provider, then sign in again.",
       };
 
-// Built from an injected database, like the app, so each test file gets an instance on its own database.
-export const createAuth = (db: Db, config: AuthConfig) =>
+// Increments the counter and starts its window in one step, so a crash between the two cannot
+// leave a counter that never expires.
+const consumeScript = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return { count, redis.call('TTL', KEYS[1]) }
+`;
+
+// Counted in Redis rather than in Better Auth's per-process memory, so the limit holds whichever
+// API instance a request reaches. Plugged in as the rate limit's own storage and not as Better
+// Auth's secondaryStorage, which would also move sessions and OAuth state out of Postgres.
+const createRedisRateLimitStorage = (redis: Redis): BetterAuthRateLimitStorage => ({
+  consume: async (key, { window, max }) => {
+    const [count, secondsLeft]: [number, number] = await redis.client.send("EVAL", [
+      consumeScript,
+      "1",
+      redis.name("auth-rate-limit", key),
+      String(window),
+    ]);
+    return count <= max
+      ? { allowed: true, retryAfter: null }
+      : { allowed: false, retryAfter: secondsLeft };
+  },
+});
+
+// enabled left out keeps Better Auth's default: on in production only.
+export type AuthRateLimit = { redis: Redis } & Pick<
+  BetterAuthRateLimitOptions,
+  "enabled" | "customRules"
+>;
+
+// Built from an injected database, like the app, so each test file gets an instance on its own
+// database. Without a rate limit, Better Auth's is off: its in-memory count would not hold across
+// instances.
+export const createAuth = (db: Db, config: AuthConfig, rateLimit?: AuthRateLimit) =>
   betterAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     baseURL: config.baseURL,
@@ -66,6 +106,13 @@ export const createAuth = (db: Db, config: AuthConfig) =>
     // The one attachment path that skips validateUserInfo (linking by id token), and manual linking
     // is not offered anyway.
     disabledPaths: ["/link-social"],
+    rateLimit: rateLimit
+      ? {
+          enabled: rateLimit.enabled,
+          customRules: rateLimit.customRules,
+          customStorage: createRedisRateLimitStorage(rateLimit.redis),
+        }
+      : { enabled: false },
   });
 
 export type Auth = ReturnType<typeof createAuth>;
