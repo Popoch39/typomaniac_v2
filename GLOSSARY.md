@@ -52,6 +52,10 @@ _Avoid_: enemy, rival, adversary
 What a Participant's Game in a Duel is worth, an integer: `round(WPM × (Accuracy / 100)² × 10)`, so Accuracy counts twice. Nothing typed is worth 0 Points. Points belong to a Duel, not to a Game's measures: a Practice Game has none.
 _Avoid_: score, LP (reserved for ranked progression), Round score (reserved for Rounds won)
 
+**Lead**:
+The difference in Points between the two Participants of a Round, held by the one with more; with equal Points, nobody leads.
+_Avoid_: advantage, margin, gap, difference
+
 **Outcome** (`Outcome`):
 What a Round or a Duel means for one Participant: `win`, `loss` or `draw`. A Round goes to the Participant with more Points; equal Points make it a draw, with no tie-break. A Duel goes to whoever won more Rounds; otherwise it is a draw.
 _Avoid_: result (reserved for a Game's Result), score, verdict, issue
