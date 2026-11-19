@@ -15,6 +15,7 @@ const letterKeyVariants = cva(
       size: {
         sm: "size-11 rounded-md text-xl [--keycap-depth:4px]",
         md: "size-14 rounded-md text-[22px]",
+        lg: "size-16 rounded-xl text-xl [--keycap-border:3px] [--keycap-depth:7px]",
         xl: "h-[clamp(48px,7.6vw,92px)] w-[clamp(44px,7vw,84px)] rounded-xl text-[clamp(26px,4.6vw,56px)] [--keycap-border:3px] [--keycap-depth:9px]",
       },
     },

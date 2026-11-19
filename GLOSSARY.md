@@ -179,6 +179,14 @@ _Avoid_: league, level, rank (reserved for the full Rank)
 A step inside a Tier, from IV, the lowest, to I, the highest. Master has no Division.
 _Avoid_: sub-tier, step, league
 
+**Promotion**:
+A ranked Player's Rank going up one Division at 100 LP; from Division I it goes to Division IV of the next Tier, and from Diamond I to Master.
+_Avoid_: rank up, level up
+
+**Tier promotion**:
+A Promotion that changes the Tier, from Division I of one Tier to the next Tier.
+_Avoid_: tier up, rank up, ascension
+
 **Rank** (`Rank`):
 What a ranked Player sees and climbs on the ladder: their Tier, their Division (except in Master) and their LP.
 _Avoid_: rating, league, level, standing (reserved for the full Standing)

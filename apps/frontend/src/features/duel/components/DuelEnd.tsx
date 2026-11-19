@@ -4,6 +4,7 @@ import { DuelCaption } from "./DuelCaption.tsx";
 import { DuelEndActions } from "./DuelEndActions.tsx";
 import { DuelRankedEnd } from "./DuelRankedEnd.tsx";
 import { DuelRoundDetails } from "./DuelRoundDetails.tsx";
+import { TierPromotionScene } from "./TierPromotionScene.tsx";
 
 /**
  * The end of the Duel, shown as soon as its last Round ends: the Rounds already decide its Outcome,
@@ -24,6 +25,7 @@ export function DuelEnd() {
         <DuelEndActions />
       </section>
       <DuelRoundDetails />
+      <TierPromotionScene />
     </>
   );
 }

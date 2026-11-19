@@ -76,6 +76,7 @@
   --sidebar-ring: var(--focus-ring);
 
   /* Typing colours. The Opponent is red everywhere, against the Participant's own action colour. */
+  --letter-correct: #a3c98a;
   --letter-incorrect: #ca4754;
   --letter-extra: #7e2a33;
   --opponent: var(--danger);
@@ -113,6 +114,7 @@
   --color-tier-platinum: var(--tier-platinum);
   --color-tier-diamond: var(--tier-diamond);
   --color-tier-master: var(--tier-master);
+  --color-letter-correct: var(--letter-correct);
   --color-letter-incorrect: var(--letter-incorrect);
   --color-letter-extra: var(--letter-extra);
   --color-opponent: var(--opponent);
@@ -253,6 +255,702 @@
   fill: var(--ornament-tier);
   animation: ornament-blink 2.4s steps(1) infinite;
 
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* An LP bar cell filling or emptying from --lp-from; its delay and duration are set per cell. */
+@utility lp-sweep {
+  animation-name: lp-sweep;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes lp-sweep {
+  from {
+    width: var(--lp-from);
+  }
+}
+
+/*
+ * The Rank up scene of a Tier promotion: a 1040×680 stage, scaled down to fit the viewport and never
+ * up. tan(atan2()) turns the ratio of two lengths into the number `scale` needs.
+ */
+@utility rank-up-fit {
+  scale: min(1, tan(atan2(100cqw, 1040px)), tan(atan2(100cqh, 680px)));
+}
+
+/* Silver: the old Ornament dips, then is cut away at the end of the wipe that draws the new one. */
+@utility rank-up-silver-old {
+  animation: rank-up-silver-old 1.4s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-silver-old {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  25% {
+    transform: translateY(8px);
+  }
+  45% {
+    transform: translateY(0);
+  }
+  99% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The designed stepped wipe, the one property of the scene animated besides transform and opacity. */
+@utility rank-up-wipe {
+  animation: rank-up-wipe 0.7s steps(19) 0.7s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-wipe {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@utility rank-up-scan {
+  animation: rank-up-scan 0.7s steps(19) 0.7s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-scan {
+  0% {
+    transform: translateY(372px);
+    opacity: 1;
+  }
+  99% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
+/* A square ring of the Tier colour, thrown out from the Ornament. */
+@utility rank-up-ring {
+  animation: rank-up-ring 1s cubic-bezier(0.1, 0.7, 0.3, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-ring {
+  0% {
+    transform: scale(0.4) rotate(0deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3.4) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+/* A burst particle flies to (--burst-x, --burst-y), then falls 140px as it fades. */
+@utility rank-up-burst {
+  animation: rank-up-burst var(--burst-duration) cubic-bezier(0.12, 0.75, 0.3, 1) both;
+  animation-delay: var(--burst-delay);
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-burst {
+  0% {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(-50%, -50%) translate(var(--burst-x), var(--burst-y));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--burst-x), calc(var(--burst-y) + 140px));
+    opacity: 0;
+  }
+}
+
+@utility rank-up-rise {
+  animation: rank-up-rise 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-rise {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Continue keeps its box from the start, and shows once the entrance has played. */
+@utility rank-up-appear {
+  animation: rank-up-appear 0.2s ease-out both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Gold: the old Ornament jitters, then flips out edge on. */
+@utility rank-up-gold-old {
+  animation: rank-up-flip-out 0.3s cubic-bezier(0.55, 0, 0.9, 0.4) 0.7s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-flip-out {
+  0% {
+    opacity: 1;
+    transform: rotateY(0deg);
+  }
+  99% {
+    opacity: 1;
+    transform: rotateY(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: rotateY(90deg);
+  }
+}
+
+@utility rank-up-jitter {
+  animation: rank-up-jitter 0.1s steps(1) 7;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-jitter {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-3px, 1px);
+  }
+  50% {
+    transform: translate(3px, -1px);
+  }
+  75% {
+    transform: translate(-2px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* The new Ornament flips in from edge on, overshooting before it settles. */
+@utility rank-up-flip-in {
+  animation: rank-up-flip-in 0.55s cubic-bezier(0.2, 1.6, 0.45, 1) 1s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-flip-in {
+  from {
+    transform: rotateY(-90deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
+}
+
+/* Once landed, the new Ornament floats for as long as the scene stays open; Gold lands earliest. */
+@utility rank-up-float {
+  animation: rank-up-float 3.2s ease-in-out var(--rank-up-float-at, 2.2s) infinite;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* The screen shake as the new Ornament lands; its delay and duration come from the Tier's timings. */
+@utility rank-up-shake {
+  animation: rank-up-shake linear both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-shake {
+  0% {
+    transform: translate(0, 0);
+  }
+  12% {
+    transform: translate(-9px, 5px);
+  }
+  25% {
+    transform: translate(8px, -6px);
+  }
+  37% {
+    transform: translate(-6px, -3px);
+  }
+  50% {
+    transform: translate(5px, 4px);
+  }
+  62% {
+    transform: translate(-3px, 2px);
+  }
+  75% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* A letter of a title spelled in keys drops in, bounces once and settles. */
+@utility rank-up-drop {
+  animation: rank-up-drop 0.5s cubic-bezier(0.5, 0, 0.75, 0) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-drop {
+  0% {
+    transform: translateY(-90px);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(7px);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Platinum: the old Ornament jitters as it lifts out. */
+@utility rank-up-platinum-old {
+  animation: rank-up-lift-out 1s cubic-bezier(0.5, 0, 0.9, 0.5) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-lift-out {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  99% {
+    opacity: 1;
+    transform: translateY(-26px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px);
+  }
+}
+
+@utility rank-up-platinum-jitter {
+  animation: rank-up-jitter 0.08s steps(1) 0.2s 10;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The new Ornament slams down from above. */
+@utility rank-up-slam {
+  animation: rank-up-slam 0.34s cubic-bezier(0.6, 0, 0.9, 0.4) 1s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-slam {
+  0% {
+    transform: translateY(-200px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Rays fade in by steps, then turn for as long as the scene stays open, around their centre. */
+@utility rank-up-rays {
+  transform-origin: center;
+  animation:
+    rank-up-rays-in 0.5s steps(5) both,
+    rank-up-spin var(--rays-spin) linear infinite;
+  animation-delay: var(--rays-at);
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-rays-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rank-up-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A square of the grid blinks on, then fades out by steps. */
+@utility rank-up-blink {
+  animation: rank-up-blink 0.9s steps(6) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-blink {
+  0% {
+    opacity: 0;
+  }
+  1% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Diamond: rings close on the old Ornament as it jitters, until it shatters into tiles. */
+@utility rank-up-inward-ring {
+  animation: rank-up-inward-ring 0.7s cubic-bezier(0.6, 0, 0.9, 0.4) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-inward-ring {
+  0% {
+    transform: scale(3.2) rotate(45deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  92% {
+    transform: scale(0.55) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.5) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+@utility rank-up-diamond-old {
+  animation: rank-up-hold-out 1.2s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-hold-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility rank-up-diamond-jitter {
+  animation: rank-up-jitter 0.07s steps(1) 0.3s 13;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The whole new Ornament shows once its tiles have assembled. */
+@utility rank-up-diamond-new {
+  animation: rank-up-hold-in 2.2s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-hold-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* A tile flies off to (--tile-x, --tile-y), turning by --tile-rotate, as it fades. */
+@utility rank-up-shatter {
+  animation: rank-up-shatter 0.9s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-shatter {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tile-x), var(--tile-y)) rotate(var(--tile-rotate));
+    opacity: 0;
+  }
+}
+
+/* A tile flies in from (--tile-x, --tile-y) to its place in the new Ornament. */
+@utility rank-up-assemble {
+  animation: rank-up-assemble 0.75s cubic-bezier(0.2, 0.95, 0.25, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-assemble {
+  0% {
+    transform: translate(var(--tile-x), var(--tile-y)) rotate(var(--tile-rotate));
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A pixel of rain falls past the bottom of the stage, again and again; its column, duration and delay
+   come from the drop. */
+@utility rank-up-rain {
+  animation: rank-up-rain linear infinite backwards;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-rain {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(730px);
+    opacity: 1;
+  }
+}
+
+/* A pixel star blinks off and on, again and again; its duration and delay come from the star. */
+@utility rank-up-star {
+  animation: rank-up-star steps(1) infinite backwards;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-star {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Master: the old Ornament jitters longer, under four rings, until it shatters into tiles. */
+@utility rank-up-master-old {
+  animation: rank-up-hold-out 1.3s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility rank-up-master-jitter {
+  animation: rank-up-jitter 0.06s steps(1) 0.35s 16;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The whole new Ornament shows once its tiles have assembled. */
+@utility rank-up-master-new {
+  animation: rank-up-hold-in 2.35s steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* A side key of the Master scene goes down once at --press-at, then again every 3.2s from --idle-at. */
+@utility rank-up-key-press {
+  animation:
+    rank-up-key-press 0.26s ease both,
+    rank-up-key-idle 3.2s ease infinite;
+  animation-delay: var(--press-at), var(--idle-at);
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-key-press {
+  0% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(8px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes rank-up-key-idle {
+  0% {
+    transform: none;
+  }
+  5% {
+    transform: translateY(8px);
+  }
+  10% {
+    transform: none;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* The lit face of a side key, shown from the moment it is pressed. */
+@utility rank-up-key-light {
+  animation: rank-up-hold-in var(--press-at) steps(1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }

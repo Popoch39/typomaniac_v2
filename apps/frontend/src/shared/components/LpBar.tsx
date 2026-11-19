@@ -1,13 +1,18 @@
+import { cn } from "../lib/utils.ts";
 import { useLpBar } from "../hooks/useLpBar.ts";
 
 interface LpBarProps {
   lp: number;
   /** The Rank the LP climb toward. */
   next: string;
+  /** The LP held before, for the bar to sweep from as it appears. */
+  from?: number;
+  /** Keeps the bar at `from` until released, while something covers it. */
+  isSweepHeld?: boolean;
 }
 
-export function LpBar({ lp, next }: LpBarProps) {
-  const { held, max, toNext, cellFills, valueText } = useLpBar(lp, next);
+export function LpBar({ lp, next, from, isSweepHeld = false }: LpBarProps) {
+  const { held, max, toNext, cells, valueText } = useLpBar(lp, next, from);
 
   return (
     <div className="flex flex-col gap-3">
@@ -31,12 +36,19 @@ export function LpBar({ lp, next }: LpBarProps) {
         aria-valuetext={valueText}
         className="grid grid-cols-10 gap-1.25"
       >
-        {cellFills.map((fill, index) => (
+        {cells.map(({ isSwept, style }, index) => (
           <span
             key={index}
             className="block h-5.5 overflow-hidden rounded-xs border-2 border-key-outline bg-key-edge"
           >
-            <span className="block h-full bg-action" style={{ width: `${fill * 100}%` }} />
+            <span
+              className={cn(
+                "block h-full bg-action",
+                isSwept && "lp-sweep",
+                isSwept && isSweepHeld && "[animation-play-state:paused]",
+              )}
+              style={style}
+            />
           </span>
         ))}
       </div>

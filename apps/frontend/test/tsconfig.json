@@ -27,6 +27,8 @@
     "../src/features/duel/points",
     "../src/features/duel/rank",
     "../src/features/duel/round",
+    "../src/features/duel/scene",
+    "../src/features/duel/store/useTierPromotionStore.ts",
     "../src/features/leaderboard/own",
     "../src/features/leaderboard/page",
     "../src/features/ornament/art",
@@ -37,6 +39,7 @@
     "../src/features/queue/refusal",
     "../src/shared/api/describeApiError.ts",
     "../src/shared/lib/formatClock.ts",
+    "../src/shared/lib/lpBarCells.ts",
     "../src/shared/lib/reconnectDelay.ts",
     "../src/shared/lib/reconnectingSocket.ts"
   ],
