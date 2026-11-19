@@ -1,41 +1,8 @@
-import type { CSSProperties } from "react";
-import {
-  DIAMOND_ASSEMBLE_AT,
-  DIAMOND_SHATTER_AT,
-  DIAMOND_TILES,
-  type Tile,
-} from "../scene/diamondTiles.ts";
-import { MASTER_ASSEMBLE_AT, MASTER_SHATTER_AT, MASTER_TILES } from "../scene/masterTiles.ts";
+import type { CustomPropertyStyle } from "../../../shared/lib/customPropertyStyle.ts";
+import type { Tile } from "../scene/cutIntoTiles.ts";
+import type { Tiling } from "../scene/tierScenes.ts";
 
-type CustomStyle = CSSProperties & Record<`--${string}`, string>;
-
-/** The Tiers whose scene shatters the old Ornament into tiles and assembles the new one from them. */
-export type ShatteredTier = "diamond" | "master";
-
-type Tiling = {
-  readonly tiles: readonly Tile[];
-  readonly shatterAt: number;
-  readonly assembleAt: number;
-  /** When the assembled Ornament starts to float, with the whole new one. */
-  readonly floatClassName: string;
-};
-
-const TILINGS: Readonly<Record<ShatteredTier, Tiling>> = {
-  diamond: {
-    tiles: DIAMOND_TILES,
-    shatterAt: DIAMOND_SHATTER_AT,
-    assembleAt: DIAMOND_ASSEMBLE_AT,
-    floatClassName: "[--rank-up-float-at:2.7s]",
-  },
-  master: {
-    tiles: MASTER_TILES,
-    shatterAt: MASTER_SHATTER_AT,
-    assembleAt: MASTER_ASSEMBLE_AT,
-    floatClassName: "[--rank-up-float-at:2.9s]",
-  },
-};
-
-const tileStyles = (tiles: readonly Tile[], at: number): CustomStyle[] =>
+const tileStyles = (tiles: readonly Tile[], at: number): CustomPropertyStyle[] =>
   tiles.map(({ clipPath, x, y, rotate, delay }) => ({
     clipPath,
     animationDelay: `${at + delay}s`,
@@ -45,11 +12,9 @@ const tileStyles = (tiles: readonly Tile[], at: number): CustomStyle[] =>
   }));
 
 /** The tiles the old Ornament shatters into, and the ones the new Ornament assembles from. */
-export function useTierPromotionTiles(tier: ShatteredTier) {
-  const { tiles, shatterAt, assembleAt, floatClassName } = TILINGS[tier];
+export function useTierPromotionTiles({ tiles, shatterAt, assembleAt }: Tiling) {
   return {
     oldTileStyles: tileStyles(tiles, shatterAt),
     newTileStyles: tileStyles(tiles, assembleAt),
-    floatClassName,
   };
 }

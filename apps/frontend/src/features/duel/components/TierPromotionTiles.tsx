@@ -1,16 +1,14 @@
-import type { Ornament } from "@repo/ranked-engine";
-import type { AvatarPlayer } from "../../../shared/hooks/useAvatar.ts";
-import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
+import type { ReactNode } from "react";
 import { cn } from "../../../shared/lib/utils.ts";
-import { type ShatteredTier, useTierPromotionTiles } from "../hooks/useTierPromotionTiles.ts";
+import { useTierPromotionTiles } from "../hooks/useTierPromotionTiles.ts";
+import type { Tiling } from "../scene/tierScenes.ts";
 
 interface TierPromotionTilesProps {
-  tier: ShatteredTier;
-  player: AvatarPlayer;
-  oldOrnament: NonNullable<Ornament>;
-  newOrnament: NonNullable<Ornament>;
-  /** Scales the Ornament to the box of the hero, as the hero does. */
-  avatarClassName: string;
+  tiling: Tiling;
+  /** The float of the new Ornament, which its tiles share. */
+  floatClassName: string;
+  oldAvatar: ReactNode;
+  newAvatar: ReactNode;
 }
 
 /**
@@ -18,13 +16,12 @@ interface TierPromotionTilesProps {
  * clipped copy of the whole Ornamented Avatar. The new tiles float with the new Ornament they cover.
  */
 export function TierPromotionTiles({
-  tier,
-  player,
-  oldOrnament,
-  newOrnament,
-  avatarClassName,
+  tiling,
+  floatClassName,
+  oldAvatar,
+  newAvatar,
 }: TierPromotionTilesProps) {
-  const { oldTileStyles, newTileStyles, floatClassName } = useTierPromotionTiles(tier);
+  const { oldTileStyles, newTileStyles } = useTierPromotionTiles(tiling);
 
   return (
     <div aria-hidden="true" className="absolute inset-0 motion-reduce:hidden">
@@ -34,29 +31,17 @@ export function TierPromotionTiles({
           className="absolute inset-0 grid place-items-center opacity-0 rank-up-shatter"
           style={style}
         >
-          <OrnamentedAvatar
-            player={player}
-            ornament={oldOrnament}
-            size="lg"
-            isOwn
-            className={avatarClassName}
-          />
+          {oldAvatar}
         </div>
       ))}
-      <div className={cn("absolute inset-0 rank-up-float", floatClassName)}>
+      <div className={cn("absolute inset-0", floatClassName)}>
         {newTileStyles.map((style, index) => (
           <div
             key={index}
             className="absolute inset-0 grid place-items-center rank-up-assemble"
             style={style}
           >
-            <OrnamentedAvatar
-              player={player}
-              ornament={newOrnament}
-              size="lg"
-              isOwn
-              className={avatarClassName}
-            />
+            {newAvatar}
           </div>
         ))}
       </div>

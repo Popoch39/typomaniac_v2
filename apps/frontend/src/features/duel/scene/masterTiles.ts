@@ -1,4 +1,4 @@
-import { cutIntoTiles } from "./diamondTiles.ts";
+import { cutIntoTiles } from "./cutIntoTiles.ts";
 
 /** When the old Ornament shatters, and when the new one starts to assemble, in seconds. */
 export const MASTER_SHATTER_AT = 1.3;

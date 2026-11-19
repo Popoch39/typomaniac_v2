@@ -1,8 +1,6 @@
-import type { CSSProperties } from "react";
 import { LetterKey } from "../../../shared/components/LetterKey.tsx";
+import type { CustomPropertyStyle } from "../../../shared/lib/customPropertyStyle.ts";
 import { MASTER_SIDE_KEYS } from "../scene/masterSideKeys.ts";
-
-type CustomStyle = CSSProperties & Record<`--${string}`, string>;
 
 /**
  * The keys of the Master scene down both sides of the Ornament, pressed one after the other and lit
@@ -10,7 +8,7 @@ type CustomStyle = CSSProperties & Record<`--${string}`, string>;
  */
 export function TierPromotionSideKeys() {
   return MASTER_SIDE_KEYS.map(({ letter, x, y, pressAt, idleAt }) => {
-    const style: CustomStyle = {
+    const style: CustomPropertyStyle = {
       left: `${x}px`,
       top: `${y}px`,
       "--press-at": `${pressAt}s`,
