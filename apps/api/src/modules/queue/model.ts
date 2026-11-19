@@ -1,4 +1,5 @@
 import { t } from "elysia";
+import { RateLimited } from "../rate-limit/index.ts";
 
 // The Player has a ranked Duel to finish first, the one named.
 const rankedDuelUnfinished = t.Object({
@@ -80,6 +81,6 @@ export const Socket = {
     ]),
     // The other statuses refuse the upgrade.
     409: rankedDuelUnfinished,
-    429: t.Object({ code: t.Literal("RATE_LIMITED") }),
+    429: RateLimited,
   },
 };

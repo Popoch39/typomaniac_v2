@@ -15,6 +15,7 @@ import type { Redis } from "../../redis/client.ts";
 import { createProtection, personOf } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
+import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
@@ -353,18 +354,13 @@ export const createDuelRoutes = (
             participant: { ...participant, connected: false },
           });
         },
-        // A failing handler of an open socket, which only has an id once upgraded; the app's error
-        // hook answers it after this one.
-        error(context) {
-          if (!("id" in context) || typeof context.id !== "string") return;
-          const seating = seated.get(context.id);
-          logger.error("Socket on Duel {duelId} failed", {
+        error: logSocketFailure(logger, "Socket on Duel {duelId} failed", (context, id) => {
+          const seating = seated.get(id);
+          return {
             duelId: context.params.id,
             ...(seating ? { seat: seating.participant.seat } : {}),
-            ...personOf(context),
-            error: context.error,
-          });
-        },
+          };
+        }),
       })
   );
 };

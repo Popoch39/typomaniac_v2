@@ -5,11 +5,12 @@ import { Elysia, status } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { createProtection, personOf } from "../auth/index.ts";
+import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
 import { mayReconnect } from "../lifecycle/closeCode.ts";
+import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
@@ -152,12 +153,7 @@ export const createQueueRoutes = (
           if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
           else await leaveQueue(redis, presence);
         },
-        // A failing handler of an open socket, which only has an id once upgraded; the app's error
-        // hook answers it after this one.
-        error(context) {
-          if (!("id" in context)) return;
-          logger.error("Queue socket failed", { ...personOf(context), error: context.error });
-        },
+        error: logSocketFailure(logger, "Queue socket failed"),
       })
   );
 };

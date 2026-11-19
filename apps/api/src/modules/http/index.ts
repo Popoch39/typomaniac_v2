@@ -35,6 +35,25 @@ const statusOf = (status: number | keyof StatusMap | undefined, response: unknow
 };
 
 /**
+ * The error hook of a socket route: logs a failing handler of an open socket, with the person and
+ * what `describe` adds. Only an open socket has an id; the app's error hook answers after this one.
+ */
+export const logSocketFailure =
+  <Context extends { readonly error: unknown }>(
+    logger: Logger,
+    message: string,
+    describe: (context: Context, id: string) => Record<string, unknown> = () => ({}),
+  ) =>
+  (context: Context) => {
+    if (!("id" in context) || typeof context.id !== "string") return;
+    logger.error(message, {
+      ...describe(context, context.id),
+      ...personOf(context),
+      error: context.error,
+    });
+  };
+
+/**
  * Gives each request an id of the server's own, echoed in `x-request-id`, logs one line per request
  * once its response is sent, and turns any unexpected error into a 500 that leaks nothing but the
  * id. Used before the routes, which it reaches through its global hooks.

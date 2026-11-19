@@ -1,5 +1,5 @@
 import type { Logger } from "@repo/logger";
-import { type Context, status } from "elysia";
+import { type Context, status, t } from "elysia";
 import type { Redis } from "../../redis/client.ts";
 import {
   consumeWindow,
@@ -7,6 +7,9 @@ import {
   resolveClientIp,
   type SocketSource,
 } from "./service.ts";
+
+/** The body of every 429, for the `response` of a route that a limit guards. */
+export const RateLimited = t.Object({ code: t.Literal("RATE_LIMITED") });
 
 export type RateLimit = { readonly max: number; readonly windowSeconds: number };
 
