@@ -25,7 +25,7 @@ type App = ReturnType<typeof createApp>;
 const createInstances = async (count: number, options: DuelOptions, db: Db = testDb.db) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: count }, () =>
-    createApp(db, auth, testRedis.redis, getLogger("api"), options).listen(0),
+    createApp(db, auth, testRedis.redis, getLogger("api"), { duel: options }).listen(0),
   );
   return {
     apps,

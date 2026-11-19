@@ -19,17 +19,9 @@ afterAll(async () => {
 // Listening on an ephemeral port: the client IP is read from the socket, which the in-process
 // request seam does not have. Every request of this file comes from the same loopback address.
 const listenWith = (redis: Redis, rateLimitOptions: RateLimitOptions) => {
-  const app = createApp(
-    testDb.db,
-    auth,
-    redis,
-    getLogger("api"),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    rateLimitOptions,
-  ).listen(0);
+  const app = createApp(testDb.db, auth, redis, getLogger("api"), {
+    rateLimit: rateLimitOptions,
+  }).listen(0);
   return { origin: `http://localhost:${app.server?.port}`, stop: () => app.stop(true) };
 };
 

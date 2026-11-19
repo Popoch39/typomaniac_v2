@@ -21,17 +21,10 @@ afterAll(async () => {
 
 // Listening on an ephemeral port: the in-process request seam cannot upgrade a connection.
 const listenWith = (redis: Redis, rateLimitOptions: RateLimitOptions) => {
-  const app = createApp(
-    testDb.db,
-    auth,
-    redis,
-    getLogger("api"),
-    { countdownMs: 0 },
-    undefined,
-    undefined,
-    undefined,
-    rateLimitOptions,
-  ).listen(0);
+  const app = createApp(testDb.db, auth, redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+    rateLimit: rateLimitOptions,
+  }).listen(0);
   const origin = `http://localhost:${app.server?.port}`;
   return { origin, socketOrigin: origin.replace(/^http/, "ws"), stop: () => app.stop(true) };
 };

@@ -26,7 +26,7 @@ test("a failed Duel sweep is logged as an error of the duel category, through th
     },
   });
   const app = createApp(testDb.db, auth, { ...testRedis.redis, client }, getLogger("api"), {
-    sweepIntervalMs: 10,
+    duel: { sweepIntervalMs: 10 },
   }).listen(0);
   try {
     for (let tries = 0; tries < 50 && records.length === 0; tries += 1) await Bun.sleep(10);

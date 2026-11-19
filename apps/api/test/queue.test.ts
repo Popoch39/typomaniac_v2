@@ -43,16 +43,10 @@ const hasLeft = async (cookie: string) => {
 // An instance whose sockets a test closes with 1012, as its stop does.
 const startStoppingInstance = (queueOptions?: { entryExpiryMs: number }) => {
   const lifecycle = createLifecycle();
-  const app = createApp(
-    testDb.db,
-    auth,
-    testRedis.redis,
-    getLogger("api"),
-    undefined,
-    queueOptions,
-    undefined,
+  const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    queue: queueOptions,
     lifecycle,
-  ).listen(0);
+  }).listen(0);
   return { app, lifecycle, origin: `http://localhost:${app.server?.port}` };
 };
 
@@ -262,9 +256,8 @@ test("two Players are queued side by side: one entering evicts nobody else", asy
 
 test("the Queue entry of a Player whose API instance stopped refreshing it expires on its own", async () => {
   // An instance that never refreshes in time stands for one that crashed with the socket open.
-  const stalled = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), undefined, {
-    entryExpiryMs: 150,
-    refreshMs: 60_000,
+  const stalled = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    queue: { entryExpiryMs: 150, refreshMs: 60_000 },
   }).listen(0);
   const { cookie } = await signInPlayerWithNickname(auth, origin);
   const socket = await openQueueSocket(cookie, `http://localhost:${stalled.server?.port}`);
@@ -279,8 +272,8 @@ test("the Queue entry of a Player whose API instance stopped refreshing it expir
 });
 
 test("a queued Player stays queued past the expiry while their API instance holds their socket", async () => {
-  const lively = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), undefined, {
-    entryExpiryMs: 150,
+  const lively = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    queue: { entryExpiryMs: 150 },
   }).listen(0);
   const { cookie } = await signInPlayerWithNickname(auth, origin);
   const socket = await openQueueSocket(cookie, `http://localhost:${lively.server?.port}`);

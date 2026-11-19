@@ -27,11 +27,7 @@ const createLimitedApp = (redis: Redis, rateLimitOptions?: RateLimitOptions) =>
     }),
     redis,
     getLogger("api"),
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    rateLimitOptions,
+    { rateLimit: rateLimitOptions },
   );
 
 const startSignIn = (app: ReturnType<typeof createApp>, headers: Record<string, string> = {}) =>
