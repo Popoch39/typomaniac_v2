@@ -22,6 +22,23 @@ export const consumeWindow = async (redis: Redis, key: string, windowSeconds: nu
   return { count, secondsLeft };
 };
 
+/**
+ * Counts in memory the messages of one socket in fixed windows of `windowMs`. Each call counts one
+ * message received at `now` and tells whether its window now holds more than `max`.
+ */
+export const createMessageWindow = (max: number, windowMs: number) => {
+  let windowStart = Number.NEGATIVE_INFINITY;
+  let count = 0;
+  return (now: number) => {
+    if (now - windowStart >= windowMs) {
+      windowStart = now;
+      count = 0;
+    }
+    count += 1;
+    return count > max;
+  };
+};
+
 /** What the running server knows of a request's connection; absent when a request is handled in process. */
 export type SocketSource = {
   requestIP(request: Request): { readonly address: string } | null;
