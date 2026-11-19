@@ -4,10 +4,12 @@ import {
   DEFAULT_RANKED_CONFIG,
   type DuelUpdate,
   ladderIndex,
+  type OrnamentChoice,
   type Outcome,
   type Rank,
   rankAtLadderIndex,
   type Standing,
+  wornOrnament,
 } from "@repo/ranked-engine";
 import { and, asc, count, desc, eq, isNotNull, lt, sql } from "drizzle-orm";
 import type { Db, Transaction } from "../../db/client.ts";
@@ -147,6 +149,7 @@ const leaderboardColumns = {
   ladderIndex: standingTable.ladderIndex,
   lp: standingTable.lp,
   mmr: standingTable.mmr,
+  ornament: user.ornament,
 };
 
 type LeaderboardRow = {
@@ -156,6 +159,7 @@ type LeaderboardRow = {
   ladderIndex: number | null;
   lp: number | null;
   mmr: number;
+  ornament: OrnamentChoice;
 };
 
 /** The top of the Leaderboard, in its order. Exported so that a test can read the plan of this very query. */
@@ -186,11 +190,11 @@ const countAhead = async (db: Db, { playerId, ladderIndex, lp, mmr }: Leaderboar
 
 const leaderboardPlayer = (
   position: number,
-  { nickname, avatarUrl, ladderIndex, lp }: LeaderboardRow,
+  { nickname, avatarUrl, ladderIndex, lp, ornament }: LeaderboardRow,
 ) => {
   const rank = rankFromStored(ladderIndex, lp);
   if (rank === null) throw new Error("An Unranked Player has no place on the Leaderboard");
-  return { position, nickname, avatarUrl, rank };
+  return { position, nickname, avatarUrl, rank, ornament: wornOrnament(ornament, rank) };
 };
 
 /**

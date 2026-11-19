@@ -17,6 +17,23 @@ const rank = t.Union([
   t.Object({ tier: t.Literal("master"), lp }),
 ]);
 
+// The Ornament a Player wears, written again from the `ornament` module since a model is not imported
+// across modules. `null` for a bare Avatar; the Division only in Auto, below Master.
+const ornament = t.Nullable(
+  t.Object({
+    tier: t.Union([
+      t.Literal("unranked"),
+      t.Literal("bronze"),
+      t.Literal("silver"),
+      t.Literal("gold"),
+      t.Literal("platinum"),
+      t.Literal("diamond"),
+      t.Literal("master"),
+    ]),
+    division: t.Nullable(t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)])),
+  }),
+);
+
 // Every field of the Standing a Player may see. The MMR is hidden (ADR 0006): left out here, it is
 // stripped from whatever a handler returns.
 export const standing = t.Object({
@@ -40,6 +57,7 @@ const leaderboardPlayer = t.Object({
   nickname: t.Nullable(t.String()),
   avatarUrl: t.Nullable(t.String()),
   rank,
+  ornament,
 });
 
 export const LeaderboardGet = {
