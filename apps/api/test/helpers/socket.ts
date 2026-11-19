@@ -15,9 +15,10 @@ export const openSocketOf = async <Received, Sent>(url: string, cookie: string) 
     socket.addEventListener("open", resolve, { once: true });
     socket.addEventListener("error", reject, { once: true });
   });
-  // Settles once the socket is closed, from either side: how a test sees the server close it.
-  const closed = new Promise<void>((resolve) =>
-    socket.addEventListener("close", () => resolve(), { once: true }),
+  // Settles once the socket is closed, from either side, with its close code: how a test sees the
+  // server close it.
+  const closed = new Promise<number>((resolve) =>
+    socket.addEventListener("close", (event) => resolve(event.code), { once: true }),
   );
 
   const next = () => {
@@ -31,7 +32,15 @@ export const openSocketOf = async <Received, Sent>(url: string, cookie: string) 
     await Bun.sleep(ms);
     return received.length === 0;
   };
-  return { next, send, staysSilent, closed, close: () => socket.close() };
+  return {
+    next,
+    send,
+    staysSilent,
+    closed,
+    close: () => socket.close(),
+    // Cuts the connection without a close frame, as a lost network does: the server sees 1006.
+    drop: () => socket.terminate(),
+  };
 };
 
 /** The socket of a Duel. */

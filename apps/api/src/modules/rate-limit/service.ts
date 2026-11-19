@@ -1,0 +1,79 @@
+import type { BetterAuthRateLimitStorage } from "better-auth";
+import type { Redis } from "../../redis/client.ts";
+
+// Increments the counter and starts its window in one step, so a crash between the two cannot
+// leave a counter that never expires.
+const consumeScript = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return { count, redis.call('TTL', KEYS[1]) }
+`;
+
+/**
+ * Counts one more request against `key` in a fixed window of `windowSeconds`, in Redis so that
+ * every API instance shares the count. Gives the count so far and the seconds left in the window.
+ */
+export const consumeWindow = async (redis: Redis, key: string, windowSeconds: number) => {
+  const [count, secondsLeft]: [number, number] = await redis.client.send("EVAL", [
+    consumeScript,
+    "1",
+    key,
+    String(windowSeconds),
+  ]);
+  return { count, secondsLeft };
+};
+
+// Counted in Redis rather than in Better Auth's per-process memory, so the limit holds whichever
+// API instance a request reaches. Plugged in as the rate limit's own storage and not as Better
+// Auth's secondaryStorage, which would also move sessions and OAuth state out of Postgres.
+export const createRedisRateLimitStorage = (redis: Redis): BetterAuthRateLimitStorage => ({
+  consume: async (key, { window, max }) => {
+    const { count, secondsLeft } = await consumeWindow(
+      redis,
+      redis.name("auth-rate-limit", key),
+      window,
+    );
+    return count <= max
+      ? { allowed: true, retryAfter: null }
+      : { allowed: false, retryAfter: secondsLeft };
+  },
+});
+
+/**
+ * Counts in memory the messages of one socket in fixed windows of `windowMs`. Each call counts one
+ * message received at `now` and tells whether its window now holds more than `max`.
+ */
+export const createMessageWindow = (max: number, windowMs: number) => {
+  let windowStart = Number.NEGATIVE_INFINITY;
+  let count = 0;
+  return (now: number) => {
+    if (now - windowStart >= windowMs) {
+      windowStart = now;
+      count = 0;
+    }
+    count += 1;
+    return count > max;
+  };
+};
+
+/** What the running server knows of a request's connection; absent when a request is handled in process. */
+export type SocketSource = {
+  requestIP(request: Request): { readonly address: string } | null;
+} | null;
+
+/**
+ * The address a request comes from: the socket's, or the leftmost X-Forwarded-For entry when the
+ * API is told it runs behind a proxy. Null when neither is known.
+ */
+export const resolveClientIp = (
+  request: Request,
+  server: SocketSource,
+  trustProxy: boolean,
+): string | null => {
+  if (trustProxy) {
+    // The proxy appends the address it saw, so the leftmost one is the client's as the first proxy saw it.
+    const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    if (forwarded) return forwarded;
+  }
+  return server?.requestIP(request)?.address ?? null;
+};

@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { getLogger } from "@repo/logger";
 import { startMatchmaker } from "../src/matchmaker.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 
@@ -17,7 +18,12 @@ const until = async (condition: () => boolean, timeoutMs = 2000) => {
 // Every matchmaker of one test shares the Redis of that test, hence its leader lock.
 const startCounting = (redis: Awaited<ReturnType<typeof createTestRedis>>["redis"]) => {
   const instants: number[] = [];
-  const matchmaker = startMatchmaker(redis, (now) => void instants.push(now), { tickMs, lockMs });
+  const matchmaker = startMatchmaker(
+    redis,
+    (now) => void instants.push(now),
+    getLogger("matchmaker"),
+    { tickMs, lockMs },
+  );
   return { instants, stop: matchmaker.stop };
 };
 

@@ -1,6 +1,7 @@
 import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
+import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
 import { queueQueryOptions } from "../api/queueQueryOptions.ts";
 import { parseQueueMessage } from "../message/parseQueueMessage.ts";
 
@@ -8,7 +9,12 @@ type QueueSocketHandlers = {
   readonly receive: (message: QueueServerMessage) => void;
   /** Told, in words for the user, why this Player could not enter the Queue. */
   readonly refuse: (refusal: string) => void;
-  /** The socket closed after the Player was queued. */
+  /**
+   * The socket dropped and is about to be reopened, unless this answers `false` because the
+   * Player no longer needs it.
+   */
+  readonly reconnect: () => boolean;
+  /** The socket closed after the Player was queued, and is not reopened. */
   readonly disconnect: () => void;
 };
 
@@ -35,32 +41,24 @@ async function findRefusal() {
 }
 
 // Owned by the Queue store because components may not run effects; a tab holds one Queue socket.
-let socket: WebSocket | null = null;
+const socket = createReconnectingSocket();
 
 /** Opens the Queue socket in place of any other, and hands over each message it reads. */
-export function openQueueSocket({ receive, refuse, disconnect }: QueueSocketHandlers) {
-  closeQueueSocket();
-  const opened = new WebSocket(socketUrl());
-  socket = opened;
-  let queued = false;
-  opened.addEventListener("message", (event) => {
-    queued = true;
-    const message = parseQueueMessage(String(event.data));
-    if (message !== null) receive(message);
-  });
-  opened.addEventListener("close", async () => {
-    if (socket !== opened) return;
-    if (queued) return disconnect();
-    const refusal = await findRefusal();
-    if (socket === opened) refuse(refusal);
+export function openQueueSocket({ receive, ...handlers }: QueueSocketHandlers) {
+  socket.open(socketUrl(), {
+    ...handlers,
+    receive: (data) => {
+      const message = parseQueueMessage(data);
+      if (message !== null) receive(message);
+    },
+    findRefusal,
   });
 }
 
 export function sendToQueue(message: QueueClientMessage) {
-  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  socket.send(JSON.stringify(message));
 }
 
 export function closeQueueSocket() {
-  socket?.close();
-  socket = null;
+  socket.close();
 }

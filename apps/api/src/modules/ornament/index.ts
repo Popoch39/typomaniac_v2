@@ -1,13 +1,12 @@
 import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
-import { createProtection } from "../auth/index.ts";
-import type { Auth } from "../auth/service.ts";
+import type { Protection } from "../auth/index.ts";
 import * as OrnamentModel from "./model.ts";
 import { readOwnOrnament, saveOrnamentChoice } from "./service.ts";
 
-export const createOrnamentRoutes = (db: Db, auth: Auth) =>
+export const createOrnamentRoutes = (db: Db, protection: Protection) =>
   new Elysia({ prefix: "/api/me/ornament" })
-    .use(createProtection(auth))
+    .use(protection)
     .get("/", { nicknameChosen: true, response: OrnamentModel.RootGet.Response }, ({ player }) =>
       readOwnOrnament(db, player.id),
     )

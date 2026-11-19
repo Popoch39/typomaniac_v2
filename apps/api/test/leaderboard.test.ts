@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import type { OrnamentChoice, Standing } from "@repo/ranked-engine";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { user } from "../src/db/schema.ts";
 import { eq, sql } from "drizzle-orm";
@@ -15,7 +16,7 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
 // The Leaderboard lists every ranked Player of the database: each test starts from a database of
 // this file with no Player, so that what another test stored never shows in its list.

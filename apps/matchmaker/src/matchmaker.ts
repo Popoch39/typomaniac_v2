@@ -1,3 +1,4 @@
+import type { Logger } from "@repo/logger";
 import type { Redis } from "@repo/redis";
 
 // Takes the lock when it is free and extends it when this matchmaker already holds it, in one step:
@@ -22,6 +23,7 @@ export type MatchmakerOptions = {
 export const startMatchmaker = (
   redis: Redis,
   tick: Tick,
+  logger: Logger,
   { tickMs = 1000, lockMs = 5000 }: MatchmakerOptions = {},
 ) => {
   const lockKey = redis.name("matchmaker", "leader");
@@ -38,7 +40,7 @@ export const startMatchmaker = (
       if (leads === 1 && !stopped) await tick(Date.now());
     } catch (error) {
       // Redis going away must not end the process: the next beat tries again once it is back.
-      console.error("Matchmaker beat failed", error);
+      logger.error("Matchmaker beat failed", { error });
     } finally {
       beating = false;
     }

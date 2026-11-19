@@ -3,6 +3,7 @@ import type { ServerMessage } from "@repo/duel-engine";
 import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import type { Standing } from "@repo/ranked-engine";
 import { eq } from "drizzle-orm";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import type { DuelOptions } from "../src/modules/duel/index.ts";
 import { createRelay } from "../src/modules/duel/relay.ts";
@@ -119,7 +120,7 @@ const pairRankedDuel = async (
 ) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: instances }, () =>
-    createApp(db, auth, testRedis.redis, options).listen(0),
+    createApp(db, auth, testRedis.redis, getLogger("api"), { duel: options }).listen(0),
   );
   closers.push(async () => {
     for (const app of apps) await app.stop(true);
@@ -363,9 +364,8 @@ test("the MMR is in no message of a ranked Duel", async () => {
 
 test("a Custom Duel between two Players leaves both Standings untouched, and its end carries no ranked part", async () => {
   const testRedis = await createTestRedis();
-  const app = createApp(testDb.db, auth, testRedis.redis, {
-    countdownMs: 0,
-    roundPauseMs: 0,
+  const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0, roundPauseMs: 0 },
   }).listen(0);
   closers.push(async () => {
     await app.stop(true);
@@ -515,7 +515,8 @@ test("a ranked Duel nobody connects to has its Countdown announced 10 seconds af
   // Nobody is left to connect, and no instance sweeps but the test.
   for (const app of apps) await app.stop(true);
   const relay = createRelay(redis);
-  const sweep = (now: number) => sweepDuels(testDb.db, redis, relay, sweptDelays, now);
+  const sweep = (now: number) =>
+    sweepDuels(testDb.db, redis, relay, sweptDelays, now, getLogger("api.duel"));
 
   // Not yet 10 seconds after the creation: nothing is announced.
   await sweep(createdAt.before + 9999);
@@ -571,7 +572,8 @@ test("a ranked Duel with one Player connected starts without the other once the 
   // second Round on: the sweeps stand for the instants they fall due.
   const relay = createRelay(redis);
   const delays = { expiryMs: DUEL_EXPIRY_MS, countdownMs: 0, roundPauseMs: 0 };
-  const sweep = (now: number) => sweepDuels(testDb.db, redis, relay, delays, now);
+  const sweep = (now: number) =>
+    sweepDuels(testDb.db, redis, relay, delays, now, getLogger("api.duel"));
   const starts = [countdown.startAt, countdown.startAt + 32_000, countdown.startAt + 64_000];
   for (const startAt of starts) {
     await sweep(startAt);
@@ -650,7 +652,7 @@ test("each Player of a ranked Duel is shown both Ranks, Unranked as none, and a 
   }
 
   const testRedis = await createTestRedis();
-  const app = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0);
   closers.push(async () => {
     await app.stop(true);
     await testRedis.drop();

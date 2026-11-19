@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { readDevOptions } from "../src/modules/dev/config.ts";
 import { createTestAuth } from "./helpers/auth.ts";
@@ -12,10 +13,10 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const enabledApp = createApp(testDb.db, auth, testRedis.redis, undefined, undefined, {
-  signIn: true,
+const enabledApp = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+  dev: { signIn: true },
 });
-const disabledApp = createApp(testDb.db, auth, testRedis.redis);
+const disabledApp = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
 const signIn = (app: typeof enabledApp, nickname: string) =>
   app.handle(

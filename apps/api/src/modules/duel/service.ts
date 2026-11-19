@@ -16,6 +16,7 @@ import {
   type ServerMessage,
   START_WINDOW_MS,
 } from "@repo/duel-engine";
+import type { Logger } from "@repo/logger";
 import type { Ornament, Rank } from "@repo/ranked-engine";
 import {
   applyEvent,
@@ -998,6 +999,7 @@ export const sweepDuels = async (
   relay: Pick<Relay, "publish">,
   delays: RoundDelays,
   now: number,
+  logger: Logger,
 ) => {
   const due: string[] = await redis.client.send("ZRANGEBYSCORE", [
     dueKey(redis),
@@ -1007,7 +1009,7 @@ export const sweepDuels = async (
   await Promise.all(
     due.map((duelId) =>
       advanceDuel(db, redis, relay, duelId, delays, now).catch((error: unknown) =>
-        console.error(`Could not advance Duel ${duelId}`, error),
+        logger.error("Could not advance Duel {duelId}", { duelId, error }),
       ),
     ),
   );

@@ -1,12 +1,16 @@
 import { RANKED_CONNECT_MS } from "@repo/duel-engine";
+import type { Logger } from "@repo/logger";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { Elysia, status } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { createProtection } from "../auth/index.ts";
-import type { Auth } from "../auth/service.ts";
+import { type Protection } from "../auth/index.ts";
+import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
+import { mayReconnect } from "../lifecycle/closeCode.ts";
+import { logSocketFailure } from "../http/index.ts";
+import type { Lifecycle } from "../lifecycle/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
 import * as QueueModel from "./model.ts";
@@ -19,9 +23,11 @@ import {
   leaveQueue,
   QUEUE_ENTRY_EXPIRY_MS,
   readQueueEntry,
+  refreshQueueEntry,
 } from "./service.ts";
 
 export type QueueOptions = {
+  /** How long an entry outlives its last refresh, and a socket that dropped: its time to be reclaimed. */
   readonly entryExpiryMs?: number;
   /** How often this instance refreshes the entries of its sockets; several times per expiry. */
   readonly refreshMs?: number;
@@ -33,8 +39,11 @@ export type QueueOptions = {
 
 export const createQueueRoutes = (
   db: Db,
-  auth: Auth,
+  protection: Protection,
+  rateLimiter: RateLimiter,
   redis: Redis,
+  logger: Logger,
+  lifecycle: Lifecycle,
   {
     entryExpiryMs = QUEUE_ENTRY_EXPIRY_MS,
     refreshMs = entryExpiryMs / 3,
@@ -43,8 +52,8 @@ export const createQueueRoutes = (
   }: QueueOptions = {},
 ) => {
   const evictions = createEvictions(redis);
-  const pairings = createPairingFeed(db, redis);
-  const refreshes = createEntryRefreshes(redis, {
+  const pairings = createPairingFeed(db, redis, logger);
+  const refreshes = createEntryRefreshes(redis, logger, {
     expiryMs: entryExpiryMs,
     intervalMs: refreshMs,
   });
@@ -64,7 +73,7 @@ export const createQueueRoutes = (
 
   return (
     new Elysia({ prefix: "/api/queue" })
-      .use(createProtection(auth))
+      .use(protection)
       .use(websocket())
       // A stopped instance refreshes no entry any more, as if it had crashed.
       .onStop(refreshes.stop)
@@ -82,12 +91,16 @@ export const createQueueRoutes = (
         nicknameChosen: true,
         body: QueueModel.Socket.Body,
         response: QueueModel.Socket.Response,
-        async beforeHandle({ body, player }) {
-          // Also runs before each message, which carries a body: the Duel is checked on the upgrade.
+        async beforeHandle({ body, player, set }) {
+          // Also runs before each message, which carries a body: the upgrade alone is counted and
+          // checked against the Duel.
           if (body !== undefined) return;
+          const refused = await rateLimiter.check("queueSocket", player.id, set);
+          if (refused) return refused;
           return refuseWhileInRankedDuel(player.id);
         },
         async open(ws) {
+          if (!lifecycle.hold(ws.id, ws)) return;
           const send = (message: QueueServerMessage) => ws.send(message);
           const presence: Presence = {
             playerId: ws.player.id,
@@ -100,6 +113,7 @@ export const createQueueRoutes = (
             close: () => ws.close(),
           };
           present.set(ws.id, presence);
+          logger.info("Player {playerId} opened a Queue socket", { playerId: presence.playerId });
           refreshes.hold(presence);
           await Promise.all([evictions.hold(presence), pairings.follow(presence)]);
           const { mmr } = await readStanding(db, presence.playerId);
@@ -122,14 +136,23 @@ export const createQueueRoutes = (
             { now: Date.now(), duelExpiryMs, duelConnectMs },
           );
         },
-        async close(ws) {
+        async close(ws, code) {
+          lifecycle.release(ws.id);
+          logger.info("Player {playerId} closed their Queue socket ({code})", {
+            playerId: ws.player.id,
+            code,
+          });
           const presence = present.get(ws.id);
           if (!presence) return;
           present.delete(ws.id);
           refreshes.release(presence);
           await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
-          await leaveQueue(redis, presence);
+          // A drop or a restart is followed by a reconnection, which reclaims the entry with its
+          // instant of entry and its Pairing: it is kept for a full expiry, then expires unclaimed.
+          if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
+          else await leaveQueue(redis, presence);
         },
+        error: logSocketFailure(logger, "Queue socket failed"),
       })
   );
 };

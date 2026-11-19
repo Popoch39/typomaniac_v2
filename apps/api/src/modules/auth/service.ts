@@ -1,7 +1,14 @@
-import { betterAuth, type ValidateUserInfoResult, type ValidateUserInfoSource } from "better-auth";
+import {
+  betterAuth,
+  type BetterAuthRateLimitOptions,
+  type ValidateUserInfoResult,
+  type ValidateUserInfoSource,
+} from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { Db } from "../../db/client.ts";
+import type { Redis } from "../../redis/client.ts";
 import { assignDefaultNickname } from "../player/service.ts";
+import { createRedisRateLimitStorage } from "../rate-limit/service.ts";
 import type { AuthConfig } from "./config.ts";
 
 // A Player is one email address: whoever gets a provider to present an address they do not own
@@ -19,8 +26,21 @@ export const refuseUnverifiedEmail = ({
         errorDescription: "Verify your email address with the provider, then sign in again.",
       };
 
-// Built from an injected database, like the app, so each test file gets an instance on its own database.
-export const createAuth = (db: Db, config: AuthConfig) =>
+// Better Auth reads the client IP from headers only. The API resolves it as for its own limits
+// (socket address, or X-Forwarded-For behind TRUST_PROXY) and hands it over in this header, which
+// it always overwrites so a client can never set it.
+export const CLIENT_IP_HEADER = "x-typomaniac-client-ip";
+
+// enabled left out keeps Better Auth's default: on in production only.
+export type AuthRateLimit = { redis: Redis } & Pick<
+  BetterAuthRateLimitOptions,
+  "enabled" | "customRules"
+>;
+
+// Built from an injected database, like the app, so each test file gets an instance on its own
+// database. Without a rate limit, Better Auth's is off: its in-memory count would not hold across
+// instances.
+export const createAuth = (db: Db, config: AuthConfig, rateLimit?: AuthRateLimit) =>
   betterAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     baseURL: config.baseURL,
@@ -66,6 +86,14 @@ export const createAuth = (db: Db, config: AuthConfig) =>
     // The one attachment path that skips validateUserInfo (linking by id token), and manual linking
     // is not offered anyway.
     disabledPaths: ["/link-social"],
+    advanced: { ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] } },
+    rateLimit: rateLimit
+      ? {
+          enabled: rateLimit.enabled,
+          customRules: rateLimit.customRules,
+          customStorage: createRedisRateLimitStorage(rateLimit.redis),
+        }
+      : { enabled: false },
   });
 
 export type Auth = ReturnType<typeof createAuth>;

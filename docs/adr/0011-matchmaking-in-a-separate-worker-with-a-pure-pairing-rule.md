@@ -16,4 +16,5 @@ Pairing queued Players is done by a matchmaker, a new app with no HTTP and no We
 - A second matchmaker started by mistake is harmless: a leader lock with an expiry decides which one pairs, and the atomic steps cover the overlap.
 - While the matchmaker is down, nobody is paired. A Pairing already proposed can still become a ranked Duel, because the Duel is created by the API in the atomic step of the second acceptance.
 - A Player waits up to one pass, about a second, before being paired.
+- Being connected is being queued, with one allowance: a socket that drops (1006) or that a stopping instance closes (1012) leaves its entry in place for one entry expiry, so that the reconnecting Player reclaims it with their instant of entry and their Pairing. The matchmaker is not told: it may pair a Player in that window, and a Player who does not come back in time is resolved as one who did not accept.
 - The code the two apps share (opening Redis, the Queue's keys and atomic steps, the matchmaker's pass) leaves the API for packages.

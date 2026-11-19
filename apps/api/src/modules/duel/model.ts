@@ -1,4 +1,5 @@
 import { t } from "elysia";
+import { RateLimited } from "../rate-limit/index.ts";
 import type { TSchema } from "typebox";
 
 const duelParams = t.Object({ id: t.String({ format: "uuid" }) });
@@ -173,5 +174,6 @@ export const IdSocket = {
     404: notFound,
     409: t.Object({ code: t.Literal("DUEL_FULL") }),
     426: t.Object({ code: t.Literal("UPGRADE_REQUIRED") }),
+    429: RateLimited,
   },
 };

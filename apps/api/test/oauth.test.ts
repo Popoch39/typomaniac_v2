@@ -1,4 +1,5 @@
 import { afterAll, expect, setSystemTime, test } from "bun:test";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { createTestAuth } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -6,7 +7,7 @@ import { createTestRedis } from "./helpers/redis.ts";
 
 const testDb = await createTestDb();
 const testRedis = await createTestRedis();
-const app = createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis);
+const app = createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis, getLogger("api"));
 
 type Identity = { id: string; email: string; verified: boolean; username?: string };
 

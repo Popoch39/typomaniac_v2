@@ -6,13 +6,17 @@ import {
   ROUND_PAUSE_MS,
   type ServerMessage,
 } from "@repo/duel-engine";
+import type { Logger } from "@repo/logger";
 import { applyEvent, type Game } from "@repo/typing-engine";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { createProtection } from "../auth/index.ts";
-import type { Auth } from "../auth/service.ts";
+import { type Protection, personOf } from "../auth/index.ts";
+import { CloseCode } from "../lifecycle/closeCode.ts";
+import { logSocketFailure } from "../http/index.ts";
+import type { Lifecycle } from "../lifecycle/service.ts";
+import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
@@ -52,8 +56,11 @@ export type DuelOptions = {
 
 export const createDuelRoutes = (
   db: Db,
-  auth: Auth,
+  protection: Protection,
+  rateLimiter: RateLimiter,
   redis: Redis,
+  logger: Logger,
+  lifecycle: Lifecycle,
   {
     expiryMs = DUEL_EXPIRY_MS,
     countdownMs = COUNTDOWN_MS,
@@ -79,6 +86,13 @@ export const createDuelRoutes = (
   };
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
+  // The message counter of each open socket, with whom to blame in the warning, and the sockets
+  // closed for flooding, whose messages still in flight are dropped as well.
+  const messageWindows = new Map<
+    string,
+    { readonly overCap: (now: number) => boolean; readonly key: string; readonly duelId: string }
+  >();
+  const flooded = new Set<string>();
 
   // Every instance sweeps the Duels that have something due, its own or not: a Duel moves forward
   // whoever is connected to it, and on whichever instance. One sweep at a time: a slow one is not
@@ -86,8 +100,8 @@ export const createDuelRoutes = (
   let sweeper: ReturnType<typeof setInterval> | undefined;
   let sweep: Promise<void> | undefined;
   const runSweep = () => {
-    sweep ??= sweepDuels(db, redis, relay, delays, Date.now())
-      .catch((error: unknown) => console.error("Could not sweep the Duels", error))
+    sweep ??= sweepDuels(db, redis, relay, delays, Date.now(), logger)
+      .catch((error: unknown) => logger.error("Could not sweep the Duels", { error }))
       .finally(() => {
         sweep = undefined;
       });
@@ -95,7 +109,7 @@ export const createDuelRoutes = (
 
   return (
     new Elysia({ prefix: "/api/duels" })
-      .use(createProtection(auth))
+      .use(protection)
       .use(websocket())
       .onStart(() => {
         sweeper = setInterval(runSweep, sweepIntervalMs);
@@ -109,7 +123,14 @@ export const createDuelRoutes = (
       .post(
         "/",
         { participant: true, response: { 201: DuelModel.RootPost.Response } },
-        async ({ status }) => status(201, { id: await createDuel(redis, "custom", expiryMs) }),
+        async ({ identity, request, server, set, status }) => {
+          // Per IP as well: a Guest who drops their cookie becomes a new Participant.
+          const refused =
+            (await rateLimiter.check("duelPerParticipant", identity.id, set)) ??
+            (await rateLimiter.check("duelPerIp", rateLimiter.clientIp(request, server), set));
+          if (refused) return refused;
+          return status(201, { id: await createDuel(redis, "custom", expiryMs) });
+        },
       )
       // Lets a client tell why its upgrade was refused, which a browser WebSocket never shows.
       .get(
@@ -130,12 +151,15 @@ export const createDuelRoutes = (
         params: DuelModel.IdSocket.Params,
         body: DuelModel.IdSocket.Body,
         response: DuelModel.IdSocket.Response,
-        async beforeHandle({ body, params, identity, request, status }) {
+        async beforeHandle({ body, params, identity, request, set, status }) {
           // Also runs before each message, which carries a body: the seat is claimed on the upgrade only.
           if (body !== undefined) return;
           // A plain request must not claim a seat it could never use.
           if (request.headers.get("upgrade")?.toLowerCase() !== "websocket")
             return status(426, { code: "UPGRADE_REQUIRED" });
+          // Before anything is read or claimed, so that a reconnection loop costs nothing.
+          const refused = await rateLimiter.check("duelSocket", identity.id, set);
+          if (refused) return refused;
           // Read on every upgrade, though only a first claim keeps it: the Duel holds the Ornament the seat was taken with.
           const ornament =
             identity.playerId === null
@@ -147,12 +171,36 @@ export const createDuelRoutes = (
         },
         // Hands a new Guest their cookie with the handshake, the only response a socket gets.
         upgrade: ({ set }) => set.headers,
+        // Runs on every message before its body is validated, so that malformed ones count too.
+        parse(ws) {
+          const counted = messageWindows.get(ws.id);
+          if (!counted || flooded.has(ws.id) || !counted.overCap(Date.now())) return;
+          flooded.add(ws.id);
+          logger.warn("Duel socket of {key} in seat {seat} of Duel {duelId} closed for flooding", {
+            limit: "socketMessages",
+            key: counted.key,
+            duelId: counted.duelId,
+            seat: seated.get(ws.id)?.participant.seat ?? null,
+          });
+          ws.close(CloseCode.policyViolation, "message rate exceeded");
+        },
         async open(ws) {
+          if (!lifecycle.hold(ws.id, ws)) return;
+          messageWindows.set(ws.id, {
+            overCap: rateLimiter.socketMessageWindow(),
+            key: ws.identity.id,
+            duelId: ws.params.id,
+          });
           const duel = await readDuel(redis, ws.params.id);
           const seat = duel?.holderIds.indexOf(ws.identity.id);
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
+          logger.info("Seat {seat} of Duel {duelId} opened", {
+            duelId: ws.params.id,
+            seat: self.seat,
+            ...personOf(ws),
+          });
           const round = duel.round.number;
           const { words, startAt, announced, anchorAts } = duel.round;
           const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
@@ -238,6 +286,9 @@ export const createDuelRoutes = (
         },
         async message(ws, message) {
           const now = Date.now();
+          // The message over the cap is dropped, never journaled nor relayed. Closing leaves the
+          // Participant away, as any disconnection does: no other sanction.
+          if (flooded.has(ws.id)) return;
           if (message.type === "ping") {
             ws.send({ type: "pong", clientAt: message.clientAt, serverAt: now });
             return;
@@ -273,11 +324,24 @@ export const createDuelRoutes = (
           if (ends)
             await endRound(db, redis, relay, ws.params.id, round, delays, Date.now()).catch(
               (error: unknown) =>
-                console.error(`Could not end Round ${round} of Duel ${ws.params.id}`, error),
+                logger.error("Could not end Round {round} of Duel {duelId}", {
+                  round,
+                  duelId: ws.params.id,
+                  error,
+                }),
             );
         },
-        async close(ws) {
+        async close(ws, code) {
+          lifecycle.release(ws.id);
+          messageWindows.delete(ws.id);
+          flooded.delete(ws.id);
           const seating = seated.get(ws.id);
+          logger.info("Socket on Duel {duelId} closed ({code})", {
+            duelId: ws.params.id,
+            ...(seating ? { seat: seating.participant.seat } : {}),
+            ...personOf(ws),
+            code,
+          });
           if (!seating) return;
           seated.delete(ws.id);
           const { participant, connection, delivery } = seating;
@@ -289,6 +353,13 @@ export const createDuelRoutes = (
             participant: { ...participant, connected: false },
           });
         },
+        error: logSocketFailure(logger, "Socket on Duel {duelId} failed", (context, id) => {
+          const seating = seated.get(id);
+          return {
+            duelId: context.params.id,
+            ...(seating ? { seat: seating.participant.seat } : {}),
+          };
+        }),
       })
   );
 };

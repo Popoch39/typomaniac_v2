@@ -1,7 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
 import { Elysia } from "elysia";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { createProtection } from "../src/modules/auth/index.ts";
+import { createRateLimiter } from "../src/modules/rate-limit/index.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -14,7 +16,7 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
 test("a Guest asking for their profile is told they are not signed in", async () => {
   const response = await app.handle(new Request("http://localhost/api/me"));
@@ -37,7 +39,7 @@ test("a session cookie that Better Auth did not sign is refused", async () => {
 
 test("a route protected by signedIn receives the Player and their session", async () => {
   const probe = new Elysia()
-    .use(createProtection(auth))
+    .use(createProtection(auth, createRateLimiter(testRedis.redis, getLogger("api"))))
     .get("/probe", { signedIn: true }, ({ player, session }) => ({
       playerId: player.id,
       sessionPlayerId: session.userId,

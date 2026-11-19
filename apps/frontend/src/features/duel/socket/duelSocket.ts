@@ -1,6 +1,7 @@
 import type { ClientMessage, ServerMessage } from "@repo/duel-engine";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
+import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
 import { duelQueryOptions } from "../api/duelQueryOptions.ts";
 import { parseServerMessage } from "../message/parseServerMessage.ts";
 
@@ -8,7 +9,12 @@ type DuelSocketHandlers = {
   readonly receive: (message: ServerMessage) => void;
   /** Told, in words for the user, why this Participant could not take a seat in the Duel. */
   readonly refuse: (refusal: string) => void;
-  /** The socket closed after the Participant was seated. */
+  /**
+   * The socket dropped and is about to be reopened, unless this answers `false` because the
+   * Participant no longer needs it.
+   */
+  readonly reconnect: () => boolean;
+  /** The socket closed after the Participant was seated, and is not reopened. */
   readonly disconnect: () => void;
 };
 
@@ -32,35 +38,24 @@ async function findRefusal(duelId: string) {
 }
 
 // Owned by the Duel stores because components may not run effects; one Duel is open at a time.
-let socket: WebSocket | null = null;
+const socket = createReconnectingSocket();
 
 /** Opens the socket of a Duel in place of any other, and hands over each message it reads. */
-export function openDuelSocket(
-  duelId: string,
-  { receive, refuse, disconnect }: DuelSocketHandlers,
-) {
-  closeDuelSocket();
-  const opened = new WebSocket(socketUrl(duelId));
-  socket = opened;
-  let seated = false;
-  opened.addEventListener("message", (event) => {
-    seated = true;
-    const message = parseServerMessage(String(event.data));
-    if (message !== null) receive(message);
-  });
-  opened.addEventListener("close", async () => {
-    if (socket !== opened) return;
-    if (seated) return disconnect();
-    const refusal = await findRefusal(duelId);
-    if (socket === opened) refuse(refusal);
+export function openDuelSocket(duelId: string, { receive, ...handlers }: DuelSocketHandlers) {
+  socket.open(socketUrl(duelId), {
+    ...handlers,
+    receive: (data) => {
+      const message = parseServerMessage(data);
+      if (message !== null) receive(message);
+    },
+    findRefusal: () => findRefusal(duelId),
   });
 }
 
 export function sendToDuel(message: ClientMessage) {
-  socket?.send(JSON.stringify(message));
+  socket.send(JSON.stringify(message));
 }
 
 export function closeDuelSocket() {
-  socket?.close();
-  socket = null;
+  socket.close();
 }

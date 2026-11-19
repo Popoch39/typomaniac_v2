@@ -8,6 +8,7 @@ import {
 } from "@repo/duel-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { and, count, eq } from "drizzle-orm";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { duel, duelGame, duelParticipant, duelRound, user } from "../src/db/schema.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
@@ -20,7 +21,7 @@ const testDb = await createTestDb();
 const testRedis = await createTestRedis();
 const auth = createTestAuth(testDb.db);
 // Listening on an ephemeral port: the in-process request seam cannot upgrade a connection.
-const app = createApp(testDb.db, auth, testRedis.redis).listen(0);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0);
 const origin = `http://localhost:${app.server?.port}`;
 // The Redis of the apps started with delays of their own: every instance sweeping one Redis
 // advances its Duels by its own delays, so these do not share the one of the default app.
@@ -320,7 +321,7 @@ test("the same Guest opening a full Duel again gets their own seat back", async 
 });
 
 test("a Participant whose old socket still holds their seat takes it back from another instance, and the old socket is closed", async () => {
-  const other = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  const other = createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0);
   try {
     const creatorName = uniqueNickname();
     const creatorCookie = await signInPlayerWithNickname(creatorName);
@@ -422,7 +423,9 @@ test("a Player without a Nickname can neither create nor join a Duel", async () 
 
 test("a Duel nobody joined no longer exists once its expiry has passed", async () => {
   // A second app on the same database and Redis, with an expiry short enough to wait for.
-  const shortLived = createApp(testDb.db, auth, testRedis.redis, { expiryMs: 200 }).listen(0);
+  const shortLived = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { expiryMs: 200 },
+  }).listen(0);
   try {
     const cookie = await signInPlayerWithNickname(uniqueNickname());
     const created = await fetch(`http://localhost:${shortLived.server?.port}/api/duels`, {
@@ -474,7 +477,7 @@ test("a Player who closed their socket is shown away, then takes their own seat 
 });
 
 test("two Players on two API instances sharing Redis see each other arrive", async () => {
-  const other = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  const other = createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0);
   try {
     const opponentName = uniqueNickname();
     const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
@@ -525,7 +528,12 @@ test("the state is the first message a socket receives, even when the Opponent's
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
-  const stalling = createApp(testDb.db, auth, { ...testRedis.redis, client }).listen(0);
+  const stalling = createApp(
+    testDb.db,
+    auth,
+    { ...testRedis.redis, client },
+    getLogger("api"),
+  ).listen(0);
   try {
     const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
     const opponentName = uniqueNickname();
@@ -643,7 +651,9 @@ const startDuel = async (
   db = testDb.db,
   roundPauseMs = 0,
 ) => {
-  const quick = createApp(db, auth, quickRedis.redis, { countdownMs, roundPauseMs }).listen(0);
+  const quick = createApp(db, auth, quickRedis.redis, getLogger("api"), {
+    duel: { countdownMs, roundPauseMs },
+  }).listen(0);
   const socketUrl = (duelId: string) =>
     `ws://localhost:${quick.server?.port}/api/duels/${duelId}/socket`;
   const creatorCookie = cookies.creatorCookie ?? (await signInPlayerWithNickname(uniqueNickname()));
@@ -777,8 +787,12 @@ test("an Event naming another Round than the current one is ignored", async () =
 });
 
 test("a Participant who comes back on another API instance resumes the same Game, and the Opponent sees them leave and return", async () => {
-  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
-  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const first = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+  }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+  }).listen(0);
   const socketUrl = (port: number | undefined, duelId: string) =>
     `ws://localhost:${port}/api/duels/${duelId}/socket`;
   try {
@@ -1566,8 +1580,12 @@ test("a Participant who comes back after the deadline, while the server is still
 }, 40_000);
 
 test("two Participants on two API instances sharing Redis receive each other's Events", async () => {
-  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
-  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const first = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+  }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+  }).listen(0);
   const socketUrl = (port: number | undefined, duelId: string) =>
     `ws://localhost:${port}/api/duels/${duelId}/socket`;
   try {
@@ -1605,8 +1623,12 @@ test("two Participants on two API instances sharing Redis receive each other's E
 
 test("with two API instances on one Redis, each Round ends exactly once for both Participants, and the Duel is finalised and saved exactly once", async () => {
   const options = { countdownMs: 0, roundPauseMs: 0 };
-  const first = createApp(testDb.db, auth, testRedis.redis, options).listen(0);
-  const second = createApp(testDb.db, auth, testRedis.redis, options).listen(0);
+  const first = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: options,
+  }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: options,
+  }).listen(0);
   const socketUrl = (port: number | undefined, duelId: string) =>
     `ws://localhost:${port}/api/duels/${duelId}/socket`;
   try {
@@ -1802,8 +1824,12 @@ test("a start sent early inside the accepted window gains no typing time: its Ev
 });
 
 test("a Participant who comes back on another API instance is bounded against the same anchor", async () => {
-  const first = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
-  const second = createApp(testDb.db, auth, testRedis.redis, { countdownMs: 0 }).listen(0);
+  const first = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+  }).listen(0);
+  const second = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
+  }).listen(0);
   const socketUrl = (port: number | undefined, duelId: string) =>
     `ws://localhost:${port}/api/duels/${duelId}/socket`;
   try {
