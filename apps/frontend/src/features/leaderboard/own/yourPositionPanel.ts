@@ -7,7 +7,7 @@ import { rankName } from "../../ranked/standing/rankName.ts";
  * the next Division when ranked (none in Master), a word on Placement when signed in but Unranked,
  * nothing for a Guest.
  */
-export function ownPosition<P extends { rank: Rank }>(own: P | null, isSignedIn: boolean) {
+export function yourPositionPanel<P extends { rank: Rank }>(own: P | null, isSignedIn: boolean) {
   if (own === null)
     return isSignedIn ? ({ kind: "unranked" } as const) : ({ kind: "guest" } as const);
   const { rank } = own;
