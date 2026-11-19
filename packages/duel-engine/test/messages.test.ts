@@ -21,7 +21,13 @@ const serverMessages: ServerMessage[] = [
     type: "state",
     seat: 1,
     round: 2,
-    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] }],
+    rounds: [
+      {
+        results: [getResult(finished), getResult(finished)],
+        multipliers: [1.07, 1],
+        outcomes: ["win", "loss"],
+      },
+    ],
     startAt: 9000,
     words: ["cat", "dog"],
     participants: [
@@ -47,19 +53,32 @@ const serverMessages: ServerMessage[] = [
     type: "roundEnd",
     round: 1,
     results: [getResult(finished), getResult(finished)],
+    multipliers: [1.0625, 1.0625],
     outcomes: ["draw", "draw"],
     nextStartAt: 42_000,
   },
   {
     type: "end",
     outcomes: ["draw", "draw"],
-    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["draw", "draw"] }],
+    rounds: [
+      {
+        results: [getResult(finished), getResult(finished)],
+        multipliers: [1, 1],
+        outcomes: ["draw", "draw"],
+      },
+    ],
     ranked: null,
   },
   {
     type: "end",
     outcomes: ["win", "loss"],
-    rounds: [{ results: [getResult(finished), getResult(finished)], outcomes: ["win", "loss"] }],
+    rounds: [
+      {
+        results: [getResult(finished), getResult(finished)],
+        multipliers: [1.1, 1.02],
+        outcomes: ["win", "loss"],
+      },
+    ],
     ranked: [
       {
         lpDelta: 23,
