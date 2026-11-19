@@ -15,6 +15,7 @@ import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
 import { personOf } from "../http/index.ts";
 import type { Auth } from "../auth/service.ts";
+import { CloseCode } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
@@ -86,9 +87,12 @@ export const createDuelRoutes = (
   };
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
-  // The message counter of each open socket, and the sockets closed for flooding, whose messages
-  // still in flight are dropped as well.
-  const messageWindows = new Map<string, (now: number) => boolean>();
+  // The message counter of each open socket, with whom to blame in the warning, and the sockets
+  // closed for flooding, whose messages still in flight are dropped as well.
+  const messageWindows = new Map<
+    string,
+    { readonly overCap: (now: number) => boolean; readonly key: string; readonly duelId: string }
+  >();
   const flooded = new Set<string>();
 
   // Every instance sweeps the Duels that have something due, its own or not: a Duel moves forward
@@ -168,8 +172,26 @@ export const createDuelRoutes = (
         },
         // Hands a new Guest their cookie with the handshake, the only response a socket gets.
         upgrade: ({ set }) => set.headers,
+        // Runs on every message before its body is validated, so that malformed ones count too.
+        parse(ws) {
+          const counted = messageWindows.get(ws.id);
+          if (!counted || flooded.has(ws.id) || !counted.overCap(Date.now())) return;
+          flooded.add(ws.id);
+          logger.warn("Duel socket of {key} in seat {seat} of Duel {duelId} closed for flooding", {
+            limit: "socketMessages",
+            key: counted.key,
+            duelId: counted.duelId,
+            seat: seated.get(ws.id)?.participant.seat ?? null,
+          });
+          ws.close(CloseCode.policyViolation, "message rate exceeded");
+        },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
+          messageWindows.set(ws.id, {
+            overCap: rateLimiter.socketMessageWindow(),
+            key: ws.identity.id,
+            duelId: ws.params.id,
+          });
           const duel = await readDuel(redis, ws.params.id);
           const seat = duel?.holderIds.indexOf(ws.identity.id);
           const self = duel?.participants.find((participant) => participant.seat === seat);
@@ -265,28 +287,9 @@ export const createDuelRoutes = (
         },
         async message(ws, message) {
           const now = Date.now();
-          if (flooded.has(ws.id)) return;
-          let overCap = messageWindows.get(ws.id);
-          if (!overCap) {
-            overCap = rateLimiter.socketMessageWindow();
-            messageWindows.set(ws.id, overCap);
-          }
           // The message over the cap is dropped, never journaled nor relayed. Closing leaves the
           // Participant away, as any disconnection does: no other sanction.
-          if (overCap(now)) {
-            flooded.add(ws.id);
-            logger.warn(
-              "Duel socket of {key} in seat {seat} of Duel {duelId} closed for flooding",
-              {
-                limit: "socketMessages",
-                key: ws.identity.id,
-                duelId: ws.params.id,
-                seat: seated.get(ws.id)?.participant.seat ?? null,
-              },
-            );
-            ws.close(1008, "message rate exceeded");
-            return;
-          }
+          if (flooded.has(ws.id)) return;
           if (message.type === "ping") {
             ws.send({ type: "pong", clientAt: message.clientAt, serverAt: now });
             return;

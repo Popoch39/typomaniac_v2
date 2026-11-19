@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import type { ServerMessage } from "@repo/duel-engine";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { getLogger, type LogRecord, resetLogger, setupLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
@@ -190,5 +191,28 @@ test("a Duel socket flooding past the message cap is closed with 1008, its exces
     expect(warnings).toHaveLength(1);
     expect(warnings[0]?.category).toEqual(["api", "duel"]);
     expect(warnings[0]?.properties).toMatchObject({ duelId: id, seat: 0 });
+  });
+});
+
+test("malformed messages count toward the message cap: a socket flooding them is closed with 1008", async () => {
+  await withRedis(async (redis) => {
+    const { origin, socketOrigin, stop } = listenWith(redis, {
+      socketMessages: { max: 3, windowSeconds: 60 },
+    });
+    const flooder = await signInPlayerWithNickname(auth, origin);
+    const id = await createDuel(origin, flooder.cookie);
+    // Sends whatever it is given: the server's body validation refuses each of these.
+    const flooding = await openSocketOf<ServerMessage, unknown>(
+      `${socketOrigin}/api/duels/${id}/socket`,
+      flooder.cookie,
+    );
+    await flooding.next();
+
+    for (let sent = 0; sent < 10; sent++) flooding.send({ type: "malformed" });
+    const closeCode = await flooding.closed;
+    await stop();
+
+    expect(closeCode).toBe(1008);
+    expect(warningsFor(flooder.player.id)).toHaveLength(1);
   });
 });
