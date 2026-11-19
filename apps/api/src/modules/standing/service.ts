@@ -128,8 +128,11 @@ export const readOwnStanding = async (db: Db, playerId: string) => {
   return { rank, placement: { ...placement, outcomes: placementDuels.map((d) => d.outcome) } };
 };
 
-/** How many ranked Players the Leaderboard lists. */
-export const LEADERBOARD_SIZE = 100;
+/** How many Positions the Podium holds, above the first page. */
+export const PODIUM_SIZE = 3;
+
+/** How many ranked Players a page of the Leaderboard lists, from the first Position after the Podium. */
+export const LEADERBOARD_PAGE_SIZE = 15;
 
 const isRanked = isNotNull(standingTable.ladderIndex);
 
@@ -162,15 +165,24 @@ type LeaderboardRow = {
   ornament: OrnamentChoice;
 };
 
-/** The top of the Leaderboard, in its order. Exported so that a test can read the plan of this very query. */
-export const leaderboardTop = (db: Db) =>
+/**
+ * The ranked Players after the first `offset` ones, at most `limit` of them, in the Leaderboard's
+ * order. Exported so that a test can read the plan of this very query.
+ */
+export const leaderboardSlice = (db: Db, offset: number, limit: number) =>
   db
     .select(leaderboardColumns)
     .from(standingTable)
     .innerJoin(user, eq(user.id, standingTable.playerId))
     .where(isRanked)
     .orderBy(...leaderboardOrder)
-    .limit(LEADERBOARD_SIZE);
+    .offset(offset)
+    .limit(limit);
+
+const countRanked = async (db: Db) => {
+  const [row] = await db.select({ total: count() }).from(standingTable).where(isRanked);
+  return row?.total ?? 0;
+};
 
 // The ranked Players ahead of this one in the Leaderboard's order.
 const countAhead = async (db: Db, { playerId, ladderIndex, lp, mmr }: LeaderboardRow) => {
@@ -197,22 +209,49 @@ const leaderboardPlayer = (
   return { position, nickname, avatarUrl, rank, ornament: wornOrnament(ornament, rank) };
 };
 
-/**
- * The ranked Players at the top of the Leaderboard and, for a signed-in ranked Player, their own
- * place, inside the top or below it. A Guest (`playerId` null) and an Unranked Player have none.
- */
-export const readLeaderboard = async (db: Db, playerId: string | null) => {
-  const top = await leaderboardTop(db);
-  const players = top.map((row, index) => leaderboardPlayer(index + 1, row));
-  if (playerId === null) return { players, own: null };
-
-  const inTop = top.findIndex((row) => row.playerId === playerId);
-  if (inTop !== -1) return { players, own: players[inTop] ?? null };
+// The signed-in Player's own place, found among the rows already read before it is looked up.
+const readOwn = async (
+  db: Db,
+  playerId: string,
+  read: { position: number; row: LeaderboardRow }[],
+) => {
+  const known = read.find(({ row }) => row.playerId === playerId);
+  if (known) return leaderboardPlayer(known.position, known.row);
   const [row] = await db
     .select(leaderboardColumns)
     .from(standingTable)
     .innerJoin(user, eq(user.id, standingTable.playerId))
     .where(and(isRanked, eq(standingTable.playerId, playerId)));
-  if (!row) return { players, own: null };
-  return { players, own: leaderboardPlayer((await countAhead(db, row)) + 1, row) };
+  return row ? leaderboardPlayer((await countAhead(db, row)) + 1, row) : null;
+};
+
+/**
+ * The Podium, one page of the ranked Players after it and, for a signed-in ranked Player, their own
+ * place, wherever it is. A page past the last one is served as the last page; with no more ranked
+ * Players than the Podium holds there is one page, and it is empty. A Guest (`playerId` null) and an
+ * Unranked Player have no place of their own.
+ */
+export const readLeaderboard = async (db: Db, playerId: string | null, requestedPage: number) => {
+  const total = await countRanked(db);
+  const pageCount = Math.max(1, Math.ceil((total - PODIUM_SIZE) / LEADERBOARD_PAGE_SIZE));
+  const page = Math.min(requestedPage, pageCount);
+  const pageStart = PODIUM_SIZE + (page - 1) * LEADERBOARD_PAGE_SIZE;
+  const [podiumRows, pageRows] = await Promise.all([
+    leaderboardSlice(db, 0, PODIUM_SIZE),
+    leaderboardSlice(db, pageStart, LEADERBOARD_PAGE_SIZE),
+  ]);
+  const read = [
+    ...podiumRows.map((row, index) => ({ position: index + 1, row })),
+    ...pageRows.map((row, index) => ({ position: pageStart + index + 1, row })),
+  ];
+  const listed = (rows: typeof read) =>
+    rows.map(({ position, row }) => leaderboardPlayer(position, row));
+  return {
+    podium: listed(read.slice(0, podiumRows.length)),
+    players: listed(read.slice(podiumRows.length)),
+    page,
+    pageCount,
+    total,
+    own: playerId === null ? null : await readOwn(db, playerId, read),
+  };
 };
