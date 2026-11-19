@@ -1,4 +1,5 @@
 import { rankAtLadderIndex } from "./ladder.ts";
+import { isTierChoice, TIERS } from "./tier.ts";
 import type { Division, Rank, Tier } from "./types.ts";
 
 /** What a Player chose to wear: their Rank's Ornament, none, the Unranked plate, or a pinned Tier. */
@@ -6,8 +7,6 @@ export type OrnamentChoice = "auto" | "none" | "unranked" | Tier;
 
 /** The Ornament a Player wears, `null` for a bare Avatar. */
 export type Ornament = { tier: Tier | "unranked"; division: Division | null } | null;
-
-const TIERS: Tier[] = ["bronze", "silver", "gold", "platinum", "diamond", "master"];
 
 /** ORNAMENT-1: Auto follows the Rank, Division included; a pinned Ornament draws its Tier alone. */
 export function wornOrnament(choice: OrnamentChoice, rank: Rank | null): Ornament {
@@ -19,7 +18,7 @@ export function wornOrnament(choice: OrnamentChoice, rank: Rank | null): Ornamen
 
 /** ORNAMENT-2: a Tier's Ornament is unlocked once the Peak Tier reaches it; the other choices always are. */
 export function isOrnamentUnlocked(choice: OrnamentChoice, peakTier: Tier | null): boolean {
-  if (choice === "auto" || choice === "none" || choice === "unranked") return true;
+  if (!isTierChoice(choice)) return true;
   return peakTier !== null && TIERS.indexOf(choice) <= TIERS.indexOf(peakTier);
 }
 

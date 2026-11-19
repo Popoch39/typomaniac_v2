@@ -1,4 +1,5 @@
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
+import { isTierChoice } from "@repo/ranked-engine";
 
 /** Whether a value read from JSON has the expected shape. */
 type Check = (value: unknown) => boolean;
@@ -15,17 +16,16 @@ const hasFields = (value: unknown, checks: Record<string, Check>) =>
   isRecord(value) && Object.entries(checks).every(([key, check]) => check(value[key]));
 
 const DIVISIONS = [1, 2, 3, 4];
-const DIVISION_TIERS = ["bronze", "silver", "gold", "platinum", "diamond"];
 
 const isRank: Check = (value) => {
   if (!isRecord(value) || !Number.isInteger(value.lp)) return false;
   if (value.tier === "master") return true;
-  return DIVISION_TIERS.includes(String(value.tier)) && DIVISIONS.includes(Number(value.division));
+  return isTierChoice(value.tier) && DIVISIONS.includes(Number(value.division));
 };
 
 const isOrnament: Check = (value) =>
   hasFields(value, {
-    tier: (tier) => ["unranked", ...DIVISION_TIERS, "master"].includes(String(tier)),
+    tier: (tier) => tier === "unranked" || isTierChoice(tier),
     division: (division) => division === null || DIVISIONS.includes(Number(division)),
   });
 

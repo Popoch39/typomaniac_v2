@@ -1,9 +1,11 @@
 import {
   isOrnamentUnlocked,
+  isTierChoice,
   type Ornament,
   type OrnamentChoice,
   type Rank,
   type Tier,
+  TIERS,
   wornOrnament,
 } from "@repo/ranked-engine";
 import { tierName } from "../../ranked/standing/rankName.ts";
@@ -18,16 +20,12 @@ export type OrnamentOption = {
   readonly lockedHint: string | null;
 };
 
-const TIERS: readonly Tier[] = ["bronze", "silver", "gold", "platinum", "diamond", "master"];
-
 const CHOICES: readonly OrnamentChoice[] = ["auto", "none", "unranked", ...TIERS];
 
 const LABELS = { auto: "Auto", none: "None", unranked: "Unranked" } as const;
 
 const labelOf = (choice: OrnamentChoice) =>
-  choice === "auto" || choice === "none" || choice === "unranked"
-    ? LABELS[choice]
-    : tierName(choice);
+  isTierChoice(choice) ? tierName(choice) : LABELS[choice];
 
 /** Every Ornament a Player may choose from, the Tiers above their Peak Tier locked. */
 export function ornamentOptions(peakTier: Tier | null, rank: Rank | null): OrnamentOption[] {

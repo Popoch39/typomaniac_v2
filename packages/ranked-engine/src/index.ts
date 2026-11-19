@@ -7,4 +7,5 @@ export { expectedScore } from "./mmr.ts";
 export { isOrnamentUnlocked, tierAtLadderIndex, wornOrnament } from "./ornament.ts";
 export type { Ornament, OrnamentChoice } from "./ornament.ts";
 export { createStanding } from "./standing.ts";
+export { isTierChoice, TIERS } from "./tier.ts";
 export type { Division, Outcome, Rank, RankChange, Standing, Tier } from "./types.ts";

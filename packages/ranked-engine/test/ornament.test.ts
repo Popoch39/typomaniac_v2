@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { isOrnamentUnlocked, tierAtLadderIndex, wornOrnament } from "../src/index.ts";
+import {
+  isOrnamentUnlocked,
+  isTierChoice,
+  TIERS,
+  tierAtLadderIndex,
+  wornOrnament,
+} from "../src/index.ts";
 
 test("ORNAMENT-1: Auto wears the Unranked plate while Unranked", () => {
   expect(wornOrnament("auto", null)).toEqual({ tier: "unranked", division: null });
@@ -66,4 +72,16 @@ test("ORNAMENT-3: the Peak Tier is the Tier of the highest ladder index reached"
   expect(tierAtLadderIndex(4)).toBe("silver");
   expect(tierAtLadderIndex(19)).toBe("diamond");
   expect(tierAtLadderIndex(20)).toBe("master");
+});
+
+test("the six Tiers run from Bronze up to Master", () => {
+  expect(TIERS).toEqual(["bronze", "silver", "gold", "platinum", "diamond", "master"]);
+});
+
+test("a Tier choice pins a Tier; Auto, None, Unranked and anything else do not", () => {
+  expect(isTierChoice("gold")).toBe(true);
+  expect(isTierChoice("master")).toBe(true);
+  expect(isTierChoice("auto")).toBe(false);
+  expect(isTierChoice("unranked")).toBe(false);
+  expect(isTierChoice(1)).toBe(false);
 });
