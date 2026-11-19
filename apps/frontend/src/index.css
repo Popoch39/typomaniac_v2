@@ -163,6 +163,109 @@
   }
 }
 
+/*
+ * The Ornament palette: each layer of an Ornament's pixel art (features/ornament/art) is painted by one
+ * of these, from the theme tokens and the Tier colour that an ornament-<tier> utility sets on its SVG.
+ */
+@utility ornament-bronze {
+  --ornament-tier: var(--tier-bronze);
+}
+
+@utility ornament-silver {
+  --ornament-tier: var(--tier-silver);
+}
+
+@utility ornament-gold {
+  --ornament-tier: var(--tier-gold);
+}
+
+@utility ornament-platinum {
+  --ornament-tier: var(--tier-platinum);
+}
+
+@utility ornament-diamond {
+  --ornament-tier: var(--tier-diamond);
+}
+
+@utility ornament-master {
+  --ornament-tier: var(--tier-master);
+}
+
+@utility ornament-outline {
+  fill: var(--key-outline);
+}
+
+@utility ornament-recess {
+  fill: color-mix(in srgb, var(--ornament-tier) 22%, var(--surface-card));
+}
+
+@utility ornament-tier-highlight {
+  fill: color-mix(in srgb, var(--ornament-tier) 50%, var(--ink));
+}
+
+@utility ornament-tier-light {
+  fill: color-mix(in srgb, var(--ornament-tier) 76%, var(--ink));
+}
+
+@utility ornament-tier-face {
+  fill: var(--ornament-tier);
+}
+
+@utility ornament-tier-shade {
+  fill: color-mix(in srgb, var(--ornament-tier) 74%, var(--key-outline));
+}
+
+@utility ornament-tier-dark {
+  fill: color-mix(in srgb, var(--ornament-tier) 50%, var(--key-outline));
+}
+
+@utility ornament-key-highlight {
+  fill: color-mix(in srgb, var(--key-face) 72%, var(--ink));
+}
+
+@utility ornament-key-light {
+  fill: color-mix(in srgb, var(--key-face) 88%, var(--ink));
+}
+
+@utility ornament-key-face {
+  fill: var(--key-face);
+}
+
+@utility ornament-key-shade {
+  fill: color-mix(in srgb, var(--key-face) 60%, var(--key-edge));
+}
+
+@utility ornament-key-dark {
+  fill: var(--key-edge);
+}
+
+@utility ornament-ink {
+  fill: var(--ink);
+}
+
+@utility ornament-on-key {
+  fill: var(--on-key);
+}
+
+/* A gem core: it blinks between the Tier colour and ink, and holds still for reduced motion. */
+@utility ornament-core {
+  fill: var(--ornament-tier);
+  animation: ornament-blink 2.4s steps(1) infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes ornament-blink {
+  0% {
+    fill: var(--ornament-tier);
+  }
+  50% {
+    fill: var(--ink);
+  }
+}
+
 /* The plate's pins: the only radial gradient of the system. */
 @utility plate-dots {
   background-image: radial-gradient(var(--plate-dot) 1.5px, transparent 1.7px);
