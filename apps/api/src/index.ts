@@ -16,11 +16,13 @@ const devOptions = readDevOptions();
 const db = openDatabase(requireDatabaseUrl());
 await migrateDatabase(db, migrationsFolder);
 
+const redis = await openRedis(redisUrl);
+
 // Re-exported so Elysia's AOT can discover the app from the process entry.
 export const app = createApp(
   db,
-  createAuth(db, authConfig),
-  await openRedis(redisUrl),
+  createAuth(db, authConfig, { redis }),
+  redis,
   undefined,
   undefined,
   devOptions,
