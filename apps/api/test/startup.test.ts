@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
+import { openSocket } from "./helpers/socket.ts";
 
 const entry = join(import.meta.dir, "../src/index.ts");
 
@@ -73,6 +74,49 @@ test("LOG_LEVEL=warn hides the info lines", async () => {
   );
 
   expect(output).toBe("");
+});
+
+test("on SIGTERM, the API closes an open Duel socket with 1012, logs each step and exits 0 within 10 seconds", async () => {
+  const port = String(freePort());
+  const api = startApi({ NODE_ENV: "production", PORT: port });
+  for (let tries = 0; tries < 100; tries += 1) {
+    const ready = await fetch(`http://localhost:${port}/ready`).then(
+      (response) => response.ok,
+      () => false,
+    );
+    if (ready) break;
+    await Bun.sleep(100);
+  }
+  const created = await fetch(`http://localhost:${port}/api/duels`, { method: "POST" });
+  const { id } = (await created.json()) as { id: string };
+  const guestCookie =
+    created.headers
+      .getSetCookie()
+      .find((header) => header.startsWith("guest="))
+      ?.split(";")[0] ?? "";
+  const socket = await openSocket(`ws://localhost:${port}/api/duels/${id}/socket`, guestCookie);
+  await socket.next();
+
+  const signaledAt = Date.now();
+  api.kill("SIGTERM");
+  const [closeCode, exitCode] = await Promise.all([socket.closed, api.exited]);
+
+  expect(closeCode).toBe(1012);
+  expect(exitCode).toBe(0);
+  expect(Date.now() - signaledAt).toBeLessThan(10_000);
+  const output = await new Response(api.stdout).text();
+  const messages = output
+    .trim()
+    .split("\n")
+    .map((line) => (JSON.parse(line) as { message: string }).message);
+  expect(messages).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining("SIGTERM"),
+      expect.stringContaining("Closed 1 socket"),
+      expect.stringContaining("Stopped"),
+      expect.stringContaining("Closed Redis and Postgres"),
+    ]),
+  );
 });
 
 test("the API refuses to start without its Redis address, before touching Postgres", async () => {
