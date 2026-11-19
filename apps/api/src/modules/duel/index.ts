@@ -13,6 +13,7 @@ import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
+import { personOf } from "../http/index.ts";
 import type { Auth } from "../auth/service.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
@@ -174,6 +175,11 @@ export const createDuelRoutes = (
           const self = duel?.participants.find((participant) => participant.seat === seat);
           // Only when the Duel expired between the claim and the opening.
           if (!duel || !self) return ws.close();
+          logger.info("Seat {seat} of Duel {duelId} opened", {
+            duelId: ws.params.id,
+            seat: self.seat,
+            ...personOf(ws),
+          });
           const round = duel.round.number;
           const { words, startAt, announced, anchorAts } = duel.round;
           const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
@@ -323,11 +329,17 @@ export const createDuelRoutes = (
                 }),
             );
         },
-        async close(ws) {
+        async close(ws, code) {
           lifecycle.release(ws.id);
           messageWindows.delete(ws.id);
           flooded.delete(ws.id);
           const seating = seated.get(ws.id);
+          logger.info("Socket on Duel {duelId} closed ({code})", {
+            duelId: ws.params.id,
+            ...(seating ? { seat: seating.participant.seat } : {}),
+            ...personOf(ws),
+            code,
+          });
           if (!seating) return;
           seated.delete(ws.id);
           const { participant, connection, delivery } = seating;
@@ -337,6 +349,18 @@ export const createDuelRoutes = (
           await relay.publish(ws.params.id, participant.seat, {
             type: "presence",
             participant: { ...participant, connected: false },
+          });
+        },
+        // A failing handler of an open socket, which only has an id once upgraded; the app's error
+        // hook answers it after this one.
+        error(context) {
+          if (!("id" in context) || typeof context.id !== "string") return;
+          const seating = seated.get(context.id);
+          logger.error("Socket on Duel {duelId} failed", {
+            duelId: context.params.id,
+            ...(seating ? { seat: seating.participant.seat } : {}),
+            ...personOf(context),
+            error: context.error,
           });
         },
       })

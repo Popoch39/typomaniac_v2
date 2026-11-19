@@ -6,6 +6,7 @@ import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
 import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
+import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
 import { createOrnamentRoutes } from "./modules/ornament/index.ts";
@@ -32,33 +33,37 @@ export const createApp = (
   rateLimitOptions?: RateLimitOptions,
 ) => {
   const rateLimiter = createRateLimiter(redis, logger.getChild("rate-limit"), rateLimitOptions);
-  return new Elysia()
-    .decorate("db", db)
-    .use(createAuthRoutes(auth, rateLimiter))
-    .get("/health", () => "ok")
-    .use(createLifecycleRoutes(db, redis, lifecycle))
-    .use(createPlayerRoutes(db, auth, rateLimiter))
-    .use(createOrnamentRoutes(db, auth, rateLimiter))
-    .use(createStandingRoutes(db, auth, rateLimiter))
-    .use(
-      createDuelRoutes(
-        db,
-        auth,
-        rateLimiter,
-        redis,
-        logger.getChild("duel"),
-        lifecycle,
-        duelOptions,
-      ),
-    )
-    .use(
-      createQueueRoutes(db, auth, rateLimiter, redis, logger.getChild("queue"), lifecycle, {
-        duelExpiryMs: duelOptions?.expiryMs,
-        duelConnectMs: duelOptions?.connectMs,
-        ...queueOptions,
-      }),
-    )
-    .use(createDevRoutes(auth, devOptions));
+  return (
+    new Elysia()
+      // First, so that its hooks reach every route after it.
+      .use(createRequestLog(logger.getChild("http")))
+      .decorate("db", db)
+      .use(createAuthRoutes(auth, rateLimiter))
+      .get("/health", () => "ok")
+      .use(createLifecycleRoutes(db, redis, lifecycle))
+      .use(createPlayerRoutes(db, auth, rateLimiter))
+      .use(createOrnamentRoutes(db, auth, rateLimiter))
+      .use(createStandingRoutes(db, auth, rateLimiter))
+      .use(
+        createDuelRoutes(
+          db,
+          auth,
+          rateLimiter,
+          redis,
+          logger.getChild("duel"),
+          lifecycle,
+          duelOptions,
+        ),
+      )
+      .use(
+        createQueueRoutes(db, auth, rateLimiter, redis, logger.getChild("queue"), lifecycle, {
+          duelExpiryMs: duelOptions?.expiryMs,
+          duelConnectMs: duelOptions?.connectMs,
+          ...queueOptions,
+        }),
+      )
+      .use(createDevRoutes(auth, devOptions))
+  );
 };
 
 export type App = ReturnType<typeof createApp>;
