@@ -1,6 +1,6 @@
 import { TableCell, TableRow } from "../../../shared/components/ui/table.tsx";
-import { PlayerAvatar } from "../../auth/components/PlayerAvatar.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
+import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { LeaderboardRank } from "./LeaderboardRank.tsx";
 
@@ -19,7 +19,7 @@ export function LeaderboardRow({ player, isOwn }: LeaderboardRowProps) {
       <TableCell className="px-5 py-3.5 font-mono font-bold">{player.position}</TableCell>
       <TableCell className="px-3 py-3.5">
         <span className="flex items-center gap-3 font-bold">
-          <PlayerAvatar player={player} isOwn={isOwn} className="size-9 text-sm" />
+          <OrnamentedAvatar player={player} ornament={player.ornament} size="sm" isOwn={isOwn} />
           <PlayerNickname player={player} />
         </span>
       </TableCell>
