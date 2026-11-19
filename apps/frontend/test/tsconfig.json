@@ -12,7 +12,9 @@
   },
   "include": [
     ".",
+    "../src/features/game/clock",
     "../src/features/game/input",
+    "../src/features/game/store",
     "../src/features/game/words/judgeLetter.ts",
     "../src/features/game/words/withoutSeparator.ts",
     "../src/features/duel/clock",
