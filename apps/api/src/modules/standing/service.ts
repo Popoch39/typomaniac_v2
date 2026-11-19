@@ -11,7 +11,7 @@ import {
   type Standing,
   wornOrnament,
 } from "@repo/ranked-engine";
-import { and, asc, count, desc, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, lt, type SQL, sql } from "drizzle-orm";
 import type { Db, Transaction } from "../../db/client.ts";
 import { duelParticipant, standing as standingTable, user } from "../../db/schema.ts";
 
@@ -165,16 +165,20 @@ type LeaderboardRow = {
   ornament: OrnamentChoice;
 };
 
+// The ranked Players, with what the Leaderboard shows of them, among those meeting `condition`.
+const selectRanked = (db: Db, condition?: SQL) =>
+  db
+    .select(leaderboardColumns)
+    .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
+    .where(condition === undefined ? isRanked : and(isRanked, condition));
+
 /**
  * The ranked Players after the first `offset` ones, at most `limit` of them, in the Leaderboard's
  * order. Exported so that a test can read the plan of this very query.
  */
 export const leaderboardSlice = (db: Db, offset: number, limit: number) =>
-  db
-    .select(leaderboardColumns)
-    .from(standingTable)
-    .innerJoin(user, eq(user.id, standingTable.playerId))
-    .where(isRanked)
+  selectRanked(db)
     .orderBy(...leaderboardOrder)
     .offset(offset)
     .limit(limit);
@@ -182,26 +186,6 @@ export const leaderboardSlice = (db: Db, offset: number, limit: number) =>
 const countRanked = async (db: Db) => {
   const [row] = await db.select({ total: count() }).from(standingTable).where(isRanked);
   return row?.total ?? 0;
-};
-
-// The ranked Players ahead of this one in the Leaderboard's order, or behind it.
-const comparedTo = (
-  side: "ahead" | "behind",
-  { playerId, ladderIndex, lp, mmr }: LeaderboardRow,
-) => {
-  const own = sql`(${ladderIndex}::smallint, ${lp}::integer, ${mmr}::integer)`;
-  const columns = sql`(${standingTable.ladderIndex}, ${standingTable.lp}, ${standingTable.mmr})`;
-  return side === "ahead"
-    ? sql`(${columns} > ${own} or (${columns} = ${own} and ${standingTable.playerId} < ${playerId}))`
-    : sql`(${columns} < ${own} or (${columns} = ${own} and ${standingTable.playerId} > ${playerId}))`;
-};
-
-const countAhead = async (db: Db, row: LeaderboardRow) => {
-  const [counted] = await db
-    .select({ ahead: count() })
-    .from(standingTable)
-    .where(and(isRanked, comparedTo("ahead", row)));
-  return counted?.ahead ?? 0;
 };
 
 // The Leaderboard's order turned around, to walk up from a Player to the one just ahead.
@@ -212,14 +196,35 @@ const reversedLeaderboardOrder = [
   desc(standingTable.playerId),
 ];
 
-// The ranked Player just ahead of this one, or just behind, if any.
-const readNeighbour = async (db: Db, side: "ahead" | "behind", row: LeaderboardRow) => {
-  const [neighbour] = await db
-    .select(leaderboardColumns)
+// For each side of a Player: how a Standing past them compares to theirs, how the id breaks a tie,
+// and the order that walks away from them.
+const sides = {
+  ahead: { past: sql.raw(">"), pastId: sql.raw("<"), order: reversedLeaderboardOrder },
+  behind: { past: sql.raw("<"), pastId: sql.raw(">"), order: leaderboardOrder },
+};
+
+type Side = keyof typeof sides;
+
+// The ranked Players ahead of this one in the Leaderboard's order, or behind it.
+const comparedTo = (side: Side, { playerId, ladderIndex, lp, mmr }: LeaderboardRow) => {
+  const { past, pastId } = sides[side];
+  const own = sql`(${ladderIndex}::smallint, ${lp}::integer, ${mmr}::integer)`;
+  const columns = sql`(${standingTable.ladderIndex}, ${standingTable.lp}, ${standingTable.mmr})`;
+  return sql`(${columns} ${past} ${own} or (${columns} = ${own} and ${standingTable.playerId} ${pastId} ${playerId}))`;
+};
+
+const countAhead = async (db: Db, row: LeaderboardRow) => {
+  const [counted] = await db
+    .select({ ahead: count() })
     .from(standingTable)
-    .innerJoin(user, eq(user.id, standingTable.playerId))
-    .where(and(isRanked, comparedTo(side, row)))
-    .orderBy(...(side === "ahead" ? reversedLeaderboardOrder : leaderboardOrder))
+    .where(and(isRanked, comparedTo("ahead", row)));
+  return counted?.ahead ?? 0;
+};
+
+// The ranked Player just ahead of this one, or just behind, if any.
+const readNeighbour = async (db: Db, side: Side, row: LeaderboardRow) => {
+  const [neighbour] = await selectRanked(db, comparedTo(side, row))
+    .orderBy(...sides[side].order)
     .limit(1);
   return neighbour ?? null;
 };
@@ -242,11 +247,7 @@ const readOwn = async (
 ) => {
   const known = read.find(({ row }) => row.playerId === playerId);
   if (known) return { own: leaderboardPlayer(known.position, known.row), around: null };
-  const [row] = await db
-    .select(leaderboardColumns)
-    .from(standingTable)
-    .innerJoin(user, eq(user.id, standingTable.playerId))
-    .where(and(isRanked, eq(standingTable.playerId, playerId)));
+  const [row] = await selectRanked(db, eq(standingTable.playerId, playerId));
   if (!row) return { own: null, around: null };
   const [ahead, position, behind] = await Promise.all([
     readNeighbour(db, "ahead", row),
