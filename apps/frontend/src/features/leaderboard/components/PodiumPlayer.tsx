@@ -3,6 +3,7 @@ import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx
 import { TierBadge } from "../../ranked/components/TierBadge.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { useLeaderboardRank } from "../hooks/useLeaderboardRank.ts";
+import { YouTag } from "./YouTag.tsx";
 
 interface PodiumPlayerProps {
   player: LeaderboardPlayer;
@@ -15,8 +16,11 @@ export function PodiumPlayer({ player, isOwn }: PodiumPlayerProps) {
   return (
     <>
       <OrnamentedAvatar player={player} ornament={player.ornament} size="md" isOwn={isOwn} />
-      <span className="max-w-full truncate text-2xl font-extrabold text-ink">
-        <PlayerNickname player={player} />
+      <span className="flex max-w-full items-center gap-2.5">
+        <span className="min-w-0 truncate text-2xl font-extrabold text-ink">
+          <PlayerNickname player={player} />
+        </span>
+        {isOwn && <YouTag />}
       </span>
       <span className="flex items-center gap-3">
         <TierBadge tier={player.rank.tier} size="sm" />

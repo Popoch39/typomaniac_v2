@@ -21,7 +21,11 @@ export function LeaderboardRanking({ leaderboard }: LeaderboardRankingProps) {
       </div>
       {leaderboard.players.length > 0 && (
         <>
-          <LeaderboardTable players={leaderboard.players} own={leaderboard.own} />
+          <LeaderboardTable
+            players={leaderboard.players}
+            own={leaderboard.own}
+            around={leaderboard.around}
+          />
           <LeaderboardPagination
             page={leaderboard.page}
             pageCount={leaderboard.pageCount}

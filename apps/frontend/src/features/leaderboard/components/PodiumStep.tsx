@@ -1,5 +1,6 @@
 import { cn } from "../../../shared/lib/utils.ts";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
+import { OWN_ROW_ID } from "../own/ownRowId.ts";
 import { PodiumPlayer } from "./PodiumPlayer.tsx";
 
 interface PodiumStepProps {
@@ -16,8 +17,11 @@ export function PodiumStep({ position, label, player, isOwn }: PodiumStepProps) 
 
   return (
     <li
+      id={isOwn ? OWN_ROW_ID : undefined}
+      tabIndex={isOwn ? -1 : undefined}
+      aria-current={isOwn ? "true" : undefined}
       className={cn(
-        "flex min-w-0 flex-col items-center gap-3.5 pb-2.5",
+        "flex min-w-0 scroll-my-6 flex-col items-center gap-3.5 pb-2.5 outline-none",
         position === 2 && "md:-order-1",
       )}
     >
