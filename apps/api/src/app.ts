@@ -1,4 +1,4 @@
-import type { Logger } from "@repo/logger";
+import type { ApiModule, Logger } from "@repo/logger";
 import { Elysia } from "elysia";
 import type { Db } from "./db/client.ts";
 import { createAuthRoutes } from "./modules/auth/index.ts";
@@ -32,11 +32,13 @@ export const createApp = (
   lifecycle: Lifecycle = createLifecycle(),
   rateLimitOptions?: RateLimitOptions,
 ) => {
-  const rateLimiter = createRateLimiter(redis, logger.getChild("rate-limit"), rateLimitOptions);
+  // Only the categories `@repo/logger` names.
+  const loggerOf = (module: ApiModule) => logger.getChild(module);
+  const rateLimiter = createRateLimiter(redis, loggerOf("rate-limit"), rateLimitOptions);
   return (
     new Elysia()
       // First, so that its hooks reach every route after it.
-      .use(createRequestLog(logger.getChild("http")))
+      .use(createRequestLog(loggerOf("http")))
       .decorate("db", db)
       .use(createAuthRoutes(auth, rateLimiter))
       .get("/health", () => "ok")
@@ -44,19 +46,9 @@ export const createApp = (
       .use(createPlayerRoutes(db, auth, rateLimiter))
       .use(createOrnamentRoutes(db, auth, rateLimiter))
       .use(createStandingRoutes(db, auth, rateLimiter))
+      .use(createDuelRoutes(db, auth, rateLimiter, redis, loggerOf("duel"), lifecycle, duelOptions))
       .use(
-        createDuelRoutes(
-          db,
-          auth,
-          rateLimiter,
-          redis,
-          logger.getChild("duel"),
-          lifecycle,
-          duelOptions,
-        ),
-      )
-      .use(
-        createQueueRoutes(db, auth, rateLimiter, redis, logger.getChild("queue"), lifecycle, {
+        createQueueRoutes(db, auth, rateLimiter, redis, loggerOf("queue"), lifecycle, {
           duelExpiryMs: duelOptions?.expiryMs,
           duelConnectMs: duelOptions?.connectMs,
           ...queueOptions,

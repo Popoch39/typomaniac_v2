@@ -76,11 +76,14 @@ export const createAuthRoutes = (auth: Auth, rateLimiter: RateLimiter) =>
     "/api/auth/*",
     // Left unparsed, as a mount does: Better Auth reads the body itself.
     { parse: "none", detail: { hide: true } },
-    ({ request, server }) => {
+    async ({ request, server, set }) => {
       const headers = new Headers(request.headers);
       const ip = rateLimiter.clientIp(request, server);
       if (ip === null) headers.delete(CLIENT_IP_HEADER);
       else headers.set(CLIENT_IP_HEADER, ip);
-      return auth.handler(new Request(request, { headers }));
+      const response = await auth.handler(new Request(request, { headers }));
+      if (response.status !== 429) return response;
+      // Better Auth answers { message } with X-Retry-After: refused as every other limit instead.
+      return rateLimiter.refuse("auth", ip, Number(response.headers.get("x-retry-after")), set);
     },
   );

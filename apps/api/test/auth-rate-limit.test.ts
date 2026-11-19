@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { getLogger } from "@repo/logger";
+import { getLogger, type LogRecord, resetLogger, setupLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import type { RateLimitOptions } from "../src/modules/rate-limit/index.ts";
 import type { Redis } from "../src/redis/client.ts";
@@ -8,8 +8,13 @@ import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 
 const testDb = await createTestDb();
+const records: LogRecord[] = [];
+await setupLogger({ sink: (record) => void records.push(record) });
 
-afterAll(() => testDb.drop());
+afterAll(async () => {
+  await resetLogger();
+  await testDb.drop();
+});
 
 // Two sign-ins a minute, so a third one is refused well within the window.
 const createLimitedApp = (redis: Redis, rateLimitOptions?: RateLimitOptions) =>
@@ -45,6 +50,28 @@ test("a sign-in beyond the limit is refused with 429", async () => {
   expect((await startSignIn(app)).status).toBe(200);
   expect((await startSignIn(app)).status).toBe(200);
   expect((await startSignIn(app)).status).toBe(429);
+  await testRedis.drop();
+});
+
+test("a refused sign-in answers as every limit does: RATE_LIMITED with Retry-After, and a warning naming the limit and the key", async () => {
+  const testRedis = await createTestRedis();
+  const app = createLimitedApp(testRedis.redis, { trustProxy: true });
+  const from = () => startSignIn(app, { "x-forwarded-for": "203.0.113.9" });
+  await from();
+  await from();
+
+  const refused = await from();
+
+  expect(refused.status).toBe(429);
+  expect(await refused.json()).toEqual({ code: "RATE_LIMITED" });
+  const retryAfter = Number(refused.headers.get("retry-after"));
+  expect(retryAfter).toBeGreaterThanOrEqual(1);
+  expect(retryAfter).toBeLessThanOrEqual(60);
+  const warnings = records.filter(
+    ({ level, properties }) => level === "warning" && properties.key === "203.0.113.9",
+  );
+  expect(warnings).toHaveLength(1);
+  expect(warnings[0]?.properties.limit).toBe("auth");
   await testRedis.drop();
 });
 

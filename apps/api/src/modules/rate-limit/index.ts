@@ -47,7 +47,22 @@ export const createRateLimiter = (
   { trustProxy = false, limits = {}, socketMessages = SOCKET_MESSAGE_LIMIT }: RateLimitOptions = {},
 ) => {
   const limitOf = (name: RateLimitName) => limits[name] ?? RATE_LIMITS[name];
+  /**
+   * The 429 every limit answers, Better Auth's included, with the seconds until the window ends;
+   * each refusal is logged with the limit and the key it counted.
+   */
+  const refuse = (
+    limit: RateLimitName | "auth",
+    key: string | null,
+    secondsLeft: number,
+    set: Context["set"],
+  ) => {
+    logger.warn("Rate limit {limit} exceeded by {key}", { limit, key });
+    set.headers["retry-after"] = String(Math.max(1, secondsLeft));
+    return status(429, { code: "RATE_LIMITED" });
+  };
   return {
+    refuse,
     clientIp: (request: Request, server: SocketSource) =>
       resolveClientIp(request, server, trustProxy),
     /**
@@ -63,9 +78,7 @@ export const createRateLimiter = (
         windowSeconds,
       );
       if (count <= max) return;
-      logger.warn("Rate limit {limit} exceeded by {key}", { limit: name, key });
-      set.headers["retry-after"] = String(Math.max(1, secondsLeft));
-      return status(429, { code: "RATE_LIMITED" });
+      return refuse(name, key, secondsLeft, set);
     },
     /** A counter of one socket's messages, which tells when a message goes over the cap. */
     socketMessageWindow: () =>
