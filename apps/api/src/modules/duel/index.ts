@@ -85,6 +85,10 @@ export const createDuelRoutes = (
   };
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
+  // The message counter of each open socket, and the sockets closed for flooding, whose messages
+  // still in flight are dropped as well.
+  const messageWindows = new Map<string, (now: number) => boolean>();
+  const flooded = new Set<string>();
 
   // Every instance sweeps the Duels that have something due, its own or not: a Duel moves forward
   // whoever is connected to it, and on whichever instance. One sweep at a time: a slow one is not
@@ -143,12 +147,15 @@ export const createDuelRoutes = (
         params: DuelModel.IdSocket.Params,
         body: DuelModel.IdSocket.Body,
         response: DuelModel.IdSocket.Response,
-        async beforeHandle({ body, params, identity, request, status }) {
+        async beforeHandle({ body, params, identity, request, set, status }) {
           // Also runs before each message, which carries a body: the seat is claimed on the upgrade only.
           if (body !== undefined) return;
           // A plain request must not claim a seat it could never use.
           if (request.headers.get("upgrade")?.toLowerCase() !== "websocket")
             return status(426, { code: "UPGRADE_REQUIRED" });
+          // Before anything is read or claimed, so that a reconnection loop costs nothing.
+          const refused = await rateLimiter.check("duelSocket", identity.id, set);
+          if (refused) return refused;
           // Read on every upgrade, though only a first claim keeps it: the Duel holds the Ornament the seat was taken with.
           const ornament =
             identity.playerId === null
@@ -252,6 +259,28 @@ export const createDuelRoutes = (
         },
         async message(ws, message) {
           const now = Date.now();
+          if (flooded.has(ws.id)) return;
+          let overCap = messageWindows.get(ws.id);
+          if (!overCap) {
+            overCap = rateLimiter.socketMessageWindow();
+            messageWindows.set(ws.id, overCap);
+          }
+          // The message over the cap is dropped, never journaled nor relayed. Closing leaves the
+          // Participant away, as any disconnection does: no other sanction.
+          if (overCap(now)) {
+            flooded.add(ws.id);
+            logger.warn(
+              "Duel socket of {key} in seat {seat} of Duel {duelId} closed for flooding",
+              {
+                limit: "socketMessages",
+                key: ws.identity.id,
+                duelId: ws.params.id,
+                seat: seated.get(ws.id)?.participant.seat ?? null,
+              },
+            );
+            ws.close(1008, "message rate exceeded");
+            return;
+          }
           if (message.type === "ping") {
             ws.send({ type: "pong", clientAt: message.clientAt, serverAt: now });
             return;
@@ -296,6 +325,8 @@ export const createDuelRoutes = (
         },
         async close(ws) {
           lifecycle.release(ws.id);
+          messageWindows.delete(ws.id);
+          flooded.delete(ws.id);
           const seating = seated.get(ws.id);
           if (!seating) return;
           seated.delete(ws.id);

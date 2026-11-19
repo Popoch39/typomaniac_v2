@@ -88,9 +88,12 @@ export const createQueueRoutes = (
         nicknameChosen: true,
         body: QueueModel.Socket.Body,
         response: QueueModel.Socket.Response,
-        async beforeHandle({ body, player }) {
-          // Also runs before each message, which carries a body: the Duel is checked on the upgrade.
+        async beforeHandle({ body, player, set }) {
+          // Also runs before each message, which carries a body: the upgrade alone is counted and
+          // checked against the Duel.
           if (body !== undefined) return;
+          const refused = await rateLimiter.check("queueSocket", player.id, set);
+          if (refused) return refused;
           return refuseWhileInRankedDuel(player.id);
         },
         async open(ws) {

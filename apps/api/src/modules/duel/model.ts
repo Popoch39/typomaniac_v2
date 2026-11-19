@@ -169,5 +169,6 @@ export const IdSocket = {
     404: notFound,
     409: t.Object({ code: t.Literal("DUEL_FULL") }),
     426: t.Object({ code: t.Literal("UPGRADE_REQUIRED") }),
+    429: t.Object({ code: t.Literal("RATE_LIMITED") }),
   },
 };

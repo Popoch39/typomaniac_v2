@@ -80,5 +80,6 @@ export const Socket = {
     ]),
     // The other statuses refuse the upgrade.
     409: rankedDuelUnfinished,
+    429: t.Object({ code: t.Literal("RATE_LIMITED") }),
   },
 };
