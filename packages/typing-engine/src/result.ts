@@ -52,10 +52,7 @@ export function getResult(game: Game): Result {
     creditActiveWord: game.config.mode === "time",
   });
   const { startedAt } = game;
-  // Only a words game gets a last, shorter bucket: a time game stops on its last whole second.
-  const buckets = cutIntoBuckets(game.endedAt - startedAt, {
-    withTail: game.config.mode === "words",
-  });
+  const buckets = resultBuckets(game, game.endedAt, startedAt);
   const history = buildHistory(game, buckets, startedAt);
   const keyPresses = countedKeyPresses(game, startedAt);
   const gaps = keyPressGaps(keyPresses, startedAt);
@@ -81,6 +78,34 @@ export function getResult(game: Game): Result {
   };
 }
 
+/**
+ * The Game's WPM history as it stands at `at`, the client timestamp in milliseconds: one value per
+ * whole second elapsed since the start, as the Result's, so that a live chart ends on the final one.
+ */
+export function getWpmHistory(game: Game, at: number): readonly number[] {
+  if (game.startedAt === null) return [];
+  // A finished Game no longer moves; one still played only has its whole seconds so far.
+  const buckets =
+    game.endedAt === null
+      ? cutIntoBuckets(Math.max(0, at - game.startedAt), { withTail: false })
+      : resultBuckets(game, game.endedAt, game.startedAt);
+  return wpmHistory(game, buckets, game.startedAt);
+}
+
+// Only a words game gets a last, shorter bucket: a time game stops on its last whole second.
+function resultBuckets(game: Game, endedAt: number, startedAt: number): readonly Bucket[] {
+  return cutIntoBuckets(endedAt - startedAt, { withTail: game.config.mode === "words" });
+}
+
+function wpmHistory(game: Game, buckets: readonly Bucket[], startedAt: number): readonly number[] {
+  return buckets.map((bucket) => {
+    const reached = game.progress.filter((sample) => sample.at - startedAt <= bucket.until);
+    // Nothing typed yet when the bucket ends: a game started on a signal, before its first letter.
+    const creditedChars = reached.at(-1)?.creditedChars ?? 0;
+    return Math.round(wordsPerMinute(creditedChars, bucket.until / 1000));
+  });
+}
+
 function buildHistory(game: Game, buckets: readonly Bucket[], startedAt: number): History {
   const keystrokeInstants = game.keystrokes.map((keystroke) => keystroke.at - startedAt);
   const errorInstants = game.keystrokes
@@ -88,12 +113,7 @@ function buildHistory(game: Game, buckets: readonly Bucket[], startedAt: number)
     .map((keystroke) => keystroke.at - startedAt);
 
   return {
-    wpm: buckets.map((bucket) => {
-      const reached = game.progress.filter((sample) => sample.at - startedAt <= bucket.until);
-      // Nothing typed yet when the bucket ends: a game started on a signal, before its first letter.
-      const creditedChars = reached.at(-1)?.creditedChars ?? 0;
-      return Math.round(wordsPerMinute(creditedChars, bucket.until / 1000));
-    }),
+    wpm: wpmHistory(game, buckets, startedAt),
     keystrokeRate: buckets.map((bucket) =>
       Math.round(wordsPerMinute(countInBucket(keystrokeInstants, bucket), bucket.seconds)),
     ),

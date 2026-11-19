@@ -5,7 +5,12 @@ import { FocusVeil } from "./FocusVeil.tsx";
 import { LiveStatsBar } from "./LiveStatsBar.tsx";
 import { WordList } from "./WordList.tsx";
 
-export function TypingArea() {
+interface TypingAreaProps {
+  wordSize?: "regular" | "large";
+  hasLiveStats?: boolean;
+}
+
+export function TypingArea({ wordSize = "regular", hasLiveStats = true }: TypingAreaProps) {
   const inputRef = useTypingInput();
   const { onKeyDown, onKeyUp } = useKeyPresses();
   const { inputId, isFocused, onFocus, onBlur } = useTypingFocus();
@@ -28,10 +33,10 @@ export function TypingArea() {
         onFocus={onFocus}
         onBlur={onBlur}
       />
-      <LiveStatsBar />
+      {hasLiveStats && <LiveStatsBar />}
       {/* The focus veil covers only the words, leaving the Live stats readable. */}
       <div className="relative">
-        <WordList />
+        <WordList size={wordSize} />
         {!isFocused && <FocusVeil inputId={inputId} />}
       </div>
     </div>

@@ -1,7 +1,7 @@
-import { TypingArea } from "../../game/components/TypingArea.tsx";
 import { DuelBand } from "./DuelBand.tsx";
 import { DuelCountdown } from "./DuelCountdown.tsx";
 import { DuelEnd } from "./DuelEnd.tsx";
+import { DuelLiveRound } from "./DuelLiveRound.tsx";
 import { DuelRoundEnd } from "./DuelRoundEnd.tsx";
 
 interface DuelBroadcastProps {
@@ -18,7 +18,7 @@ export function DuelBroadcast({ phase }: DuelBroadcastProps) {
       <div className="flex grow flex-col gap-4">
         {phase === "countdown" && <DuelCountdown />}
         {/* Mounted at the Start only: typing during the Countdown reaches no Game. */}
-        {phase === "running" && <TypingArea />}
+        {phase === "running" && <DuelLiveRound />}
         {phase === "roundEnd" && <DuelRoundEnd />}
         {phase === "finished" && <DuelEnd />}
       </div>

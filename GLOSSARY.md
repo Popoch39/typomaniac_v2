@@ -141,6 +141,10 @@ _Avoid_: Keystroke consistency
 The time in a Game during which the player is not typing.
 _Avoid_: AFK, pause
 
+**WPM history**:
+The WPM reached at the end of each second of a Game, counted from its start. The Result holds the final one; it can also be read live, while the Game is played.
+_Avoid_: speed curve, WPM series
+
 **Live stats** (`LiveStats`):
 The WPM, Raw WPM and Accuracy read while a Game is being played, as opposed to its Result.
 _Avoid_: live result, current stats

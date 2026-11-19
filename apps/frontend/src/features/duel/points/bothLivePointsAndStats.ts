@@ -1,5 +1,6 @@
 import { getPoints } from "@repo/duel-engine";
 import { type Game, getLiveStats } from "@repo/typing-engine";
+import { opponentReadAt } from "./opponentReadAt.ts";
 
 export type LivePointsAndStats = {
   readonly points: number;
@@ -16,19 +17,11 @@ function readLivePointsAndStats(game: Game, at: number): LivePointsAndStats {
 
 /**
  * Both sides of a Round live, the Participant's own first, read at `at` on their own clock. The
- * Opponent's Game is read as much time after their start as has passed since the Participant's
- * own: both Games started at the same real instant, on two different clocks.
+ * Opponent's Game is read as much time after their start as has passed since the Participant's own.
  */
 export function bothLivePointsAndStats(selfGame: Game, opponentGame: Game | null, at: number) {
   const self = readLivePointsAndStats(selfGame, at);
-  if (opponentGame?.startedAt == null || selfGame.startedAt === null) {
-    return { self, opponent: NOTHING_TYPED };
-  }
-  return {
-    self,
-    opponent: readLivePointsAndStats(
-      opponentGame,
-      opponentGame.startedAt + (at - selfGame.startedAt),
-    ),
-  };
+  const opponentAt = opponentReadAt(selfGame, opponentGame, at);
+  if (opponentGame === null || opponentAt === null) return { self, opponent: NOTHING_TYPED };
+  return { self, opponent: readLivePointsAndStats(opponentGame, opponentAt) };
 }

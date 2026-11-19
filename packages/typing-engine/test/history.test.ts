@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { applyEvent, createGame, getResult } from "../src/index.ts";
+import { applyEvent, createGame, getResult, getWpmHistory } from "../src/index.ts";
 import { typeText } from "./helpers/typing.ts";
 
 /** History of a 1-word words Game on `word`, typed one character at each of `instants` (ms). */
@@ -160,4 +160,52 @@ test("HIST-1: after a start signal the buckets are counted from the signal, empt
   });
   // Mean 9, deviation √99 = 9.9499, c = 1.10554, 100 × (1 − tanh(1.88625…)) = 4.50.
   expect(result.consistency).toBe(4.5);
+});
+
+/** A 30 s time Game on 4-letter words, its clock started at 0 ms. */
+function startedTimeGame(seconds = 30) {
+  const words = ["abcd", "efgh", "ijkl", "mnop", "qrst", "uvwx"];
+  return applyEvent(createGame({ mode: "time", seconds }, words), { type: "start", at: 0 });
+}
+
+test("HIST-8: the WPM history read live has one 0 per second elapsed while nothing is typed", () => {
+  expect(getWpmHistory(startedTimeGame(), 3500)).toEqual([0, 0, 0]);
+});
+
+test("HIST-8: a steady typist reads the same WPM every second", () => {
+  // 10 characters a second, from 100 to 3000 ms: 10 / 5 / (1 / 60) = 120.
+  const typing = typeText(startedTimeGame(), "abcd efgh ijkl mnop qrst uvwx ", 100, 100);
+
+  expect(getWpmHistory(typing, 3000)).toEqual([120, 120, 120]);
+});
+
+test("HIST-8: a pause makes the WPM history fall, the WPM being counted since the start", () => {
+  // 5 characters by 500 ms, then nothing: 5 / 5 / (1 / 60) = 60, then 30 and 20.
+  const typing = typeText(startedTimeGame(), "abcd ", 100, 100);
+
+  expect(getWpmHistory(typing, 3000)).toEqual([60, 30, 20]);
+});
+
+test("HIST-8: the WPM history read before the start is empty", () => {
+  const game = createGame({ mode: "time", seconds: 30 }, ["abcd"]);
+
+  expect(getWpmHistory(game, 5000)).toEqual([]);
+  expect(getWpmHistory(applyEvent(game, { type: "start", at: 5000 }), 4000)).toEqual([]);
+});
+
+test("HIST-8: the WPM history read mid-second stops on the last whole second", () => {
+  // "efgh " typed between 1100 and 1500 ms is in no whole second yet at 1999 ms.
+  const typing = typeText(typeText(startedTimeGame(), "abcd ", 100, 100), "efgh ", 1100, 100);
+
+  expect(getWpmHistory(typing, 1999)).toEqual([60]);
+});
+
+test("HIST-8: at the end of a time Game, the WPM history read live is the Result's", () => {
+  const typing = typeText(startedTimeGame(3), "abcd efgh ijkl ", 200, 150);
+  // The end Tick lands a little after the third second, as a real clock does.
+  const finished = applyEvent(typing, { type: "tick", at: 3004 });
+
+  expect(getWpmHistory(finished, 3004)).toEqual(getResult(finished).history.wpm);
+  // A finished Game no longer moves, however late it is read.
+  expect(getWpmHistory(finished, 9000)).toEqual(getResult(finished).history.wpm);
 });

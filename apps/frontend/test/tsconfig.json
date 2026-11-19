@@ -21,6 +21,7 @@
     "../src/features/game/words/mistakeRuns.ts",
     "../src/features/duel/clock",
     "../src/features/duel/caret",
+    "../src/features/duel/chart",
     "../src/features/duel/message",
     "../src/features/duel/points",
     "../src/features/duel/rank",
