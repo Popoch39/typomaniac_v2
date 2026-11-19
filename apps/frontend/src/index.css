@@ -277,6 +277,175 @@
   }
 }
 
+/*
+ * The Rank up scene of a Tier promotion: a 1040×680 stage, scaled down to fit the viewport and never
+ * up. tan(atan2()) turns the ratio of two lengths into the number `scale` needs.
+ */
+@utility rank-up-fit {
+  scale: min(1, tan(atan2(100cqw, 1040px)), tan(atan2(100cqh, 680px)));
+}
+
+/* Silver: the old Ornament dips, then is cut away at the end of the wipe that draws the new one. */
+@utility rank-up-silver-old {
+  animation: rank-up-silver-old 1.4s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-silver-old {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  25% {
+    transform: translateY(8px);
+  }
+  45% {
+    transform: translateY(0);
+  }
+  99% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The designed stepped wipe, the one property of the scene animated besides transform and opacity. */
+@utility rank-up-wipe {
+  animation: rank-up-wipe 0.7s steps(19) 0.7s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-wipe {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@utility rank-up-scan {
+  animation: rank-up-scan 0.7s steps(19) 0.7s both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-scan {
+  0% {
+    transform: translateY(372px);
+    opacity: 1;
+  }
+  99% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
+/* A square ring of the Tier colour, thrown out from the Ornament. */
+@utility rank-up-ring {
+  animation: rank-up-ring 1s cubic-bezier(0.1, 0.7, 0.3, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-ring {
+  0% {
+    transform: scale(0.4) rotate(0deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3.4) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+/* A burst particle flies to (--burst-x, --burst-y), then falls 140px as it fades. */
+@utility rank-up-burst {
+  animation: rank-up-burst var(--burst-duration) cubic-bezier(0.12, 0.75, 0.3, 1) both;
+  animation-delay: var(--burst-delay);
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-burst {
+  0% {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(-50%, -50%) translate(var(--burst-x), var(--burst-y));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--burst-x), calc(var(--burst-y) + 140px));
+    opacity: 0;
+  }
+}
+
+@utility rank-up-rise {
+  animation: rank-up-rise 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-rise {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Continue keeps its box from the start, and shows once the entrance has played. */
+@utility rank-up-appear {
+  animation: rank-up-appear 0.2s ease-out both;
+
+  /* Under reduced motion the scene shows its final state directly. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes rank-up-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes ornament-blink {
   0% {
     fill: var(--ornament-tier);

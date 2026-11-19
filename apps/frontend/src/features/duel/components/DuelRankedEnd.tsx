@@ -11,7 +11,7 @@ const TONES: Readonly<Record<LpTone, string>> = {
 };
 
 export function DuelRankedEnd() {
-  const { isRanked, block } = useDuelRankedEnd();
+  const { isRanked, block, isLpSweepHeld } = useDuelRankedEnd();
   if (!isRanked) return null;
 
   return (
@@ -41,7 +41,12 @@ export function DuelRankedEnd() {
       </div>
       <div className="h-14">
         {block?.progress && (
-          <LpBar lp={block.progress.lp} from={block.progress.from} next={block.progress.next} />
+          <LpBar
+            lp={block.progress.lp}
+            from={block.progress.from}
+            next={block.progress.next}
+            isSweepHeld={isLpSweepHeld}
+          />
         )}
         {block?.placement && (
           <p className="m-0 font-mono text-sm font-bold text-ink-subtle">{block.placement}</p>

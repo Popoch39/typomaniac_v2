@@ -22,6 +22,7 @@ import type { DuelPhase } from "../phase/duelPhase.ts";
 import { closeDuelSocket, openDuelSocket, sendToDuel } from "../socket/duelSocket.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 import { useDuelCountdownStore } from "./useDuelCountdownStore.ts";
+import { useTierPromotionStore } from "./useTierPromotionStore.ts";
 
 type DuelState = {
   readonly phase: DuelPhase;
@@ -226,6 +227,9 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       stopResumingGame();
       stopForwardingEvents();
       const { outcomes, ranked } = message;
+      const { seat } = get();
+      // Opened with the end, so that the LP bar it holds mounts held.
+      if (ranked !== null && seat !== null) useTierPromotionStore.getState().end(ranked[seat]);
       set({ phase: "finished", rounds: message.rounds, end: { outcomes, ranked } });
       // The Standing moved: the Ranked page and the profile read the new one.
       if (ranked !== null) void queryClient.invalidateQueries({ queryKey: standingQueryKey });
@@ -261,6 +265,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     resumedJournal = [];
     shiftEventTime(0);
     stopForwardingEvents();
+    useTierPromotionStore.getState().reset();
     set(initialState);
   };
 

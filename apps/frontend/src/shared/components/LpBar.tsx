@@ -7,9 +7,11 @@ interface LpBarProps {
   next: string;
   /** The LP held before, for the bar to sweep from as it appears. */
   from?: number;
+  /** Keeps the bar at `from` until released, while something covers it. */
+  isSweepHeld?: boolean;
 }
 
-export function LpBar({ lp, next, from }: LpBarProps) {
+export function LpBar({ lp, next, from, isSweepHeld = false }: LpBarProps) {
   const { held, max, toNext, cells, valueText } = useLpBar(lp, next, from);
 
   return (
@@ -39,7 +41,14 @@ export function LpBar({ lp, next, from }: LpBarProps) {
             key={index}
             className="block h-5.5 overflow-hidden rounded-xs border-2 border-key-outline bg-key-edge"
           >
-            <span className={cn("block h-full bg-action", isSwept && "lp-sweep")} style={style} />
+            <span
+              className={cn(
+                "block h-full bg-action",
+                isSwept && "lp-sweep",
+                isSwept && isSweepHeld && "[animation-play-state:paused]",
+              )}
+              style={style}
+            />
           </span>
         ))}
       </div>
