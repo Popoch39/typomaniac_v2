@@ -1,17 +1,12 @@
-import type { Ornament } from "@repo/ranked-engine";
 import { cn } from "../../../shared/lib/utils.ts";
-import type { OrnamentDetail } from "../art/ornamentDrawing.ts";
-import { useOrnamentDrawing } from "../hooks/useOrnamentDrawing.ts";
+import type { OrnamentDrawing } from "../art/ornamentDrawing.ts";
 
 interface OrnamentArtProps {
-  ornament: NonNullable<Ornament>;
-  detail: OrnamentDetail;
+  drawing: OrnamentDrawing;
 }
 
 // Decorative: the Nickname and the Rank next to it say in text what the Ornament draws.
-export function OrnamentArt({ ornament, detail }: OrnamentArtProps) {
-  const { tierClassName, layers, numeral } = useOrnamentDrawing(ornament, detail);
-
+export function OrnamentArt({ drawing: { tierClassName, layers, numeral } }: OrnamentArtProps) {
   return (
     <svg
       viewBox="0 0 64 76"

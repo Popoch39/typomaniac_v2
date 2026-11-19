@@ -1,4 +1,4 @@
-import { PlayerAvatar } from "../../features/auth/components/PlayerAvatar.tsx";
+import { PlayerAvatar } from "./PlayerAvatar.tsx";
 import { useOpponentCaret } from "../hooks/useOpponentCaret.ts";
 import { caretClassName } from "../lib/caretClassName.ts";
 

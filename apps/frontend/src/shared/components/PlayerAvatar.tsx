@@ -1,10 +1,9 @@
-import { Avatar, AvatarFallback, AvatarImage } from "../../../shared/components/ui/avatar.tsx";
-import { cn } from "../../../shared/lib/utils.ts";
-import { useAvatar } from "../hooks/useAvatar.ts";
-import type { SignedInPlayer } from "../hooks/useSignedInPlayer.ts";
+import { type AvatarPlayer, useAvatar } from "../hooks/useAvatar.ts";
+import { cn } from "../lib/utils.ts";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar.tsx";
 
 interface PlayerAvatarProps {
-  player: Pick<SignedInPlayer, "nickname" | "avatarUrl">;
+  player: AvatarPlayer;
   /** The reader's own avatar is an action key: that colour means "you". */
   isOwn?: boolean;
   className?: string;
