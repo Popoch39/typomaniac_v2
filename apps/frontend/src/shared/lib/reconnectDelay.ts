@@ -1,5 +1,13 @@
-/** The close codes after which the server may be back: a restart (1012) or a dropped connection (1006). */
-const RETRIED_CODES = new Set([1006, 1012]);
+/** The WebSocket close codes the client acts on, named once (RFC 6455, section 7.4.1). */
+export const CloseCode = {
+  /** The connection dropped without a close frame. */
+  abnormal: 1006,
+  /** The server instance stops, not for anything the client did. */
+  serviceRestart: 1012,
+} as const;
+
+/** The close codes after which the server may be back. */
+const RETRIED_CODES = new Set<number>([CloseCode.abnormal, CloseCode.serviceRestart]);
 const FIRST_DELAY_MS = 500;
 // Doubling from half a second, the last try comes about 15 s after the close.
 const MAX_ATTEMPTS = 5;

@@ -35,7 +35,8 @@
     "../src/features/queue/refusal",
     "../src/shared/api/describeApiError.ts",
     "../src/shared/lib/formatClock.ts",
-    "../src/shared/lib/reconnectDelay.ts"
+    "../src/shared/lib/reconnectDelay.ts",
+    "../src/shared/lib/reconnectingSocket.ts"
   ],
   "references": [
     { "path": "../../../packages/typing-engine" },
