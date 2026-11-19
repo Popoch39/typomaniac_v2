@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { Elysia } from "elysia";
 import { createApp } from "../src/app.ts";
 import { createProtection } from "../src/modules/auth/index.ts";
+import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
@@ -59,7 +60,12 @@ test("a Player with no Nickname reads their own profile, without their email", a
   );
 
   expect(response.status).toBe(200);
-  expect(await response.clone().json()).toEqual({ id: player.id, nickname: null, avatarUrl: null });
+  expect(await response.clone().json()).toEqual({
+    id: player.id,
+    nickname: null,
+    avatarUrl: null,
+    ornament: { tier: "unranked", division: null },
+  });
   expect(await response.text()).not.toContain("ada@example.com");
 });
 
@@ -72,5 +78,32 @@ test("a Player whose provider gave a picture reads it as their Avatar", async ()
   );
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ id: player.id, nickname: null, avatarUrl: image });
+  expect(await response.json()).toMatchObject({ id: player.id, nickname: null, avatarUrl: image });
+});
+
+test("a new Player wears the Unranked plate", async () => {
+  const { cookie } = await signInPlayer(auth);
+
+  const response = await app.handle(
+    new Request("http://localhost/api/me", { headers: { cookie } }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ ornament: { tier: "unranked", division: null } });
+});
+
+test("a ranked Player wears the Ornament of their Tier, with their Division", async () => {
+  const { player, cookie } = await signInPlayer(auth);
+  await saveStanding(testDb.db, player.id, {
+    mmr: 1400,
+    duelsPlayed: 12,
+    rank: { tier: "gold", division: 2, lp: 30 },
+  });
+
+  const response = await app.handle(
+    new Request("http://localhost/api/me", { headers: { cookie } }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ ornament: { tier: "gold", division: 2 } });
 });
