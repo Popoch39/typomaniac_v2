@@ -13,7 +13,10 @@ export function Word({ index }: WordProps) {
   const scrollRef = useActiveWordScroll(index);
 
   return (
-    <span ref={scrollRef} className={isWrong ? "underline decoration-letter-incorrect" : undefined}>
+    <span
+      ref={scrollRef}
+      className={isWrong ? "underline decoration-letter-incorrect decoration-wavy" : undefined}
+    >
       {Array.from({ length: letterCount }, (_, letterIndex) => (
         <Letter key={letterIndex} wordIndex={index} letterIndex={letterIndex} />
       ))}

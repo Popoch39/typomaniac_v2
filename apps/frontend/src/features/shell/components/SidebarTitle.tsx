@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Keyboard } from "lucide-react";
+import { BrandMark } from "../../../shared/components/BrandMark.tsx";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -10,9 +10,14 @@ export function SidebarTitle() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Typomaniac">
+        {/* Below 24px the logo's wave blurs into a line, so the rail trades padding for size. */}
+        <SidebarMenuButton
+          asChild
+          tooltip="Typomaniac"
+          className="group-data-[collapsible=icon]:p-1!"
+        >
           <Link to="/custom">
-            <Keyboard aria-hidden="true" />
+            <BrandMark className="size-6!" />
             <span className="font-heading text-base font-semibold text-foreground">Typomaniac</span>
           </Link>
         </SidebarMenuButton>
