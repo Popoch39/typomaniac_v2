@@ -8,14 +8,12 @@ import { readOwnOrnament, saveOrnamentChoice } from "./service.ts";
 export const createOrnamentRoutes = (db: Db, auth: Auth) =>
   new Elysia({ prefix: "/api/me/ornament" })
     .use(createProtection(auth))
-    .get(
-      "/",
-      { nicknameChosen: true, response: OrnamentModel.MeOrnamentGet.Response },
-      ({ player }) => readOwnOrnament(db, player.id),
+    .get("/", { nicknameChosen: true, response: OrnamentModel.RootGet.Response }, ({ player }) =>
+      readOwnOrnament(db, player.id),
     )
     .put(
       "/",
-      { nicknameChosen: true, body: OrnamentModel.MeOrnamentPut.Body },
+      { nicknameChosen: true, body: OrnamentModel.RootPut.Body },
       async ({ player, body, status }) => {
         if ((await saveOrnamentChoice(db, player.id, body.choice)) === "locked")
           return status(403, { code: "ORNAMENT_LOCKED" });

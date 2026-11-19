@@ -32,10 +32,10 @@ const ownOrnament = t.Object({
   worn: ornament,
 });
 
-export const MeOrnamentGet = {
+export const RootGet = {
   Response: ownOrnament,
 };
 
-export const MeOrnamentPut = {
+export const RootPut = {
   Body: t.Object({ choice: ornamentChoice }),
 };
