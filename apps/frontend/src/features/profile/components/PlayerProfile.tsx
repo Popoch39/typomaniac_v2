@@ -22,8 +22,15 @@ export function PlayerProfile({ player }: PlayerProfileProps) {
         </div>
       </Panel>
       <StandingGate player={player}>{(standing) => <RankCard standing={standing} />}</StandingGate>
-      {/* Choosing an Ornament takes a Nickname, like everything shown to other Players. */}
-      {player.nickname !== null && <OrnamentPicker player={player} />}
+      {/* Choosing an Ornament takes a Nickname, like everything shown to other Players: one without is
+          told so rather than offered the picker. */}
+      {player.nickname === null ? (
+        <Panel title="Ornament">
+          <p className="m-0 text-ink-muted">Choose a Nickname to choose an Ornament.</p>
+        </Panel>
+      ) : (
+        <OrnamentPicker player={player} />
+      )}
     </div>
   );
 }
