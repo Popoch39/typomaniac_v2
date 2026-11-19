@@ -1,0 +1,1 @@
+ALTER TABLE "duel_game" ADD COLUMN "multiplier" double precision DEFAULT 1 NOT NULL;
