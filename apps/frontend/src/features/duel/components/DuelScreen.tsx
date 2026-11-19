@@ -1,17 +1,21 @@
-import { TypingArea } from "../../game/components/TypingArea.tsx";
 import { useDuelPhase } from "../hooks/useDuelPhase.ts";
-import { DuelCountdown } from "./DuelCountdown.tsx";
+import { DuelBroadcast } from "./DuelBroadcast.tsx";
 import { DuelDisconnected } from "./DuelDisconnected.tsx";
-import { DuelEnd } from "./DuelEnd.tsx";
 import { DuelInviteLink } from "./DuelInviteLink.tsx";
-import { DuelLivePoints } from "./DuelLivePoints.tsx";
 import { DuelParticipants } from "./DuelParticipants.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
-import { DuelRoundEnd } from "./DuelRoundEnd.tsx";
-import { DuelRoundScore } from "./DuelRoundScore.tsx";
 
 export function DuelScreen() {
   const phase = useDuelPhase();
+
+  if (
+    phase === "countdown" ||
+    phase === "running" ||
+    phase === "roundEnd" ||
+    phase === "finished"
+  ) {
+    return <DuelBroadcast phase={phase} />;
+  }
 
   return (
     // Full screen outside the shell: a centred column with room around it, like the Game screen's padding.
@@ -24,30 +28,6 @@ export function DuelScreen() {
           <DuelInviteLink />
         </>
       )}
-      {phase === "countdown" && (
-        <>
-          <DuelParticipants />
-          <DuelRoundScore />
-          <DuelCountdown />
-        </>
-      )}
-      {/* Mounted at the Start only: typing during the Countdown reaches no Game. */}
-      {phase === "running" && (
-        <>
-          <DuelParticipants />
-          <DuelRoundScore />
-          <DuelLivePoints />
-          <TypingArea />
-        </>
-      )}
-      {phase === "roundEnd" && (
-        <>
-          <DuelParticipants />
-          <DuelRoundScore />
-          <DuelRoundEnd />
-        </>
-      )}
-      {phase === "finished" && <DuelEnd />}
       {phase === "disconnected" && <DuelDisconnected />}
     </main>
   );
