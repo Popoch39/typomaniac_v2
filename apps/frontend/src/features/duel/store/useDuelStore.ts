@@ -58,7 +58,11 @@ type DuelState = {
     readonly outcomes: RoundOutcomes;
     readonly ranked: readonly [RankedEnd, RankedEnd] | null;
   } | null;
+  /** The Duel joined, which a navigation to another one must leave for it. */
+  readonly duelId: string | null;
   readonly join: (duelId: string) => void;
+  /** Joins `duelId` unless it is the Duel already joined. */
+  readonly follow: (duelId: string) => void;
   readonly leave: () => void;
 };
 
@@ -104,6 +108,7 @@ const initialState = {
   opponentGame: null,
   refusal: null,
   end: null,
+  duelId: null,
 } as const;
 
 export const useDuelStore = create<DuelState>()((set, get) => {
@@ -239,15 +244,21 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     set(initialState);
   };
 
+  const join = (duelId: string) => {
+    leave();
+    set({ duelId });
+    openDuelSocket(duelId, {
+      receive,
+      refuse: (refusal) => set({ phase: "refused", refusal }),
+      disconnect,
+    });
+  };
+
   return {
     ...initialState,
-    join: (duelId) => {
-      leave();
-      openDuelSocket(duelId, {
-        receive,
-        refuse: (refusal) => set({ phase: "refused", refusal }),
-        disconnect,
-      });
+    join,
+    follow: (duelId) => {
+      if (get().duelId !== duelId) join(duelId);
     },
     leave,
   };

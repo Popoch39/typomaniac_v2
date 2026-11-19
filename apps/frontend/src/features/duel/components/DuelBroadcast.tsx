@@ -1,3 +1,4 @@
+import { useDuelTitle } from "../hooks/useDuelTitle.ts";
 import { DuelBand } from "./DuelBand.tsx";
 import { DuelCountdown } from "./DuelCountdown.tsx";
 import { DuelEnd } from "./DuelEnd.tsx";
@@ -9,6 +10,9 @@ interface DuelBroadcastProps {
 }
 
 export function DuelBroadcast({ phase }: DuelBroadcastProps) {
+  // The last Round's end already shows the Duel's, so the server ending the Duel moves nothing.
+  const isDecided = useDuelTitle() !== null;
+
   return (
     // Full width up to 1440px, its margins narrowing on smaller screens, so the band and the Target
     // words have room.
@@ -19,8 +23,8 @@ export function DuelBroadcast({ phase }: DuelBroadcastProps) {
         {phase === "countdown" && <DuelCountdown />}
         {/* Mounted at the Start only: typing during the Countdown reaches no Game. */}
         {phase === "running" && <DuelLiveRound />}
-        {phase === "roundEnd" && <DuelRoundEnd />}
-        {phase === "finished" && <DuelEnd />}
+        {phase === "roundEnd" && !isDecided && <DuelRoundEnd />}
+        {(phase === "finished" || (phase === "roundEnd" && isDecided)) && <DuelEnd />}
       </div>
     </main>
   );
