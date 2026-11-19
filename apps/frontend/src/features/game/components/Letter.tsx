@@ -1,7 +1,7 @@
 import { OpponentCaret } from "../../../shared/components/OpponentCaret.tsx";
 import { useLetter } from "../hooks/useLetter.ts";
 import type { LetterState } from "../words/judgeLetter.ts";
-import { Caret } from "./Caret.tsx";
+import { CaretAnchor } from "./CaretAnchor.tsx";
 
 const LETTER_CLASS: Record<LetterState, string> = {
   untyped: "text-muted-foreground",
@@ -21,7 +21,7 @@ export function Letter({ wordIndex, letterIndex }: LetterProps) {
 
   return (
     <>
-      {hasCaretBefore && <Caret />}
+      {hasCaretBefore && <CaretAnchor />}
       <OpponentCaret wordIndex={wordIndex} letterIndex={letterIndex} />
       <span className={LETTER_CLASS[state]}>{char}</span>
     </>
