@@ -83,6 +83,29 @@ test("the instant the Live stats are read at stops moving once the Game is resta
   expect(store.getState().readAt).toBe(restartedAt);
 });
 
+test("the instant the Live stats are read at stops moving once the config of a running Game changes", async () => {
+  store.getState().setConfig({ mode: "time", seconds: 30 });
+  store.getState().applyEvent({ type: "start", at: performance.timeOrigin + performance.now() });
+  store.getState().setConfig({ mode: "time", seconds: 60 });
+  const reconfiguredAt = store.getState().readAt;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBe(reconfiguredAt);
+});
+
+test("a refresh behind the instant the Live stats are read at does not move it back", async () => {
+  const start = performance.timeOrigin + performance.now();
+  store.getState().setConfig({ mode: "time", seconds: 30 });
+  store.getState().applyEvent({ type: "start", at: start });
+  // An Event stamped ahead of this client's clock, as one on a shifted Game clock can be.
+  store.getState().applyEvent({ type: "insert", at: start + 10_000, text: "a" });
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBe(start + 10_000);
+});
+
 test("the instant the Live stats are read at stops moving once the Game is finished", async () => {
   store.getState().loadGame({ mode: "words", wordCount: 1 }, ["a"]);
   const start = performance.timeOrigin + performance.now();
@@ -94,6 +117,18 @@ test("the instant the Live stats are read at stops moving once the Game is finis
   await Bun.sleep(250);
 
   expect(store.getState().readAt).toBe(finishedAt);
+});
+
+test("the Keystroke that finishes a words Game moves the instant the Live stats are read at to its end", () => {
+  store.getState().loadGame({ mode: "words", wordCount: 1 }, ["a"]);
+  const start = performance.timeOrigin + performance.now();
+  store.getState().applyEvent({ type: "start", at: start });
+
+  store.getState().applyEvent({ type: "insert", at: start + 50, text: "a" });
+
+  const { game, readAt } = store.getState();
+  expect(game.status).toBe("finished");
+  expect(readAt).toBe(start + 50);
 });
 
 test("an Event older than the instant the Live stats are read at does not move it back", async () => {
