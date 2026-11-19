@@ -118,6 +118,7 @@ test("a Guest reads the Podium and the first page by Tier, Division and LP, with
     pageCount: 1,
     total: 5,
     own: null,
+    around: null,
   });
 });
 
@@ -131,6 +132,7 @@ type Body = {
   pageCount: number;
   total: number;
   own: Listed | null;
+  around: Listed[] | null;
 };
 
 const bodyOf = async (response: Response) => {
@@ -161,6 +163,7 @@ test("an empty Leaderboard has no Podium and one empty page", async () => {
     pageCount: 1,
     total: 0,
     own: null,
+    around: null,
   });
 });
 
@@ -274,10 +277,16 @@ test("no MMR and no Player id are in the Leaderboard", async () => {
   for (let lp = 0; lp < 20; lp += 1)
     ids.push(await addPlayer(`lp${lp}`, { mmr: 1777, duelsPlayed: 30, rank: gold(lp) }));
   const signedIn = await signInPlayer(auth);
-  await saveStanding(db, signedIn.player.id, { mmr: 1777, duelsPlayed: 30, rank: gold(50) });
+  // Last, off the first page: their neighbours are in the response too.
+  await saveStanding(db, signedIn.player.id, {
+    mmr: 1777,
+    duelsPlayed: 30,
+    rank: { tier: "bronze", division: 4, lp: 0 },
+  });
 
   const body = await (await read(signedIn.cookie)).text();
 
+  expect(body).toContain('"around":[');
   expect(body).not.toContain("1777");
   expect(body.toLowerCase()).not.toContain("mmr");
   for (const id of [...ids, signedIn.player.id]) expect(body).not.toContain(id);
@@ -377,6 +386,82 @@ test("a Guest, a Player who never played ranked and a Player in Placement get no
 
   for (const cookie of [undefined, newcomer.cookie, inPlacement.cookie])
     expect((await bodyOf(await read(cookie))).own).toBeNull();
+});
+
+test("a ranked Player off the Podium and off the page is shown between the Players just ahead and behind", async () => {
+  const { auth, db, addPlayer, read } = await createLeaderboard();
+  await addRankedPlayers(addPlayer, 40);
+  const signedIn = await signInPlayer(auth, { image: "https://cdn.example.com/own.png" });
+  // Ahead of p30, who holds as many LP with a lower MMR, and behind p29.
+  await saveStanding(db, signedIn.player.id, { mmr: 1600, duelsPlayed: 30, rank: gold(10) });
+
+  const { around } = await bodyOf(await read(signedIn.cookie, "1"));
+
+  expect(around).toEqual([
+    {
+      position: 29,
+      nickname: "p29",
+      avatarUrl: null,
+      rank: gold(11),
+      ornament: { tier: "gold", division: 2 },
+    },
+    {
+      position: 30,
+      nickname: null,
+      avatarUrl: "https://cdn.example.com/own.png",
+      rank: gold(10),
+      ornament: { tier: "gold", division: 2 },
+    },
+    {
+      position: 31,
+      nickname: "p30",
+      avatarUrl: null,
+      rank: gold(10),
+      ornament: { tier: "gold", division: 2 },
+    },
+  ]);
+});
+
+test("the last-placed Player is shown after the Player just ahead, with nobody behind", async () => {
+  const { auth, db, addPlayer, read } = await createLeaderboard();
+  await addRankedPlayers(addPlayer, 20);
+  const signedIn = await signInPlayer(auth);
+  await saveStanding(db, signedIn.player.id, {
+    mmr: 1500,
+    duelsPlayed: 30,
+    rank: { tier: "bronze", division: 4, lp: 0 },
+  });
+
+  const { around } = await bodyOf(await read(signedIn.cookie, "1"));
+
+  expect(around?.map(({ position, nickname }) => ({ position, nickname }))).toEqual([
+    { position: 20, nickname: "p20" },
+    { position: 21, nickname: null },
+  ]);
+});
+
+test("nobody is shown around a Guest, an Unranked Player, a Player on the Podium or a Player on the page", async () => {
+  const { auth, db, addPlayer, read } = await createLeaderboard();
+  await addRankedPlayers(addPlayer, 40);
+  const signInAt = async (rank: Standing["rank"]) => {
+    const signedIn = await signInPlayer(auth);
+    await saveStanding(db, signedIn.player.id, { mmr: 1600, duelsPlayed: 30, rank });
+    return signedIn.cookie;
+  };
+  const unranked = await signInAt(null);
+  const onPodium = await signInAt(gold(39));
+  const onPage = await signInAt(gold(30));
+  // On page 2, which is the page served.
+  const onServedPage = await signInAt(gold(10));
+
+  for (const [cookie, page] of [
+    [undefined, "1"],
+    [unranked, "1"],
+    [onPodium, "1"],
+    [onPage, "1"],
+    [onServedPage, "2"],
+  ] as const)
+    expect((await bodyOf(await read(cookie, page))).around).toBeNull();
 });
 
 test("a page of the Leaderboard is read from its index, not sorted", async () => {

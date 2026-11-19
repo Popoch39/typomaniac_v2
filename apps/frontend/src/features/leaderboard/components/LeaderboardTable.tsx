@@ -8,15 +8,18 @@ import {
 } from "../../../shared/components/ui/table.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { usePagePositions } from "../hooks/usePagePositions.ts";
+import { AroundYouRows } from "./AroundYouRows.tsx";
 import { LeaderboardRow } from "./LeaderboardRow.tsx";
 
 interface LeaderboardTableProps {
   players: LeaderboardPlayer[];
   own: LeaderboardPlayer | null;
+  /** The reader between their neighbours, when neither on the Podium nor on this page. */
+  around: LeaderboardPlayer[] | null;
 }
 
 // On a narrow screen the table scrolls sideways inside its box rather than squeezing its columns.
-export function LeaderboardTable({ players, own }: LeaderboardTableProps) {
+export function LeaderboardTable({ players, own, around }: LeaderboardTableProps) {
   const positions = usePagePositions(players);
 
   return (
@@ -44,6 +47,7 @@ export function LeaderboardTable({ players, own }: LeaderboardTableProps) {
             />
           ))}
         </TableBody>
+        {around !== null && <AroundYouRows around={around} own={own} />}
       </Table>
     </div>
   );

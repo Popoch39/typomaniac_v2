@@ -1,7 +1,9 @@
+import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { LpBar } from "../../../shared/components/LpBar.tsx";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
+import { useShowMyRow } from "../hooks/useShowMyRow.ts";
 
 interface OwnRankedPlaceProps {
   own: LeaderboardPlayer;
@@ -11,6 +13,8 @@ interface OwnRankedPlaceProps {
 }
 
 export function OwnRankedPlace({ own, name, progress }: OwnRankedPlaceProps) {
+  const { showMyRow } = useShowMyRow();
+
   return (
     <div className="flex flex-wrap items-center gap-6 pb-1">
       <div className="flex flex-none items-center gap-4">
@@ -34,6 +38,11 @@ export function OwnRankedPlace({ own, name, progress }: OwnRankedPlaceProps) {
           <LpBar lp={progress.lp} next={progress.next} />
         </div>
       )}
+      <div className="flex-none pb-1">
+        <Keycap size="sm" onClick={showMyRow}>
+          Show my row
+        </Keycap>
+      </div>
     </div>
   );
 }
