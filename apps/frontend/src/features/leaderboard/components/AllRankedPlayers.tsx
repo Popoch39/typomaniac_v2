@@ -2,6 +2,7 @@ import type { Leaderboard } from "../hooks/useLeaderboard.ts";
 import { rankedCount } from "../page/rankedCount.ts";
 import { LeaderboardPagination } from "./LeaderboardPagination.tsx";
 import { LeaderboardTable } from "./LeaderboardTable.tsx";
+import { SectionHeader } from "./SectionHeader.tsx";
 
 interface AllRankedPlayersProps {
   leaderboard: Leaderboard;
@@ -13,12 +14,7 @@ export function AllRankedPlayers({ leaderboard }: AllRankedPlayersProps) {
 
   return (
     <section aria-labelledby="all-players-title" className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h2 id="all-players-title" className="m-0 type-section-title font-normal text-ink">
-          All ranked Players
-        </h2>
-        <span className="type-eyebrow text-ink-subtle">{count}</span>
-      </div>
+      <SectionHeader titleId="all-players-title" title="All ranked Players" aside={count} />
       {leaderboard.players.length > 0 && (
         <>
           <LeaderboardTable

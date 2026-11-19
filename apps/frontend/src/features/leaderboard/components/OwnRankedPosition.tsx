@@ -4,6 +4,7 @@ import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { useShowMyRow } from "../hooks/useShowMyRow.ts";
+import { LpAmount } from "./LpAmount.tsx";
 
 interface OwnRankedPositionProps {
   own: LeaderboardPlayer;
@@ -31,7 +32,7 @@ export function OwnRankedPosition({ own, name, progress }: OwnRankedPositionProp
       </div>
       {progress === null ? (
         <p className="m-0 font-mono text-[17px] font-bold text-ink">
-          {own.rank.lp} <span className="text-[13px] text-ink-subtle">LP</span>
+          <LpAmount lp={own.rank.lp} />
         </p>
       ) : (
         <div className="min-w-0 flex-[1_1_260px]">
