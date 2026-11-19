@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
-import type { LiveStats } from "@repo/typing-engine";
-import { getPoints, POINTS_FACTOR } from "../src/index.ts";
+import type { LiveStats, Result } from "@repo/typing-engine";
+import {
+  type FinishedRound,
+  getAverageMultiplier,
+  getPoints,
+  getRoundPoints,
+  POINTS_FACTOR,
+} from "../src/index.ts";
+import { perfectGame } from "./helpers/game.ts";
 
 test("POINTS-1: Points are the WPM times the square of the Accuracy, times 10", () => {
   expect(POINTS_FACTOR).toBe(10);
@@ -34,12 +41,37 @@ test("POINTS-5: Points are multiplied by the average Multiplier, and rounded onc
 });
 
 test("POINTS-6: a perfect 90 WPM Game beats 100 WPM at 95 % Accuracy, a perfect 70 WPM Game does not", () => {
-  // Perfect Games of 45 and 35 five-character words: 1, 1.02, 1.04, 1.06, 1.08, then 1.10 each.
-  const perfect90 = { wpm: 90, accuracy: 100, multiplier: (5.2 + 40 * 1.1) / 45 };
-  const perfect70 = { wpm: 70, accuracy: 100, multiplier: (5.2 + 30 * 1.1) / 35 };
+  // Perfect Games of 45 and 35 five-character words, typed in 30 seconds at 90 and 70 WPM.
+  const perfect90 = { wpm: 90, accuracy: 100, multiplier: getAverageMultiplier(perfectGame(45)) };
+  const perfect70 = { wpm: 70, accuracy: 100, multiplier: getAverageMultiplier(perfectGame(35)) };
   const fastButFlawed = { wpm: 100, accuracy: 95, multiplier: 1 };
 
   expect(getPoints(perfect90)).toBe(984);
   expect(getPoints(fastButFlawed)).toBe(903);
   expect(getPoints(perfect70)).toBe(764);
+});
+
+test("POINTS-7: a seat's Points in a finished Round come from its Result and its Multiplier", () => {
+  const result = (wpm: number, accuracy: number): Result => ({
+    duration: 30,
+    wpm,
+    rawWpm: wpm,
+    accuracy,
+    charCounts: { correct: 0, incorrect: 0, extra: 0, missed: 0, exactWords: 0 },
+    consistency: 0,
+    history: { wpm: [], keystrokeRate: [], errors: [] },
+    keyPressGaps: [],
+    keyHoldDurations: [],
+    keyConsistency: 0,
+    inactiveSeconds: 0,
+    inactiveAtEnd: false,
+  });
+  const round: FinishedRound = {
+    results: [result(80, 100), result(100, 93)],
+    multipliers: [1.1, 1],
+    outcomes: ["win", "loss"],
+  };
+
+  expect(getRoundPoints(round, 0)).toBe(880);
+  expect(getRoundPoints(round, 1)).toBe(865);
 });

@@ -1,6 +1,6 @@
 import {
   type FinishedRound,
-  getPoints,
+  getRoundPoints,
   opponentSeat,
   type Participant,
   type Seat,
@@ -40,7 +40,7 @@ export function summariseRound(
     name: participants.find((participant) => participant.seat === side)?.name ?? "",
     result: round.results[side],
     multiplier: round.multipliers[side],
-    points: getPoints({ ...round.results[side], multiplier: round.multipliers[side] }),
+    points: getRoundPoints(round, side),
   }));
   return { number, outcome: round.outcomes[seat], sides };
 }

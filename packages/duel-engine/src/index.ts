@@ -24,7 +24,7 @@ export type {
 } from "./messages.ts";
 export { getAverageMultiplier, getCurrentMultiplier } from "./multiplier.ts";
 export { getOutcome } from "./outcome.ts";
-export { getPoints } from "./points.ts";
+export { getPoints, getRoundPoints } from "./points.ts";
 export type { PointsMeasures } from "./points.ts";
 export { getDuelOutcomes, getRoundScore } from "./rounds.ts";
 export type { RoundOutcomes } from "./rounds.ts";
