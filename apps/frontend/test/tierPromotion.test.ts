@@ -59,13 +59,13 @@ test("a promotion from Platinum I to Diamond IV is the Diamond Tier promotion", 
   });
 });
 
-test("a promotion from Diamond I to Master is the Master Tier promotion, whose Ornament has no Division", () => {
+test("a promotion from Diamond I to Master is the Master Tier promotion, whose Ornament has no Division and whose line says the top of the ladder is reached", () => {
   expect(tierPromotion(promotedTo({ tier: "master", lp: 8 }))).toEqual({
     tier: "master",
     oldOrnament: { tier: "diamond", division: 1 },
     newOrnament: { tier: "master", division: null },
     title: { kind: "keys", letters: ["M", "a", "s", "t", "e", "r"], name: "Master" },
-    line: "Promoted from Diamond I",
+    line: "Promoted from Diamond I. You reached the top of the ladder.",
     announcement: "Promoted to Master",
   });
 });

@@ -41,6 +41,7 @@ export function tierPromotion({ rankChange, rank }: RankedEnd): TierPromotion | 
   if (rankChange !== "promoted" || rank === null || rank.tier === "bronze") return null;
   if (rank.tier !== "master" && rank.division !== 4) return null;
   const oldRank = rankAtLadderIndex(ladderIndex(rank) - 1, 0);
+  const from = `Promoted from ${rankName(oldRank)}`;
   return {
     tier: rank.tier,
     oldOrnament: rankOrnament(oldRank),
@@ -49,7 +50,8 @@ export function tierPromotion({ rankChange, rank }: RankedEnd): TierPromotion | 
       rank.tier === "silver"
         ? { kind: "name", name: rankName(rank) }
         : { kind: "keys", letters: tierName(rank.tier).split(""), name: rankName(rank) },
-    line: `Promoted from ${rankName(oldRank)}`,
+    // Master is the top of the ladder, and its line says so.
+    line: rank.tier === "master" ? `${from}. You reached the top of the ladder.` : from,
     announcement: `Promoted to ${rankName(rank)}`,
   };
 }
