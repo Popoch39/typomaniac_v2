@@ -326,7 +326,7 @@ test("a signed-in ranked Player gets their own position, on the Podium, on the p
   });
 });
 
-test("each Player wears the Ornament they chose, on the Podium, on the page and in their own place", async () => {
+test("each Player wears the Ornament they chose, on the Podium, on the page and in their own Position", async () => {
   const { auth, db, addPlayer, chooseOrnament, read } = await createLeaderboard();
   await addPlayer("auto", { mmr: 1500, duelsPlayed: 30, rank: gold(90) });
   const pinned = await addPlayer("pinned", { mmr: 1500, duelsPlayed: 30, rank: gold(80) });
@@ -422,7 +422,7 @@ test("a ranked Player off the Podium and off the page is shown between the Playe
   ]);
 });
 
-test("the last-placed Player is shown after the Player just ahead, with nobody behind", async () => {
+test("the Player in the last Position is shown after the Player just ahead, with nobody behind", async () => {
   const { auth, db, addPlayer, read } = await createLeaderboard();
   await addRankedPlayers(addPlayer, 20);
   const signedIn = await signInPlayer(auth);

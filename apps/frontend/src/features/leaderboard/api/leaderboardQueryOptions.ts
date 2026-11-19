@@ -8,7 +8,7 @@ export const leaderboardQueryKey = ["leaderboard"] as const;
 // A Duel moves Positions: past this, a page is read again rather than trusted.
 const STALE_TIME_MS = 30_000;
 
-/** The Podium, one page of the Leaderboard and, for a signed-in ranked Player, their own place. */
+/** The Podium, one page of the Leaderboard and, for a signed-in ranked Player, their own Position. */
 export const leaderboardQueryOptions = (page: number) =>
   queryOptions({
     queryKey: [...leaderboardQueryKey, page],

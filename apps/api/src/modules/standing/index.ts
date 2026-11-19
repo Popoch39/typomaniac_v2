@@ -13,7 +13,7 @@ export const createStandingRoutes = (db: Db, auth: Auth) =>
       { signedIn: true, response: StandingModel.MeStandingGet.Response },
       ({ player }) => readOwnStanding(db, player.id),
     )
-    // Public: a session is only read to find the Player's own place, never required.
+    // Public: a session is only read to find the Player's own Position, never required.
     .get(
       "/leaderboard",
       {

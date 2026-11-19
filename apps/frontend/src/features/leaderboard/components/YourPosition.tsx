@@ -1,20 +1,20 @@
 import { Panel } from "../../../shared/components/Panel.tsx";
 import { TierBadge } from "../../ranked/components/TierBadge.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
-import { useOwnPlace } from "../hooks/useOwnPlace.ts";
-import { OwnRankedPlace } from "./OwnRankedPlace.tsx";
+import { useYourPosition } from "../hooks/useYourPosition.ts";
+import { OwnRankedPosition } from "./OwnRankedPosition.tsx";
 
-interface OwnPlaceProps {
+interface YourPositionProps {
   own: LeaderboardPlayer | null;
 }
 
-export function OwnPlace({ own }: OwnPlaceProps) {
-  const place = useOwnPlace(own);
-  if (place.kind === "guest") return null;
-  if (place.kind === "ranked") {
+export function YourPosition({ own }: YourPositionProps) {
+  const view = useYourPosition(own);
+  if (view.kind === "guest") return null;
+  if (view.kind === "ranked") {
     return (
-      <Panel title="Your position" tag={place.name} flat>
-        <OwnRankedPlace own={place.own} name={place.name} progress={place.progress} />
+      <Panel title="Your position" tag={view.name} flat>
+        <OwnRankedPosition own={view.own} name={view.name} progress={view.progress} />
       </Panel>
     );
   }

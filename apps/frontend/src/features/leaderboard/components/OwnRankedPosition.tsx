@@ -5,14 +5,14 @@ import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { useShowMyRow } from "../hooks/useShowMyRow.ts";
 
-interface OwnRankedPlaceProps {
+interface OwnRankedPositionProps {
   own: LeaderboardPlayer;
   name: string;
   /** `null` in Master, where there is no Division to climb toward. */
   progress: { lp: number; next: string } | null;
 }
 
-export function OwnRankedPlace({ own, name, progress }: OwnRankedPlaceProps) {
+export function OwnRankedPosition({ own, name, progress }: OwnRankedPositionProps) {
   const { showMyRow } = useShowMyRow();
 
   return (

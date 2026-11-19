@@ -229,11 +229,11 @@ const leaderboardPlayer = (
   { nickname, avatarUrl, ladderIndex, lp, ornament }: LeaderboardRow,
 ) => {
   const rank = rankFromStored(ladderIndex, lp);
-  if (rank === null) throw new Error("An Unranked Player has no place on the Leaderboard");
+  if (rank === null) throw new Error("An Unranked Player has no Position on the Leaderboard");
   return { position, nickname, avatarUrl, rank, ornament: wornOrnament(ornament, rank) };
 };
 
-// The signed-in Player's own place, found among the rows already read before it is looked up. Off
+// The signed-in Player's own Position, found among the rows already read before it is looked up. Off
 // the Podium and the page, it comes with the Players just ahead and behind, as nothing else shows them.
 const readOwn = async (
   db: Db,
@@ -266,9 +266,9 @@ const readOwn = async (
 
 /**
  * The Podium, one page of the ranked Players after it and, for a signed-in ranked Player, their own
- * place, wherever it is, with the Players around it when it is neither on the Podium nor on the page. A page past the last one is served as the last page; with no more ranked
+ * Position, wherever it is, with the Players around it when it is neither on the Podium nor on the page. A page past the last one is served as the last page; with no more ranked
  * Players than the Podium holds there is one page, and it is empty. A Guest (`playerId` null) and an
- * Unranked Player have no place of their own.
+ * Unranked Player have no Position of their own.
  */
 export const readLeaderboard = async (db: Db, playerId: string | null, requestedPage: number) => {
   const total = await countRanked(db);
