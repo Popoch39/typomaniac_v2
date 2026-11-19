@@ -10,15 +10,21 @@ interface DuelBandSideProps {
 // Every slot keeps its box whatever it holds: the Avatar its frame before the Participant arrives,
 // the name and the Rank line their line height, the Multiplier, the Points and the Lead fixed widths
 // of monospaced figures, so the band never moves while the numbers change or a Streak resets.
+// Under xl the Avatar is zoomed to half, since `zoom` shrinks its box and not just its drawing; under lg
+// it is left out, so the figures keep their room and the name truncates first.
 export function DuelBandSide({ side, isOwn = false }: DuelBandSideProps) {
   return (
-    <div className={cn("flex min-w-0 items-center gap-5", !isOwn && "flex-row-reverse")}>
+    <div className={cn("flex min-w-0 items-center gap-3 xl:gap-5", !isOwn && "flex-row-reverse")}>
       <OrnamentedAvatar
         player={side.player}
         ornament={side.ornament}
         size="md"
         isOwn={isOwn}
-        className={cn(!side.isKnown && "invisible", side.isAway && "opacity-50 grayscale")}
+        className={cn(
+          "max-lg:hidden max-xl:[zoom:0.5]",
+          !side.isKnown && "invisible",
+          side.isAway && "opacity-50 grayscale",
+        )}
       />
       <div className={cn("flex min-w-0 flex-col gap-1.5", !isOwn && "items-end")}>
         <span
@@ -68,7 +74,7 @@ export function DuelBandSide({ side, isOwn = false }: DuelBandSideProps) {
         </span>
         <span
           className={cn(
-            "w-[4ch] text-[44px] leading-none text-ink",
+            "w-[4ch] text-[30px] leading-none text-ink xl:text-[44px]",
             isOwn ? "text-right" : "text-left",
           )}
         >

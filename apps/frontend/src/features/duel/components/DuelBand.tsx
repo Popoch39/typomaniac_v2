@@ -7,7 +7,8 @@ export function DuelBand() {
 
   return (
     // The Participant always on the left, the Opponent mirrored on the right, whichever seat is held.
-    <header className="grid grid-cols-[minmax(0,1fr)_220px_minmax(0,1fr)] items-center gap-10 border-b-2 border-key-face pb-5">
+    // Tighter under xl, so that each side's fixed-width figures still fit beside the centre.
+    <header className="grid grid-cols-[minmax(0,1fr)_180px_minmax(0,1fr)] items-center gap-6 border-b-2 border-key-face pb-5 xl:grid-cols-[minmax(0,1fr)_220px_minmax(0,1fr)] xl:gap-10">
       <DuelBandSide side={sides.self} isOwn />
       <DuelBandCentre />
       <DuelBandSide side={sides.opponent} />

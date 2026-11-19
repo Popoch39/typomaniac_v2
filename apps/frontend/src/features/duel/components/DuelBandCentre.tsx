@@ -9,7 +9,7 @@ export function DuelBandCentre() {
 
   return (
     <div className="flex flex-col items-center gap-2.5">
-      <div className="flex items-baseline gap-5 font-mono text-[36px] leading-none font-bold tabular-nums">
+      <div className="flex items-baseline gap-5 font-mono text-[28px] leading-none xl:text-[36px] font-bold tabular-nums">
         <span className="text-ink">
           <span aria-hidden="true">{roundScore}</span>
           <span className="sr-only">Rounds {roundScore}</span>
