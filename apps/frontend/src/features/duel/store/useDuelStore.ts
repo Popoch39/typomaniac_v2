@@ -43,6 +43,11 @@ type DuelState = {
   /** Why the Participant could not take a seat, in words for the user. */
   readonly refusal: string | null;
   /**
+   * Whether the socket dropped and is being reopened. The phase it dropped in stays shown until
+   * the server says where the Duel is.
+   */
+  readonly isReconnecting: boolean;
+  /**
    * The Outcomes of the Duel and, for a ranked Duel, what it did to each Player's Standing, both
    * indexed by seat, once the server has ended it.
    */
@@ -99,6 +104,7 @@ const initialState = {
   words: [],
   opponentGame: null,
   refusal: null,
+  isReconnecting: false,
   end: null,
   duelId: null,
 } as const;
@@ -154,8 +160,11 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const afterRound =
         message.rounds.length > 0 &&
         (message.words === null || message.rounds.length >= message.round);
+      // Back in a Round under way, whose Countdown follows: the screen it dropped on stays until then.
+      const isResuming = get().isReconnecting && !afterRound && message.words !== null;
       set({
-        phase: afterRound ? "roundEnd" : "waiting",
+        phase: afterRound ? "roundEnd" : isResuming ? get().phase : "waiting",
+        isReconnecting: isResuming,
         seat: message.seat,
         participants: message.participants,
         ranks: message.ranks,
@@ -188,9 +197,12 @@ export const useDuelStore = create<DuelState>()((set, get) => {
         const { round, words } = message;
         set({ round, words, opponentGame: createGame(DUEL_GAME_CONFIG, words) });
       }
-      const { phase } = get();
-      // A Game already running or over has no Start left to wait for.
-      if (phase !== "waiting" && phase !== "countdown" && phase !== "roundEnd") return;
+      const { phase, isReconnecting } = get();
+      set({ isReconnecting: false });
+      // A Game already running or over has no Start left to wait for, unless it ran on a socket
+      // that dropped since.
+      if (!isReconnecting && phase !== "waiting" && phase !== "countdown" && phase !== "roundEnd")
+        return;
       if (resumedJournal.length > 0) return resume(message.startAt);
       set({ phase: "countdown" });
       useDuelCountdownStore.getState().schedule(message.startAt, start);
@@ -216,13 +228,25 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     }
   };
 
-  const disconnect = () => {
-    // The server closes nothing a finished Duel still needs.
-    if (get().phase === "finished") return;
+  // Whatever runs on the socket stops with it: the fresh join that follows starts it again.
+  const stopFollowingSocket = () => {
     useDuelCountdownStore.getState().cancel();
     stopResumingGame();
     stopForwardingEvents();
-    set({ phase: "disconnected" });
+  };
+
+  const reconnect = () => {
+    // The server closes nothing a finished Duel still needs.
+    if (get().phase === "finished") return false;
+    stopFollowingSocket();
+    set({ isReconnecting: true });
+    return true;
+  };
+
+  const disconnect = () => {
+    if (get().phase === "finished") return;
+    stopFollowingSocket();
+    set({ phase: "disconnected", isReconnecting: false });
   };
 
   const leave = () => {
@@ -242,6 +266,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     openDuelSocket(duelId, {
       receive,
       refuse: (refusal) => set({ phase: "refused", refusal }),
+      reconnect,
       disconnect,
     });
   };
