@@ -1,7 +1,7 @@
 import type { ClientMessage, ServerMessage } from "@repo/duel-engine";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
-import { reconnectDelay } from "../../../shared/lib/reconnectDelay.ts";
+import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
 import { duelQueryOptions } from "../api/duelQueryOptions.ts";
 import { parseServerMessage } from "../message/parseServerMessage.ts";
 
@@ -38,51 +38,24 @@ async function findRefusal(duelId: string) {
 }
 
 // Owned by the Duel stores because components may not run effects; one Duel is open at a time.
-let socket: WebSocket | null = null;
-let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-// `attempt` counts the tries to reopen the socket since it was last seated, 0 for a first join.
-function connect(duelId: string, handlers: DuelSocketHandlers, attempt: number) {
-  const { receive, refuse, reconnect, disconnect } = handlers;
-  const opened = new WebSocket(socketUrl(duelId));
-  socket = opened;
-  let seated = false;
-  opened.addEventListener("message", (event) => {
-    seated = true;
-    const message = parseServerMessage(String(event.data));
-    if (message !== null) receive(message);
-  });
-  opened.addEventListener("close", async ({ code }) => {
-    if (socket !== opened) return;
-    if (seated || attempt > 0) {
-      // A reconnection is a fresh join: the server sends the state first, as for any seat claim.
-      const nextAttempt = seated ? 1 : attempt + 1;
-      const delay = reconnectDelay(code, nextAttempt);
-      if (delay === null || !reconnect()) return disconnect();
-      retryTimer = setTimeout(() => {
-        retryTimer = null;
-        connect(duelId, handlers, nextAttempt);
-      }, delay);
-      return;
-    }
-    const refusal = await findRefusal(duelId);
-    if (socket === opened) refuse(refusal);
-  });
-}
+const socket = createReconnectingSocket();
 
 /** Opens the socket of a Duel in place of any other, and hands over each message it reads. */
-export function openDuelSocket(duelId: string, handlers: DuelSocketHandlers) {
-  closeDuelSocket();
-  connect(duelId, handlers, 0);
+export function openDuelSocket(duelId: string, { receive, ...handlers }: DuelSocketHandlers) {
+  socket.open(socketUrl(duelId), {
+    ...handlers,
+    receive: (data) => {
+      const message = parseServerMessage(data);
+      if (message !== null) receive(message);
+    },
+    findRefusal: () => findRefusal(duelId),
+  });
 }
 
 export function sendToDuel(message: ClientMessage) {
-  socket?.send(JSON.stringify(message));
+  socket.send(JSON.stringify(message));
 }
 
 export function closeDuelSocket() {
-  if (retryTimer !== null) clearTimeout(retryTimer);
-  retryTimer = null;
-  socket?.close();
-  socket = null;
+  socket.close();
 }

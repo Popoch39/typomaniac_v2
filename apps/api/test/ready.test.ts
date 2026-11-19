@@ -28,7 +28,7 @@ afterAll(async () => {
 });
 
 const appWith = (db: Db, redis: Redis, lifecycle?: Lifecycle) =>
-  createApp(db, auth, redis, getLogger("api"), undefined, undefined, undefined, lifecycle);
+  createApp(db, auth, redis, getLogger("api"), { lifecycle });
 
 const ready = (app: ReturnType<typeof appWith>) =>
   app.handle(new Request("http://localhost/ready"));

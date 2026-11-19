@@ -1,7 +1,7 @@
-import type { Logger } from "@repo/logger";
+import type { ApiModule, Logger } from "@repo/logger";
 import { Elysia } from "elysia";
 import type { Db } from "./db/client.ts";
-import { createAuthRoutes } from "./modules/auth/index.ts";
+import { createAuthRoutes, createProtection } from "./modules/auth/index.ts";
 import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
 import type { DevOptions } from "./modules/dev/config.ts";
@@ -16,47 +16,62 @@ import { createRateLimiter, type RateLimitOptions } from "./modules/rate-limit/i
 import { createStandingRoutes } from "./modules/standing/index.ts";
 import type { Redis } from "./redis/client.ts";
 
+export type AppOptions = {
+  /** Lets a test shorten the Duel delays. */
+  readonly duel?: DuelOptions;
+  /** Lets a test shorten the Queue delays. */
+  readonly queue?: QueueOptions;
+  /** Off unless the entry turns them on. */
+  readonly dev?: DevOptions;
+  /** The entry's hold on the instance's stop; a new one by default. */
+  readonly lifecycle?: Lifecycle;
+  /** Lets a test lower the limits, and says whether the API sits behind a proxy. */
+  readonly rateLimit?: RateLimitOptions;
+};
+
 // The database, the auth instance and Redis are injected so tests can run each app against its own
-// throwaway Postgres database and Redis namespace, and the logger so tests can read its records. The Duel and Queue options let a test shorten
-// their delays. The dev options stay off unless the entry turns them on. The lifecycle is the entry's
-// hold on the instance's stop. The rate limit options let a test lower the limits and say whether the
-// API sits behind a proxy.
+// throwaway Postgres database and Redis namespace, and the logger so tests can read its records.
 export const createApp = (
   db: Db,
   auth: Auth,
   redis: Redis,
   logger: Logger,
-  duelOptions?: DuelOptions,
-  queueOptions?: QueueOptions,
-  devOptions?: DevOptions,
-  lifecycle: Lifecycle = createLifecycle(),
-  rateLimitOptions?: RateLimitOptions,
+  {
+    duel: duelOptions,
+    queue: queueOptions,
+    dev: devOptions,
+    lifecycle = createLifecycle(),
+    rateLimit: rateLimitOptions,
+  }: AppOptions = {},
 ) => {
-  const rateLimiter = createRateLimiter(redis, logger.getChild("rate-limit"), rateLimitOptions);
+  // Only the categories `@repo/logger` names.
+  const loggerOf = (module: ApiModule) => logger.getChild(module);
+  const rateLimiter = createRateLimiter(redis, loggerOf("rate-limit"), rateLimitOptions);
+  const protection = createProtection(auth, rateLimiter);
   return (
     new Elysia()
       // First, so that its hooks reach every route after it.
-      .use(createRequestLog(logger.getChild("http")))
+      .use(createRequestLog(loggerOf("http")))
       .decorate("db", db)
       .use(createAuthRoutes(auth, rateLimiter))
       .get("/health", () => "ok")
       .use(createLifecycleRoutes(db, redis, lifecycle))
-      .use(createPlayerRoutes(db, auth, rateLimiter))
-      .use(createOrnamentRoutes(db, auth, rateLimiter))
-      .use(createStandingRoutes(db, auth, rateLimiter))
+      .use(createPlayerRoutes(db, protection, rateLimiter))
+      .use(createOrnamentRoutes(db, protection))
+      .use(createStandingRoutes(db, auth, protection))
       .use(
         createDuelRoutes(
           db,
-          auth,
+          protection,
           rateLimiter,
           redis,
-          logger.getChild("duel"),
+          loggerOf("duel"),
           lifecycle,
           duelOptions,
         ),
       )
       .use(
-        createQueueRoutes(db, auth, rateLimiter, redis, logger.getChild("queue"), lifecycle, {
+        createQueueRoutes(db, protection, rateLimiter, redis, loggerOf("queue"), lifecycle, {
           duelExpiryMs: duelOptions?.expiryMs,
           duelConnectMs: duelOptions?.connectMs,
           ...queueOptions,

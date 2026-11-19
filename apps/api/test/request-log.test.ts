@@ -4,7 +4,7 @@ import { createApp } from "../src/app.ts";
 import { createTestAuth, signInPlayer, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
-import { openSocket, openSocketOf } from "./helpers/socket.ts";
+import { openSocket, openSocketOf, requestUpgrade } from "./helpers/socket.ts";
 
 const testDb = await createTestDb();
 const testRedis = await createTestRedis();
@@ -193,6 +193,32 @@ test("a Duel socket logs its opening and its closing with the Duel, the seat and
   });
   expect(recordsOf("api.duel")).toHaveLength(2);
   expect(recordsOf("api.http")).toEqual([]);
+});
+
+test("a refused socket upgrade writes its request record, with its status", async () => {
+  const socketOrigin = origin.replace(/^http/, "ws");
+  const unknownDuel = await requestUpgrade(
+    `${socketOrigin}/api/duels/${crypto.randomUUID()}/socket`,
+  );
+  const signedOut = await requestUpgrade(`${socketOrigin}/api/queue/socket`);
+  expect(unknownDuel.status).toBe(404);
+  expect(signedOut.status).toBe(401);
+
+  const logged = await httpRecords();
+  expect(logged.map(({ properties }) => properties)).toEqual([
+    expect.objectContaining({
+      method: "GET",
+      route: "/api/duels/:id/socket",
+      status: 404,
+      requestId: unknownDuel.headers.get("x-request-id"),
+    }),
+    expect.objectContaining({
+      method: "GET",
+      route: "/api/queue/socket",
+      status: 401,
+      requestId: signedOut.headers.get("x-request-id"),
+    }),
+  ]);
 });
 
 test("a Queue socket logs its opening and its closing with the Player", async () => {

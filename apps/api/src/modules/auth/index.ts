@@ -14,6 +14,25 @@ type Identity = {
 // One type for both branches, so that a route sees a single identity rather than their intersection.
 const withIdentity = (identity: Identity) => ({ identity });
 
+const idOf = (value: unknown) =>
+  typeof value === "object" && value !== null && "id" in value && typeof value.id === "string"
+    ? value.id
+    : undefined;
+
+// The person the macros below derived, as a log record names them: `player` or `identity`, which
+// a global hook or a socket's error hook only sees untyped. A Guest's identity has no Player id.
+export const personOf = (context: object) => {
+  const playerId = "player" in context ? idOf(context.player) : undefined;
+  if (playerId) return { playerId };
+  if (!("identity" in context)) return {};
+  const { identity } = context;
+  const id = idOf(identity);
+  if (!id || typeof identity !== "object" || identity === null) return {};
+  return "playerId" in identity && typeof identity.playerId === "string"
+    ? { playerId: identity.playerId }
+    : { guestId: id };
+};
+
 // Route options that guard a route. A separately defined route module must .use() this to get the options and their types.
 export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
   // Shared as a function rather than by nicknameChosen enabling signedIn: a macro's hooks do not see what another macro derived.
@@ -70,17 +89,23 @@ export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
   });
 };
 
+/** The protection options, built once by `createApp` and `.use()`d by each module of routes. */
+export type Protection = ReturnType<typeof createProtection>;
+
 // Better Auth's routes, on its own basePath (/api/auth), given the client IP as the API resolves it.
 export const createAuthRoutes = (auth: Auth, rateLimiter: RateLimiter) =>
   new Elysia().all(
     "/api/auth/*",
     // Left unparsed, as a mount does: Better Auth reads the body itself.
     { parse: "none", detail: { hide: true } },
-    ({ request, server }) => {
+    async ({ request, server, set }) => {
       const headers = new Headers(request.headers);
       const ip = rateLimiter.clientIp(request, server);
       if (ip === null) headers.delete(CLIENT_IP_HEADER);
       else headers.set(CLIENT_IP_HEADER, ip);
-      return auth.handler(new Request(request, { headers }));
+      const response = await auth.handler(new Request(request, { headers }));
+      if (response.status !== 429) return response;
+      // Better Auth answers { message } with X-Retry-After: refused as every other limit instead.
+      return rateLimiter.refuse("auth", ip, Number(response.headers.get("x-retry-after")), set);
     },
   );

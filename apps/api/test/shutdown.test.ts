@@ -16,16 +16,10 @@ afterAll(async () => {
 });
 
 const startInstance = (lifecycle = createLifecycle()) => {
-  const app = createApp(
-    testDb.db,
-    auth,
-    testRedis.redis,
-    getLogger("api"),
-    { countdownMs: 0 },
-    undefined,
-    undefined,
+  const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+    duel: { countdownMs: 0 },
     lifecycle,
-  ).listen(0);
+  }).listen(0);
   return { app, origin: `http://localhost:${app.server?.port}` };
 };
 

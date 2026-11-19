@@ -1,15 +1,14 @@
 import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
-import { createProtection } from "../auth/index.ts";
-import type { Auth } from "../auth/service.ts";
+import type { Protection } from "../auth/index.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
 import * as PlayerModel from "./model.ts";
 import { isReservedNickname, saveNickname } from "./service.ts";
 
-export const createPlayerRoutes = (db: Db, auth: Auth, rateLimiter: RateLimiter) =>
+export const createPlayerRoutes = (db: Db, protection: Protection, rateLimiter: RateLimiter) =>
   new Elysia({ prefix: "/api/me" })
-    .use(createProtection(auth, rateLimiter))
+    .use(protection)
     .get("/", { signedIn: true }, async ({ player }) => ({
       id: player.id,
       nickname: player.nickname ?? null,

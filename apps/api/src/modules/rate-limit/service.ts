@@ -1,3 +1,4 @@
+import type { BetterAuthRateLimitStorage } from "better-auth";
 import type { Redis } from "../../redis/client.ts";
 
 // Increments the counter and starts its window in one step, so a crash between the two cannot
@@ -21,6 +22,22 @@ export const consumeWindow = async (redis: Redis, key: string, windowSeconds: nu
   ]);
   return { count, secondsLeft };
 };
+
+// Counted in Redis rather than in Better Auth's per-process memory, so the limit holds whichever
+// API instance a request reaches. Plugged in as the rate limit's own storage and not as Better
+// Auth's secondaryStorage, which would also move sessions and OAuth state out of Postgres.
+export const createRedisRateLimitStorage = (redis: Redis): BetterAuthRateLimitStorage => ({
+  consume: async (key, { window, max }) => {
+    const { count, secondsLeft } = await consumeWindow(
+      redis,
+      redis.name("auth-rate-limit", key),
+      window,
+    );
+    return count <= max
+      ? { allowed: true, retryAfter: null }
+      : { allowed: false, retryAfter: secondsLeft };
+  },
+});
 
 /**
  * Counts in memory the messages of one socket in fixed windows of `windowMs`. Each call counts one

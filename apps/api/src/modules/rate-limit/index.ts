@@ -1,5 +1,5 @@
 import type { Logger } from "@repo/logger";
-import { type Context, status } from "elysia";
+import { type Context, status, t } from "elysia";
 import type { Redis } from "../../redis/client.ts";
 import {
   consumeWindow,
@@ -7,6 +7,9 @@ import {
   resolveClientIp,
   type SocketSource,
 } from "./service.ts";
+
+/** The body of every 429, for the `response` of a route that a limit guards. */
+export const RateLimited = t.Object({ code: t.Literal("RATE_LIMITED") });
 
 export type RateLimit = { readonly max: number; readonly windowSeconds: number };
 
@@ -47,7 +50,22 @@ export const createRateLimiter = (
   { trustProxy = false, limits = {}, socketMessages = SOCKET_MESSAGE_LIMIT }: RateLimitOptions = {},
 ) => {
   const limitOf = (name: RateLimitName) => limits[name] ?? RATE_LIMITS[name];
+  /**
+   * The 429 every limit answers, Better Auth's included, with the seconds until the window ends;
+   * each refusal is logged with the limit and the key it counted.
+   */
+  const refuse = (
+    limit: RateLimitName | "auth",
+    key: string | null,
+    secondsLeft: number,
+    set: Context["set"],
+  ) => {
+    logger.warn("Rate limit {limit} exceeded by {key}", { limit, key });
+    set.headers["retry-after"] = String(Math.max(1, secondsLeft));
+    return status(429, { code: "RATE_LIMITED" });
+  };
   return {
+    refuse,
     clientIp: (request: Request, server: SocketSource) =>
       resolveClientIp(request, server, trustProxy),
     /**
@@ -63,9 +81,7 @@ export const createRateLimiter = (
         windowSeconds,
       );
       if (count <= max) return;
-      logger.warn("Rate limit {limit} exceeded by {key}", { limit: name, key });
-      set.headers["retry-after"] = String(Math.max(1, secondsLeft));
-      return status(429, { code: "RATE_LIMITED" });
+      return refuse(name, key, secondsLeft, set);
     },
     /** A counter of one socket's messages, which tells when a message goes over the cap. */
     socketMessageWindow: () =>

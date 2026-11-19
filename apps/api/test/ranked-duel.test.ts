@@ -120,7 +120,7 @@ const pairRankedDuel = async (
 ) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: instances }, () =>
-    createApp(db, auth, testRedis.redis, getLogger("api"), options).listen(0),
+    createApp(db, auth, testRedis.redis, getLogger("api"), { duel: options }).listen(0),
   );
   closers.push(async () => {
     for (const app of apps) await app.stop(true);
@@ -365,8 +365,7 @@ test("the MMR is in no message of a ranked Duel", async () => {
 test("a Custom Duel between two Players leaves both Standings untouched, and its end carries no ranked part", async () => {
   const testRedis = await createTestRedis();
   const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
-    countdownMs: 0,
-    roundPauseMs: 0,
+    duel: { countdownMs: 0, roundPauseMs: 0 },
   }).listen(0);
   closers.push(async () => {
     await app.stop(true);

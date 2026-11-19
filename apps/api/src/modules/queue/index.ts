@@ -5,11 +5,11 @@ import { Elysia, status } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { createProtection } from "../auth/index.ts";
-import { personOf } from "../http/index.ts";
-import type { Auth } from "../auth/service.ts";
+import { type Protection } from "../auth/index.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
+import { mayReconnect } from "../lifecycle/closeCode.ts";
+import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
@@ -23,9 +23,11 @@ import {
   leaveQueue,
   QUEUE_ENTRY_EXPIRY_MS,
   readQueueEntry,
+  refreshQueueEntry,
 } from "./service.ts";
 
 export type QueueOptions = {
+  /** How long an entry outlives its last refresh, and a socket that dropped: its time to be reclaimed. */
   readonly entryExpiryMs?: number;
   /** How often this instance refreshes the entries of its sockets; several times per expiry. */
   readonly refreshMs?: number;
@@ -37,7 +39,7 @@ export type QueueOptions = {
 
 export const createQueueRoutes = (
   db: Db,
-  auth: Auth,
+  protection: Protection,
   rateLimiter: RateLimiter,
   redis: Redis,
   logger: Logger,
@@ -71,7 +73,7 @@ export const createQueueRoutes = (
 
   return (
     new Elysia({ prefix: "/api/queue" })
-      .use(createProtection(auth, rateLimiter))
+      .use(protection)
       .use(websocket())
       // A stopped instance refreshes no entry any more, as if it had crashed.
       .onStop(refreshes.stop)
@@ -145,14 +147,12 @@ export const createQueueRoutes = (
           present.delete(ws.id);
           refreshes.release(presence);
           await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
-          await leaveQueue(redis, presence);
+          // A drop or a restart is followed by a reconnection, which reclaims the entry with its
+          // instant of entry and its Pairing: it is kept for a full expiry, then expires unclaimed.
+          if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
+          else await leaveQueue(redis, presence);
         },
-        // A failing handler of an open socket, which only has an id once upgraded; the app's error
-        // hook answers it after this one.
-        error(context) {
-          if (!("id" in context)) return;
-          logger.error("Queue socket failed", { ...personOf(context), error: context.error });
-        },
+        error: logSocketFailure(logger, "Queue socket failed"),
       })
   );
 };
