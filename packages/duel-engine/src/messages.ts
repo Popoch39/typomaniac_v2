@@ -1,4 +1,4 @@
-import type { Rank, RankChange } from "@repo/ranked-engine";
+import type { Ornament, Rank, RankChange } from "@repo/ranked-engine";
 import type { GameEvent, Result } from "@repo/typing-engine";
 import type { RoundOutcomes } from "./rounds.ts";
 
@@ -11,6 +11,8 @@ export type Participant = {
   readonly name: string;
   /** The Player's Avatar picture as the seat was taken, `null` for a Guest or a Player without one. */
   readonly avatarUrl: string | null;
+  /** The Ornament the Player wore as the seat was taken, `null` for a Guest or a Player who wears none. */
+  readonly ornament: Ornament;
   readonly connected: boolean;
 };
 

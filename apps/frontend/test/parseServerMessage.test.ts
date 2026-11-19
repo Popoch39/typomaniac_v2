@@ -42,9 +42,15 @@ const messages: ServerMessage[] = [
     startAt: 4000,
     words: ["cat", "dog"],
     participants: [
-      { seat: 0, name: "ada", avatarUrl: "https://cdn.example.com/ada.png", connected: true },
-      // A Guest has no Avatar picture.
-      { seat: 1, name: "Guest 4821", avatarUrl: null, connected: false },
+      {
+        seat: 0,
+        name: "ada",
+        avatarUrl: "https://cdn.example.com/ada.png",
+        ornament: { tier: "gold", division: 2 },
+        connected: true,
+      },
+      // A Guest has no Avatar picture and no Ornament.
+      { seat: 1, name: "Guest 4821", avatarUrl: null, ornament: null, connected: false },
     ],
     // A ranked Duel: each Player's Rank, or none while Unranked.
     ranks: [{ tier: "gold", division: 2, lp: 40 }, null],
@@ -66,6 +72,8 @@ const messages: ServerMessage[] = [
       seat: 0,
       name: "ada",
       avatarUrl: "https://cdn.example.com/ada.png",
+      // The Unranked plate and a Master Ornament have no Division.
+      ornament: { tier: "unranked", division: null },
       connected: false,
     },
   },
@@ -188,9 +196,46 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     { type: "countdown", round: 1, startAt: 4000 },
     { type: "countdown", round: 1, startAt: 4000, words: null },
     { type: "countdown", round: 1, startAt: 4000, words: ["cat", 3] },
-    { type: "presence", participant: { seat: 2, name: "ada", avatarUrl: null, connected: true } },
-    { type: "presence", participant: { seat: 0, name: "ada", connected: true } },
-    { type: "presence", participant: { seat: 0, name: "ada", avatarUrl: 3, connected: true } },
+    {
+      type: "presence",
+      participant: { seat: 2, name: "ada", avatarUrl: null, ornament: null, connected: true },
+    },
+    { type: "presence", participant: { seat: 0, name: "ada", ornament: null, connected: true } },
+    {
+      type: "presence",
+      participant: { seat: 0, name: "ada", avatarUrl: 3, ornament: null, connected: true },
+    },
+    { type: "presence", participant: { seat: 0, name: "ada", avatarUrl: null, connected: true } },
+    {
+      type: "presence",
+      participant: {
+        seat: 0,
+        name: "ada",
+        avatarUrl: null,
+        ornament: { tier: "iron", division: null },
+        connected: true,
+      },
+    },
+    {
+      type: "presence",
+      participant: {
+        seat: 0,
+        name: "ada",
+        avatarUrl: null,
+        ornament: { tier: "gold", division: 5 },
+        connected: true,
+      },
+    },
+    {
+      type: "presence",
+      participant: {
+        seat: 0,
+        name: "ada",
+        avatarUrl: null,
+        ornament: { tier: "gold" },
+        connected: true,
+      },
+    },
     { type: "opponentEvent", event: { type: "insert", at: 10 } },
     { type: "opponentEvent", event: { type: "delete", at: 10, unit: "line" } },
     { type: "opponentEvent", event: { type: "jump", at: 10 } },

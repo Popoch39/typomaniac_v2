@@ -13,6 +13,7 @@ import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { createProtection } from "../auth/index.ts";
 import type { Auth } from "../auth/service.ts";
+import { readWornOrnaments } from "../ornament/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
@@ -135,7 +136,12 @@ export const createDuelRoutes = (
           // A plain request must not claim a seat it could never use.
           if (request.headers.get("upgrade")?.toLowerCase() !== "websocket")
             return status(426, { code: "UPGRADE_REQUIRED" });
-          const claimed = await claimSeat(redis, params.id, identity);
+          // Read on every upgrade, though only a first claim keeps it: the Duel holds the Ornament the seat was taken with.
+          const ornament =
+            identity.playerId === null
+              ? null
+              : ((await readWornOrnaments(db, [identity.playerId])).get(identity.playerId) ?? null);
+          const claimed = await claimSeat(redis, params.id, { ...identity, ornament });
           if (claimed === "unknown") return status(404, { code: "DUEL_NOT_FOUND" });
           if (claimed === "full") return status(409, { code: "DUEL_FULL" });
         },
