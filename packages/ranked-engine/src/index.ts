@@ -4,5 +4,7 @@ export { applyDuel } from "./duel.ts";
 export type { DuelUpdate } from "./duel.ts";
 export { ladderIndex, rankAtLadderIndex } from "./ladder.ts";
 export { expectedScore } from "./mmr.ts";
+export { isOrnamentUnlocked, wornOrnament } from "./ornament.ts";
+export type { Ornament, OrnamentChoice } from "./ornament.ts";
 export { createStanding } from "./standing.ts";
 export type { Division, Outcome, Rank, RankChange, Standing, Tier } from "./types.ts";

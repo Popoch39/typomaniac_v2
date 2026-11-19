@@ -24,6 +24,9 @@ const chooseNickname = (nickname: unknown, cookie?: string) =>
     }),
   );
 
+// What a new Player wears, and every Player of this file is one.
+const unrankedPlate = { tier: "unranked", division: null };
+
 const readProfile = async (cookie: string) => {
   const response = await app.handle(
     new Request("http://localhost/api/me", { headers: { cookie } }),
@@ -42,6 +45,7 @@ test("a Player chooses their Nickname and reads it back with the case they typed
     id: player.id,
     nickname: "Ada_Lovelace-1815",
     avatarUrl: null,
+    ornament: unrankedPlate,
   });
 });
 
@@ -67,7 +71,12 @@ test.each([
 
   expect(response.status).toBe(422);
   expect(await response.json()).toEqual({ code: "NICKNAME_INVALID" });
-  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null, avatarUrl: null });
+  expect(await readProfile(cookie)).toEqual({
+    id: player.id,
+    nickname: null,
+    avatarUrl: null,
+    ornament: unrankedPlate,
+  });
 });
 
 test("a badly formatted Nickname gets the same answer in production", async () => {
@@ -102,7 +111,12 @@ test.each(["admin", "Admin", "TYPOMANIAC", "Guest", "nUlL", "mod"])(
 
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual({ code: "NICKNAME_RESERVED" });
-    expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null, avatarUrl: null });
+    expect(await readProfile(cookie)).toEqual({
+      id: player.id,
+      nickname: null,
+      avatarUrl: null,
+      ornament: unrankedPlate,
+    });
   },
 );
 
@@ -121,11 +135,13 @@ test("a Nickname already taken by another Player is refused, whatever the case",
     id: second.player.id,
     nickname: null,
     avatarUrl: null,
+    ornament: unrankedPlate,
   });
   expect(await readProfile(first.cookie)).toEqual({
     id: first.player.id,
     nickname: "Hopper",
     avatarUrl: null,
+    ornament: unrankedPlate,
   });
 });
 
@@ -155,6 +171,7 @@ test("a Player changes their Nickname, which frees the old one for another Playe
     id: first.player.id,
     nickname: "Hedy",
     avatarUrl: null,
+    ornament: unrankedPlate,
   });
   const taken = await chooseNickname("lamarr", second.cookie);
   expect(taken.status).toBe(200);
@@ -162,6 +179,7 @@ test("a Player changes their Nickname, which frees the old one for another Playe
     id: second.player.id,
     nickname: "lamarr",
     avatarUrl: null,
+    ornament: unrankedPlate,
   });
 });
 
@@ -176,6 +194,7 @@ test("a Player takes their own Nickname again with another case", async () => {
     id: player.id,
     nickname: "JohnSon",
     avatarUrl: null,
+    ornament: unrankedPlate,
   });
 });
 
@@ -191,7 +210,12 @@ test("Better Auth's own routes cannot set the Nickname", async () => {
   );
 
   expect(response.status).toBe(400);
-  expect(await readProfile(cookie)).toEqual({ id: player.id, nickname: null, avatarUrl: null });
+  expect(await readProfile(cookie)).toEqual({
+    id: player.id,
+    nickname: null,
+    avatarUrl: null,
+    ornament: unrankedPlate,
+  });
 });
 
 const probe = new Elysia()

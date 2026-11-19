@@ -1,0 +1,2 @@
+ALTER TABLE "user" ADD COLUMN "ornament" text DEFAULT 'auto' NOT NULL;--> statement-breakpoint
+ALTER TABLE "user" ADD CONSTRAINT "user_ornament_choice" CHECK ("user"."ornament" in ('auto', 'none', 'unranked', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'master'));

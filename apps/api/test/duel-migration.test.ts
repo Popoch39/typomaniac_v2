@@ -7,7 +7,6 @@ import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-
 import { eq, sql } from "drizzle-orm";
 import { migrateDatabase } from "../src/db/client.ts";
 import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 
 const migrationsFolder = join(import.meta.dir, "../drizzle");
@@ -37,7 +36,11 @@ afterAll(async () => {
 
 test("a Duel saved before the migration reads as a single-Round Custom Duel, and replaying its journals gives its saved Results", async () => {
   const { db } = testDb;
-  const { player } = await signInPlayer(createTestAuth(db));
+  // Written as the API stored a Player then, without the columns later migrations add.
+  const player = { id: crypto.randomUUID() };
+  await db.execute(
+    sql`INSERT INTO "user" (id, name, email) VALUES (${player.id}, 'ada', ${`${player.id}@example.com`})`,
+  );
   const duelId = crypto.randomUUID();
   const words = ["cat", "dog", "owl"];
   const journals: [GameEvent[], GameEvent[]] = [
