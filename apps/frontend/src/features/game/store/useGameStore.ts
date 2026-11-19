@@ -19,7 +19,7 @@ const TIME_GAME_ADDED_WORDS = 50;
 
 type GameState = {
   readonly game: Game;
-  /** The instant the Live stats are read at, refreshed on each Tick. */
+  /** The instant the Live stats are read at, refreshed on each Tick and each Event of a running Game. */
   readonly readAt: number;
   /** Keys the typing area, so a restart or a config change remounts it and its input takes the focus again. */
   readonly restartCount: number;
@@ -100,7 +100,12 @@ export const useGameStore = create<GameState>()((set, get) => {
         // One Tick per second from the start keeps Monkeytype parity (ADR 0003).
         tickTimer = setInterval(tick, TICK_INTERVAL_MS);
       } else {
-        set({ game, lastEvent: event });
+        // Without it, what typing changes is read against the last Tick, up to a second behind.
+        const readAt =
+          game.status === "running" && event.type !== "addWords"
+            ? Math.max(get().readAt, event.at)
+            : get().readAt;
+        set({ game, readAt, lastEvent: event });
       }
       if (game.status === "finished") stopTicking();
     },

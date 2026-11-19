@@ -38,6 +38,16 @@ test("a restarted time Game keeps being topped up as the active word advances", 
   expect(game.targetWords.length).toBeGreaterThan(initialWordCount);
 });
 
+test("an Event of a running Game moves the instant the Live stats are read at to its own", () => {
+  const start = performance.timeOrigin + performance.now();
+  store.getState().setConfig({ mode: "time", seconds: 30 });
+  store.getState().applyEvent({ type: "start", at: start });
+
+  store.getState().applyEvent({ type: "insert", at: start + 400, text: "a" });
+
+  expect(store.getState().readAt).toBe(start + 400);
+});
+
 test("restarting keeps the Game's config", () => {
   store.getState().setConfig({ mode: "words", wordCount: 25 });
 
