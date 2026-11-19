@@ -19,4 +19,4 @@ A Round used to go to the higher WPM, with Accuracy only breaking an exact tie: 
 - Points are not stored and add nothing to the API contract: they are derived from the Results the server already saves and sends. No schema change, no migration.
 - Duels played before this change keep their stored Outcomes, decided by WPM; they are not re-judged.
 - Live Points come from Live stats, which are integers, floor the Accuracy and credit the word being typed, so they can differ by a few units from the final Points of the Result. Only the final Points decide the Round.
-- Combos, bonus words and other arcade mechanics stay out until real Duels show whether the formula alone is enough.
+- Combos, bonus words and other arcade mechanics stay out until real Duels show whether the formula alone is enough. A Multiplier for a Streak of Perfect words has since been added, see ADR 0013.
