@@ -61,8 +61,21 @@ const leaderboardPlayer = t.Object({
 });
 
 export const LeaderboardGet = {
+  Query: t.Object({
+    // 1 when left out.
+    page: t.Optional(t.Integer({ minimum: 1 })),
+  }),
   Response: t.Object({
+    // Positions 1 to 3, fewer while fewer Players are ranked.
+    podium: t.Array(leaderboardPlayer),
+    // The served page, from Position 4 on.
     players: t.Array(leaderboardPlayer),
+    // The page actually served: the last one when the requested page is past it.
+    page: t.Integer(),
+    // At least 1, even with no Player after the Podium.
+    pageCount: t.Integer(),
+    // How many Players are ranked.
+    total: t.Integer(),
     // The signed-in Player's own place, wherever it is; null for a Guest and an Unranked Player.
     own: t.Nullable(leaderboardPlayer),
   }),
