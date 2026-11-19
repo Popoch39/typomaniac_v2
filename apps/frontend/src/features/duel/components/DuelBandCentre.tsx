@@ -4,10 +4,8 @@ import { useDuelRoundScore } from "../hooks/useDuelRoundScore.ts";
 import { DuelRoundPips } from "./DuelRoundPips.tsx";
 
 export function DuelBandCentre() {
-  const score = useDuelRoundScore();
+  const roundScore = useDuelRoundScore();
   const clock = useDuelClock();
-  if (score === null) return null;
-  const roundScore = `${score.own}–${score.opponent}`;
 
   return (
     <div className="flex flex-col items-center gap-2.5">

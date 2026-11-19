@@ -1,3 +1,4 @@
+import { formatClock } from "../../../shared/lib/formatClock.ts";
 import { useDuelCountdownStore } from "../store/useDuelCountdownStore.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 
@@ -6,7 +7,5 @@ export function useDuelNextRound() {
   const rounds = useDuelStore((state) => state.rounds);
   const secondsLeft = useDuelCountdownStore((state) => state.secondsLeft);
   const next = `Round ${rounds.length + 1}`;
-  return secondsLeft === null
-    ? `${next} soon`
-    : `${next} in 0:${String(secondsLeft).padStart(2, "0")}`;
+  return secondsLeft === null ? `${next} soon` : `${next} in ${formatClock(secondsLeft)}`;
 }

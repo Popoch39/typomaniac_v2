@@ -1,4 +1,4 @@
-import { formatWaitingTime } from "../clock/waitingSeconds.ts";
+import { formatClock } from "../../../shared/lib/formatClock.ts";
 import { useQueueStore } from "../store/useQueueStore.ts";
 
 const WAITING = "You are in the Queue, looking for an Opponent.";
@@ -10,7 +10,7 @@ export function useQueueWaiting() {
   const leave = useQueueStore((state) => state.leave);
   return {
     status: isRequeued ? REQUEUED : WAITING,
-    waitingTime: formatWaitingTime(waitingSeconds),
+    waitingTime: formatClock(waitingSeconds),
     leave,
   };
 }

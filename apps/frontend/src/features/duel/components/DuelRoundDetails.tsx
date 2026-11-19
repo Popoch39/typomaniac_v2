@@ -14,7 +14,7 @@ export function DuelRoundDetails() {
       className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)] gap-14 border-t-2 border-key-face pt-[22px]"
     >
       <DuelRoundChart number={details.number} chart={details.chart} />
-      <DuelRoundTable number={details.number} table={details.table} />
+      <DuelRoundTable number={details.number} names={details.names} rows={details.rows} />
       <DuelRoundList rounds={details.rounds} />
     </section>
   );

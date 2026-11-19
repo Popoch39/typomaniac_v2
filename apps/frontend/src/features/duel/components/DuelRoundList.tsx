@@ -1,16 +1,15 @@
-import type { useDuelRoundDetails } from "../hooks/useDuelRoundDetails.ts";
+import type { RoundListEntry } from "../round/roundList.ts";
+import { DuelCaption } from "./DuelCaption.tsx";
 import { DuelRoundPip } from "./DuelRoundPip.tsx";
 
 interface DuelRoundListProps {
-  rounds: NonNullable<ReturnType<typeof useDuelRoundDetails>>["rounds"];
+  rounds: readonly RoundListEntry[];
 }
 
 export function DuelRoundList({ rounds }: DuelRoundListProps) {
   return (
     <section className="flex min-w-0 flex-col gap-1">
-      <h2 className="m-0 pb-1.5 font-mono text-xs font-bold tracking-[.16em] text-ink-subtle uppercase">
-        Rounds
-      </h2>
+      <DuelCaption className="pb-1.5">Rounds</DuelCaption>
       <ol className="m-0 flex list-none flex-col gap-1 p-0">
         {rounds.map(({ number, state, label, points }) => (
           <li key={number} className="flex items-center gap-3.5 py-1.5">

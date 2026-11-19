@@ -1,5 +1,6 @@
 import { useDuelRounds } from "../hooks/useDuelRounds.ts";
 import { useDuelTitle } from "../hooks/useDuelTitle.ts";
+import { DuelCaption } from "./DuelCaption.tsx";
 import { DuelEndActions } from "./DuelEndActions.tsx";
 import { DuelRankedEnd } from "./DuelRankedEnd.tsx";
 import { DuelRoundDetails } from "./DuelRoundDetails.tsx";
@@ -17,9 +18,7 @@ export function DuelEnd() {
     <>
       {/* The central block fills what the details band leaves, so the band stays at the bottom. */}
       <section className="flex grow flex-col items-center justify-center gap-[22px] text-center">
-        <h2 className="m-0 font-mono text-xs font-bold tracking-[.16em] text-ink-subtle uppercase">
-          {ended.caption}
-        </h2>
+        <DuelCaption>{ended.caption}</DuelCaption>
         <h1 className="m-0 font-display text-[56px] leading-none font-normal text-ink">{title}</h1>
         <DuelRankedEnd />
         <DuelEndActions />

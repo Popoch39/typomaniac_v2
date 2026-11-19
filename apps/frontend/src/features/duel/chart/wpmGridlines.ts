@@ -1,4 +1,5 @@
 import type { WpmChart } from "./wpmChart.ts";
+import { wpmY } from "./wpmY.ts";
 
 export type WpmGridline = {
   readonly wpm: number;
@@ -27,6 +28,6 @@ export function wpmGridlines(scale: WpmChart["scale"], height: number): WpmGridl
     STEPS.find((candidate) => valuesEvery(candidate).length <= MAX_GRIDLINES) ?? WIDEST_STEP;
   return valuesEvery(step).map((wpm) => ({
     wpm,
-    y: max === min ? height / 2 : height - ((wpm - min) / (max - min)) * height,
+    y: wpmY(wpm, scale, height),
   }));
 }

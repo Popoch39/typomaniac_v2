@@ -1,4 +1,4 @@
-import { formatWaitingTime } from "../clock/waitingSeconds.ts";
+import { formatClock } from "../../../shared/lib/formatClock.ts";
 import { usePairingStore } from "../store/usePairingStore.ts";
 
 export function usePairingPrompt() {
@@ -9,7 +9,7 @@ export function usePairingPrompt() {
   const players = usePairingStore((state) => state.players);
   return {
     players,
-    timeLeft: formatWaitingTime(secondsLeft),
+    timeLeft: formatClock(secondsLeft),
     drainedShare: acceptSeconds === 0 ? 0 : secondsLeft / acceptSeconds,
     isAccepted,
     accept,

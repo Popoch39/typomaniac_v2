@@ -1,15 +1,11 @@
-import type { ChartPoint } from "../chart/wpmChart.ts";
+import type { DrawnCurve } from "../chart/drawnCurves.ts";
 import { DuelWpmCurve } from "./DuelWpmCurve.tsx";
 
 interface DuelWpmSparklineProps {
   sparkline: {
     readonly label: string;
     /** The Opponent's curve first, so that the Participant's own is drawn on top of it. */
-    readonly curves: readonly {
-      readonly polyline: string;
-      readonly last: ChartPoint | null;
-      readonly className: string;
-    }[];
+    readonly curves: readonly DrawnCurve[];
   };
 }
 

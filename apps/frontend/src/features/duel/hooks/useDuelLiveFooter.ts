@@ -1,8 +1,9 @@
 import { DUEL_GAME_CONFIG } from "@repo/duel-engine";
 import { useGameStore } from "../../game/store/useGameStore.ts";
 import { bothWpmHistories } from "../chart/bothWpmHistories.ts";
-import { asPolyline } from "../chart/asPolyline.ts";
+import { drawnCurves } from "../chart/drawnCurves.ts";
 import { wpmChart } from "../chart/wpmChart.ts";
+import { wpmChartLabel } from "../chart/wpmChartLabel.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 import { useDuelLivePoints } from "./useDuelLivePoints.ts";
 
@@ -18,23 +19,10 @@ export function useDuelLiveFooter() {
   const live = useDuelLivePoints();
   const self = { ...live.self, name: live.self.name ?? "" };
   const opponent = { ...live.opponent, name: live.opponent.name ?? "" };
-  const [ownCurve, opponentCurve] = wpmChart(
-    bothWpmHistories(game, opponentGame, readAt),
-    SPARKLINE_BOX,
-  ).curves;
+  const chart = wpmChart(bothWpmHistories(game, opponentGame, readAt), SPARKLINE_BOX);
   return {
     self,
     opponent,
-    sparkline: {
-      label: `WPM over Round ${round ?? 1}: ${self.name} ${self.wpm}, ${opponent.name} ${opponent.wpm}`,
-      curves: [
-        {
-          ...opponentCurve,
-          polyline: asPolyline(opponentCurve.points),
-          className: "text-opponent",
-        },
-        { ...ownCurve, polyline: asPolyline(ownCurve.points), className: "text-action" },
-      ],
-    },
+    sparkline: { label: wpmChartLabel(round ?? 1, [self, opponent]), curves: drawnCurves(chart) },
   };
 }

@@ -1,5 +1,6 @@
+import { countdownDisplay } from "../clock/countdownDisplay.ts";
 import { useDuelCountdownStore } from "../store/useDuelCountdownStore.ts";
 
-export function useDuelSecondsLeft() {
-  return useDuelCountdownStore((state) => state.secondsLeft);
+export function useDuelCountdown() {
+  return countdownDisplay(useDuelCountdownStore((state) => state.secondsLeft));
 }
