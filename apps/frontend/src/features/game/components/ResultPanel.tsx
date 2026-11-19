@@ -10,7 +10,7 @@ export function ResultPanel() {
     <section className="flex flex-col gap-8">
       <ResultHeadline result={result} />
       <ResultDetails result={result} />
-      <ResultJson result={result} />
+      {import.meta.env.DEV && <ResultJson result={result} />}
     </section>
   );
 }

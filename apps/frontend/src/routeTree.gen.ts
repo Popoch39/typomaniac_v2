@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
-import { Route as DevRouteImport } from './routes/dev'
 import { Route as ShellCustomRouteImport } from './routes/_shell/custom'
 import { Route as ShellLeaderboardRouteImport } from './routes/_shell/leaderboard'
 import { Route as ShellPracticeRouteImport } from './routes/_shell/practice'
@@ -26,11 +25,6 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DevRoute = DevRouteImport.update({
-  id: '/dev',
-  path: '/dev',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellCustomRoute = ShellCustomRouteImport.update({
@@ -66,7 +60,6 @@ const DuelDuelIdRoute = DuelDuelIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dev': typeof DevRoute
   '/custom': typeof ShellCustomRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
@@ -76,7 +69,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dev': typeof DevRoute
   '/custom': typeof ShellCustomRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
@@ -88,7 +80,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_shell': typeof ShellRouteWithChildren
-  '/dev': typeof DevRoute
   '/_shell/custom': typeof ShellCustomRoute
   '/_shell/leaderboard': typeof ShellLeaderboardRoute
   '/_shell/practice': typeof ShellPracticeRoute
@@ -100,7 +91,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/dev'
     | '/custom'
     | '/leaderboard'
     | '/practice'
@@ -110,7 +100,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/dev'
     | '/custom'
     | '/leaderboard'
     | '/practice'
@@ -121,7 +110,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_shell'
-    | '/dev'
     | '/_shell/custom'
     | '/_shell/leaderboard'
     | '/_shell/practice'
@@ -133,7 +121,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ShellRoute: typeof ShellRouteWithChildren
-  DevRoute: typeof DevRoute
   DuelDuelIdRoute: typeof DuelDuelIdRoute
 }
 
@@ -151,13 +138,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dev': {
-      id: '/dev'
-      path: '/dev'
-      fullPath: '/dev'
-      preLoaderRoute: typeof DevRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/custom': {
@@ -226,7 +206,6 @@ const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ShellRoute: ShellRouteWithChildren,
-  DevRoute: DevRoute,
   DuelDuelIdRoute: DuelDuelIdRoute,
 }
 export const routeTree = rootRouteImport
