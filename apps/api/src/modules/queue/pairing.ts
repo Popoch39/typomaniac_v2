@@ -15,7 +15,9 @@ const deliver = async (db: Db, redis: Redis, follower: Follower, change: Pairing
   if (change.type === "proposed") {
     const { pairingId, expiresAt, playerId } = change;
     const players = await readPairingSides(db, redis, { pairingId, playerId });
-    // Already resolved: the change that resolved it follows, and tells the Player what became of them.
+    // Only once the Pairing is resolved: both sides entered the Queue with a Nickname (`nicknameChosen`),
+    // which is never cleared, nor is a Player deleted, so neither side can lack one. The change that
+    // resolved it follows, and tells the Player what became of them.
     if (players === null) return;
     const acceptWithinMs = Math.max(0, expiresAt - Date.now());
     return send({ type: "proposed", pairingId, acceptWithinMs, players });

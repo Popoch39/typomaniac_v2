@@ -5,7 +5,7 @@ import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { draftRankedDuel } from "../duel/service.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
-import { readNicknamesAndAvatars } from "../player/service.ts";
+import { readPublicPlayers } from "../player/service.ts";
 import { readStanding } from "../standing/service.ts";
 
 // The Queue's keys and atomic steps live in `@repo/queue`, which the matchmaker uses too. This file
@@ -41,7 +41,7 @@ export const acceptPairingAsPlayer = async (
 ) => {
   const pairing = await readPairing(redis, pairingId);
   if (!pairing) return "gone";
-  const players = await readNicknamesAndAvatars(db, pairing.playerIds);
+  const players = await readPublicPlayers(db, pairing.playerIds);
   const ornaments = await readWornOrnaments(db, pairing.playerIds);
   const [first, second] = await Promise.all(
     pairing.playerIds.map(async (pairedId) => {
@@ -82,7 +82,7 @@ export const readPairingSides = async (
   if (opponentId === undefined) return null;
   const playerIds = [playerId, opponentId];
   const [players, ornaments, [selfRank = null, opponentRank = null]] = await Promise.all([
-    readNicknamesAndAvatars(db, playerIds),
+    readPublicPlayers(db, playerIds),
     readWornOrnaments(db, playerIds),
     Promise.all(playerIds.map(async (pairedId) => (await readStanding(db, pairedId)).rank)),
   ]);

@@ -48,8 +48,8 @@ export const saveNickname = async (
   }
 };
 
-/** The Nickname and the Avatar picture of each of the Players who chose a Nickname, by Player id. */
-export const readNicknamesAndAvatars = async (db: Db, playerIds: readonly string[]) => {
+/** The Players who may appear publicly, those who chose a Nickname, by id, with their Nickname and Avatar. */
+export const readPublicPlayers = async (db: Db, playerIds: readonly string[]) => {
   const players = await db
     .select({ id: user.id, nickname: user.nickname, avatarUrl: user.image })
     .from(user)
