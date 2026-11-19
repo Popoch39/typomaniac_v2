@@ -8,6 +8,7 @@ const LETTER_CLASS: Record<LetterState, string> = {
   correct: "text-foreground",
   incorrect: "text-letter-incorrect",
   extra: "text-letter-extra",
+  missed: "text-letter-incorrect",
 };
 
 type LetterProps = {

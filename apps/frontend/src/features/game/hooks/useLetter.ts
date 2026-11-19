@@ -1,3 +1,4 @@
+import { SEPARATOR } from "@repo/typing-engine";
 import { useShallow } from "zustand/react/shallow";
 import { useGameStore } from "../store/useGameStore.ts";
 import { judgeLetter } from "../words/judgeLetter.ts";
@@ -9,11 +10,12 @@ export function useLetter(wordIndex: number, letterIndex: number) {
     useShallow((state) => {
       const { game } = state;
       const word = withoutSeparator(game.targetWords[wordIndex] ?? "");
-      const typed = withoutSeparator(game.inputs[wordIndex] ?? "");
+      const input = game.inputs[wordIndex] ?? "";
+      const typed = withoutSeparator(input);
       const isActive = game.status !== "finished" && game.activeWordIndex === wordIndex;
       return {
         char: word[letterIndex] ?? typed[letterIndex] ?? "",
-        state: judgeLetter(word, typed, letterIndex),
+        state: judgeLetter(word, typed, letterIndex, input.endsWith(SEPARATOR)),
         hasCaretBefore: isActive && typed.length === letterIndex,
       };
     }),

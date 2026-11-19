@@ -13,6 +13,10 @@ test("a typed letter differing from the word is incorrect", () => {
   expect(judgeLetter("the", "tx", 1)).toBe("incorrect");
 });
 
+test("a letter left untyped once its word is validated is missed", () => {
+  expect(judgeLetter("the", "t", 1, true)).toBe("missed");
+});
+
 test("a letter typed past the end of the word is extra", () => {
   expect(judgeLetter("the", "thes", 3)).toBe("extra");
 });
