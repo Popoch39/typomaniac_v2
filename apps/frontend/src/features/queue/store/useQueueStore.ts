@@ -23,6 +23,8 @@ type QueueState = {
   readonly refusal: string | null;
   /** Whether the Player is back in the Queue because the Opponent did not accept. */
   readonly isRequeued: boolean;
+  /** Whether the socket dropped and is being reopened, the Queue staying shown meanwhile. */
+  readonly isReconnecting: boolean;
   /** The ranked Duel to go to once both accepted. */
   readonly duelId: string | null;
   readonly enter: () => void;
@@ -44,6 +46,7 @@ const initialState = {
   waitingSeconds: 0,
   refusal: null,
   isRequeued: false,
+  isReconnecting: false,
   duelId: null,
 } as const;
 
@@ -57,6 +60,8 @@ export const useQueueStore = create<QueueState>()((set, get) => {
 
   const receive = (message: QueueServerMessage) => {
     const receivedAt = eventTime();
+    // The first message of a reopened socket.
+    if (get().isReconnecting) set({ isReconnecting: false });
     if (message.type === "queued" || message.type === "requeued") {
       const { queuedAt, serverAt } = message;
       usePairingStore.getState().close();
@@ -76,13 +81,23 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     else set({ phase: message.reason === "replaced" ? "replaced" : "notAccepted" });
   };
 
-  const disconnect = () => {
+  // A removed or paired Player was already told why: the close that follows adds nothing.
+  const isInQueue = () => {
     const { phase } = get();
-    // A removed or paired Player was already told why: the close that follows adds nothing.
-    if (phase !== "queued" && phase !== "proposed") return;
+    return phase === "queued" || phase === "proposed";
+  };
+
+  const reconnect = () => {
+    if (!isInQueue()) return false;
+    set({ isReconnecting: true });
+    return true;
+  };
+
+  const disconnect = () => {
+    if (!isInQueue()) return;
     stopWaitingTimer();
     usePairingStore.getState().close();
-    set({ phase: "disconnected" });
+    set({ phase: "disconnected", isReconnecting: false });
   };
 
   const leave = () => {
@@ -100,6 +115,7 @@ export const useQueueStore = create<QueueState>()((set, get) => {
       openQueueSocket({
         receive,
         refuse: (refusal) => set({ phase: "refused", refusal }),
+        reconnect,
         disconnect,
       });
     },
