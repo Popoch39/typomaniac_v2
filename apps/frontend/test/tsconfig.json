@@ -27,6 +27,7 @@
     "../src/features/duel/points",
     "../src/features/duel/rank",
     "../src/features/duel/round",
+    "../src/features/leaderboard/own",
     "../src/features/leaderboard/page",
     "../src/features/ornament/art",
     "../src/features/ornament/picker",
