@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { Elysia } from "elysia";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { createProtection } from "../src/modules/auth/index.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
@@ -13,7 +14,7 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
 const chooseNickname = (nickname: unknown, cookie?: string) =>
   app.handle(

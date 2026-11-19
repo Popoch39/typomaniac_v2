@@ -9,6 +9,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@repo/logger": "*",
     "@repo/queue": "*",
     "@repo/redis": "*"
   },

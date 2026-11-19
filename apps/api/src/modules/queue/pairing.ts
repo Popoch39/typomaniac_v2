@@ -1,3 +1,4 @@
+import type { Logger } from "@repo/logger";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
@@ -34,7 +35,7 @@ const deliver = async (db: Db, redis: Redis, follower: Follower, change: Pairing
  * Hands the Pairing changes the matchmaker and the other API instances publish to the sockets this
  * instance holds. Each instance follows the channel while it holds a Queue socket.
  */
-export const createPairingFeed = (db: Db, redis: Redis) => {
+export const createPairingFeed = (db: Db, redis: Redis, logger: Logger) => {
   const local = new Set<Follower>();
   // The last delivery to each socket: a proposal waits for its reads, and the changes that follow
   // it wait their turn, so that a socket gets them in the order they were published.
@@ -49,7 +50,10 @@ export const createPairingFeed = (db: Db, redis: Redis) => {
       const delivered = (deliveries.get(follower) ?? Promise.resolve())
         .then(() => deliver(db, redis, follower, change))
         .catch((error: unknown) =>
-          console.error(`Could not tell ${follower.playerId} of the Pairing change`, error),
+          logger.error("Could not tell {playerId} of the Pairing change", {
+            playerId: follower.playerId,
+            error,
+          }),
         );
       deliveries.set(follower, delivered);
     }

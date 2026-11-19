@@ -38,7 +38,7 @@ test/
 - Les tables restent toutes dans `src/db/schema.ts` : l'adaptateur Better Auth et drizzle-kit lisent ce seul fichier.
 - `src/app.ts` compose l'app et exporte `App` (type partagé avec le client Eden) sans écouter de port. Il ne déclare aucune route métier : une nouvelle route va dans son module.
 - `src/index.ts` est le seul endroit qui appelle `.listen()`.
-- `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse. Les packages que l'API importe (`@repo/typing-engine`, `@repo/duel-engine`, `@repo/ranked-engine`, `@repo/matchmaking-engine`, `@repo/redis`, `@repo/queue`) sont compilés depuis leurs sources : leur dossier entier doit aussi être copié avant `bun build`, sinon l'import ne se résout pas. `apps/matchmaker/Dockerfile` suit la même règle.
+- `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse. Les packages que l'API importe (`@repo/typing-engine`, `@repo/duel-engine`, `@repo/ranked-engine`, `@repo/matchmaking-engine`, `@repo/redis`, `@repo/logger`, `@repo/queue`) sont compilés depuis leurs sources : leur dossier entier doit aussi être copié avant `bun build`, sinon l'import ne se résout pas. `apps/matchmaker/Dockerfile` suit la même règle.
 - Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet. Exception : une route WebSocket ne s'upgrade pas par `app.handle()`, ses tests font `.listen(0)` et passent par de vrais clients HTTP et WebSocket (`test/helpers/socket.ts`).
 
 ## Base de données
@@ -48,8 +48,8 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
 - Le schéma vit dans `src/db/schema.ts` (`drizzle-orm/pg-core`). Après chaque changement : `bun run db:generate`, puis commit du dossier `drizzle/` généré.
 - Schémas d'API : TypeBox 1.x (`t` d'Elysia) écrits à la main. `drizzle-orm/typebox`, cité par `.agents/skills/elysiajs/references/drizzle.md`, n'existe qu'en Drizzle 1.0 ; ne pas installer `drizzle-typebox` (TypeBox 0.x, incompatible avec Elysia 2).
-- `src/app.ts` exporte `createApp(db, auth, redis)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
-- Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis)`.
+- `src/app.ts` exporte `createApp(db, auth, redis, logger)`. La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
+- Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis, getLogger("api"))`.
 
 ## Redis
 
@@ -58,8 +58,16 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
 - Redis local : lancé par le même `docker compose up -d` que Postgres ; `REDIS_URL` dans `apps/api/.env`. `src/index.ts` refuse de démarrer sans lui, avant d'ouvrir Postgres.
 - `openRedis` et `requireRedisUrl` vivent dans `packages/redis` (`@repo/redis`), que le matchmaker utilise aussi ; `src/redis/client.ts` les ré-exporte et reste le seul chemin d'import dans l'API.
 - `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.
-- Redis est injecté comme la base : `createApp(db, auth, redis)`.
+- Redis est injecté comme la base : `createApp(db, auth, redis, logger)`.
 - Dans les tests : `const testRedis = await createTestRedis()` (`test/helpers/redis.ts`) ouvre Redis sous un namespace propre au fichier ; `afterAll` appelle `testRedis.drop()`, qui efface ses clés et ferme les connexions.
+
+## Logs
+
+`@repo/logger` (`packages/logger`, LogTape), partagé avec le matchmaker. `src/index.ts` appelle `setupLogger()` une fois : lignes JSON sur stdout sous `NODE_ENV=production`, lignes lisibles sinon, niveau par `LOG_LEVEL` (`info` par défaut).
+
+- Le logger est injecté comme la base : `createApp(db, auth, redis, logger)` passe `logger.getChild("<module>")` aux modules qui loguent. Aucun module n'importe `getLogger`.
+- Pas de `console.*` dans `src/`. Message à gabarit et propriétés : `logger.error("Could not advance Duel {duelId}", { duelId, error })`. Jamais de cookie, d'en-tête `authorization` ni de secret en propriété.
+- Dans les tests, sans `setupLogger` les loggers ne sortent rien. Pour lire les records : `await setupLogger({ sink: (record) => void records.push(record) })`, puis `resetLogger()` en `afterAll` (voir `test/logging.test.ts`).
 
 ## Auth
 

@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import type { MatchmakerTickOptions } from "@repo/queue";
 import type { PairingSide, QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { readDuel } from "../src/modules/duel/service.ts";
 import { proposePairing, readQueueEntry, tickMatchmaker } from "../src/modules/queue/service.ts";
@@ -23,7 +24,7 @@ afterAll(async () => {
 const openQueue = async (instances = 1) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: instances }, () =>
-    createApp(testDb.db, auth, testRedis.redis).listen(0),
+    createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0),
   );
   closers.push(async () => {
     for (const app of apps) await app.stop(true);

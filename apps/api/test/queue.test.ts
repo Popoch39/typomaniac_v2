@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { readQueueEntry } from "../src/modules/queue/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
@@ -11,7 +12,7 @@ import { openSocketOf, requestUpgrade } from "./helpers/socket.ts";
 const testDb = await createTestDb();
 const testRedis = await createTestRedis();
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis).listen(0);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0);
 const origin = `http://localhost:${app.server?.port}`;
 afterAll(async () => {
   await app.stop(true);
@@ -157,7 +158,7 @@ test("a second socket of the same Player evicts the first, which is told and clo
 });
 
 test("a second socket on another API instance evicts the first", async () => {
-  const other = createApp(testDb.db, auth, testRedis.redis).listen(0);
+  const other = createApp(testDb.db, auth, testRedis.redis, getLogger("api")).listen(0);
   const otherOrigin = `http://localhost:${other.server?.port}`;
   const { cookie } = await signInPlayerWithNickname(auth, origin);
   const first = await openQueueSocket(cookie);
@@ -193,7 +194,7 @@ test("two Players are queued side by side: one entering evicts nobody else", asy
 
 test("the Queue entry of a Player whose API instance stopped refreshing it expires on its own", async () => {
   // An instance that never refreshes in time stands for one that crashed with the socket open.
-  const stalled = createApp(testDb.db, auth, testRedis.redis, undefined, {
+  const stalled = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), undefined, {
     entryExpiryMs: 150,
     refreshMs: 60_000,
   }).listen(0);
@@ -210,7 +211,7 @@ test("the Queue entry of a Player whose API instance stopped refreshing it expir
 });
 
 test("a queued Player stays queued past the expiry while their API instance holds their socket", async () => {
-  const lively = createApp(testDb.db, auth, testRedis.redis, undefined, {
+  const lively = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), undefined, {
     entryExpiryMs: 150,
   }).listen(0);
   const { cookie } = await signInPlayerWithNickname(auth, origin);

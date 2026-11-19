@@ -1,0 +1,17 @@
+{
+  "name": "@repo/logger",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@logtape/logtape": "^2.4.2"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/bun": "^1.4.4",
+    "typescript": "7.0.2"
+  }
+}

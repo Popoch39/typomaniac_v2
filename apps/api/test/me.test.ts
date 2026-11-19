@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { Elysia } from "elysia";
+import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import { createProtection } from "../src/modules/auth/index.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
@@ -14,7 +15,7 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis);
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
 test("a Guest asking for their profile is told they are not signed in", async () => {
   const response = await app.handle(new Request("http://localhost/api/me"));
