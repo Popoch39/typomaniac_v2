@@ -3,7 +3,7 @@ import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { draftRankedDuel } from "../duel/service.ts";
-import { readNicknames } from "../player/service.ts";
+import { readNicknamesAndAvatars } from "../player/service.ts";
 import { readStanding } from "../standing/service.ts";
 
 // The Queue's keys and atomic steps live in `@repo/queue`, which the matchmaker uses too. This file
@@ -24,8 +24,8 @@ export type { DuelCreation, EntryHolder, PairingChange } from "@repo/queue";
 
 /**
  * Records that the Player accepts the Pairing at `now`, as `acceptPairing` answers. The ranked Duel
- * the second acceptance creates is drafted ahead of that step, and shows each Player by Nickname and
- * by Rank as they stand now.
+ * the second acceptance creates is drafted ahead of that step, and shows each Player by Nickname,
+ * Avatar and Rank as they stand now.
  */
 export const acceptPairingAsPlayer = async (
   db: Db,
@@ -39,12 +39,12 @@ export const acceptPairingAsPlayer = async (
 ) => {
   const pairing = await readPairing(redis, pairingId);
   if (!pairing) return "gone";
-  const nicknames = await readNicknames(db, pairing.playerIds);
+  const players = await readNicknamesAndAvatars(db, pairing.playerIds);
   const [first, second] = await Promise.all(
     pairing.playerIds.map(async (pairedId) => {
-      const nickname = nicknames.get(pairedId);
-      if (nickname === undefined) return null;
-      return { playerId: pairedId, nickname, rank: (await readStanding(db, pairedId)).rank };
+      const player = players.get(pairedId);
+      if (player === undefined) return null;
+      return { playerId: pairedId, ...player, rank: (await readStanding(db, pairedId)).rank };
     }),
   );
   if (!first || !second) return "gone";

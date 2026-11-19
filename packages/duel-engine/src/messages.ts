@@ -9,6 +9,8 @@ export type Participant = {
   readonly seat: Seat;
   /** The Player's Nickname, or the Guest's generated display name. */
   readonly name: string;
+  /** The Player's Avatar picture as the seat was taken, `null` for a Guest or a Player without one. */
+  readonly avatarUrl: string | null;
   readonly connected: boolean;
 };
 

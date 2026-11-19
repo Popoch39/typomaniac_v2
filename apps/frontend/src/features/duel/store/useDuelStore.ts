@@ -261,6 +261,6 @@ useDuelStore.subscribe(({ opponentGame, participants, seat }) => {
     .show(
       opponentGame === null || opponent === undefined
         ? null
-        : { ...opponentCaretPosition(opponentGame), name: opponent.name },
+        : { ...opponentCaretPosition(opponentGame), opponent },
     );
 });
