@@ -1,40 +1,29 @@
 import { Panel } from "../../../shared/components/Panel.tsx";
-import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
-import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import { OrnamentPicker } from "../../ornament/components/OrnamentPicker.tsx";
 import { RankCard } from "../../ranked/components/RankCard.tsx";
-import { ProfileGate } from "./ProfileGate.tsx";
+import type { OwnStanding } from "../../ranked/standing/describeStanding.ts";
+import { PlayerPanel } from "./PlayerPanel.tsx";
 
 interface PlayerProfileProps {
   player: SignedInPlayer;
+  standing: OwnStanding;
 }
 
-export function PlayerProfile({ player }: PlayerProfileProps) {
+export function PlayerProfile({ player, standing }: PlayerProfileProps) {
   return (
-    <ProfileGate player={player}>
-      {(standing) => (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
-          <Panel title="Player">
-            <div className="flex items-center gap-6 pb-1">
-              <OrnamentedAvatar player={player} ornament={player.ornament} size="lg" isOwn />
-              <p className="m-0 type-card-title wrap-anywhere text-ink normal-case">
-                <PlayerNickname player={player} />
-              </p>
-            </div>
-          </Panel>
-          <RankCard standing={standing} />
-          {/* Choosing an Ornament takes a Nickname, like everything shown to other Players: one without is
-          told so rather than offered the picker. */}
-          {player.nickname === null ? (
-            <Panel title="Ornament">
-              <p className="m-0 text-ink-muted">Choose a Nickname to choose an Ornament.</p>
-            </Panel>
-          ) : (
-            <OrnamentPicker player={player} />
-          )}
-        </div>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
+      <PlayerPanel player={player} />
+      <RankCard standing={standing} />
+      {/* Choosing an Ornament takes a Nickname, like everything shown to other Players: one without is
+      told so rather than offered the picker. */}
+      {player.nickname === null ? (
+        <Panel title="Ornament">
+          <p className="m-0 text-ink-muted">Choose a Nickname to choose an Ornament.</p>
+        </Panel>
+      ) : (
+        <OrnamentPicker player={player} />
       )}
-    </ProfileGate>
+    </div>
   );
 }

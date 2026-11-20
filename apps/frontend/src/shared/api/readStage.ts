@@ -15,3 +15,15 @@ export function readStage(reads: readonly ReadStatus[]): "loading" | "failed" | 
   if (reads.some((read) => read.isPending || isRetrying(read))) return "loading";
   return "ready";
 }
+
+/**
+ * A read the page waits on but whose failure another part of it shows: it keeps the page loading,
+ * a retry included, and never fails it.
+ */
+export function loadingOnly(read: ReadStatus): ReadStatus {
+  return {
+    isPending: read.isPending || (read.isError && read.isFetching),
+    isError: false,
+    isFetching: read.isFetching,
+  };
+}
