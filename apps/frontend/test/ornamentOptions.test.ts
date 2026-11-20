@@ -44,7 +44,7 @@ test("without a Peak Tier, every Tier is locked", () => {
   ]);
 });
 
-test("each option previews the Ornament it would put on, Auto with the Division of the Rank", () => {
+test("each option previews the Ornament it would put on, with the Division of the Rank for Auto and its Tier", () => {
   const previews = ornamentOptions("gold", { tier: "silver", division: 2, lp: 10 }).map(
     ({ preview }) => preview,
   );
@@ -54,7 +54,7 @@ test("each option previews the Ornament it would put on, Auto with the Division 
     null,
     { tier: "unranked", division: null },
     { tier: "bronze", division: null },
-    { tier: "silver", division: null },
+    { tier: "silver", division: 2 },
   ]);
 });
 

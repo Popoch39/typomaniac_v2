@@ -357,7 +357,7 @@ test("each Player wears the Ornament they chose, on the Podium, on the page and 
     { nickname: "bare", ornament: null },
     { nickname: "plate", ornament: { tier: "unranked", division: null } },
   ]);
-  expect(own).toMatchObject({ position: 25, ornament: { tier: "bronze", division: null } });
+  expect(own).toMatchObject({ position: 25, ornament: { tier: "bronze", division: 2 } });
 });
 
 test("a Player off the page among equal Standings gets the position the order gives them", async () => {
