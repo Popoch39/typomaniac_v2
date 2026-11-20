@@ -1,12 +1,10 @@
-import { BackHomeLink } from "./BackHomeLink.tsx";
+import { RouteErrorPage } from "./RouteErrorPage.tsx";
+import { RouteNotFoundPanel } from "./RouteNotFoundPanel.tsx";
 
 export function RouteNotFound() {
   return (
-    <main>
-      <p role="alert" className="text-danger">
-        This page does not exist.
-      </p>
-      <BackHomeLink />
-    </main>
+    <RouteErrorPage>
+      <RouteNotFoundPanel />
+    </RouteErrorPage>
   );
 }

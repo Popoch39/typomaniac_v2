@@ -1,6 +1,7 @@
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
 import { DevLeaderboardStates } from "./DevLeaderboardStates.tsx";
 import { DevRankedStates } from "./DevRankedStates.tsx";
+import { DevRouteStates } from "./DevRouteStates.tsx";
 
 /** A dev-only page that shows each skeleton beside its loaded page, and each error state forced on. */
 export function DevStatesPage() {
@@ -12,6 +13,7 @@ export function DevStatesPage() {
       />
       <DevRankedStates />
       <DevLeaderboardStates />
+      <DevRouteStates />
     </main>
   );
 }
