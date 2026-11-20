@@ -1,9 +1,20 @@
-import { useDuelParticipants } from "../hooks/useDuelParticipants.ts";
+import type { Participant } from "@repo/duel-engine";
 import { DuelParticipantChip } from "./DuelParticipantChip.tsx";
 
-export function DuelParticipants() {
-  const { self, opponent, opponentAway, opponentRank } = useDuelParticipants();
+interface DuelParticipantsProps {
+  self: Participant | undefined;
+  opponent: Participant | undefined;
+  opponentAway: boolean;
+  /** The name of the Opponent's Rank in a ranked Duel. */
+  opponentRank: string | null;
+}
 
+export function DuelParticipants({
+  self,
+  opponent,
+  opponentAway,
+  opponentRank,
+}: DuelParticipantsProps) {
   return (
     // The Participant's own side first.
     <div className="flex items-center gap-4 text-xl text-muted-foreground">
