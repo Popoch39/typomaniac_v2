@@ -17,6 +17,7 @@ export function PlayerBlockSkeleton() {
         </div>
       }
       action={<SkeletonBlock className="h-8 w-full group-data-[collapsible=icon]:w-8" />}
+      failure={null}
     />
   );
 }

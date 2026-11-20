@@ -33,6 +33,7 @@ export function PlayerBlockFailed({ failure, retry }: PlayerBlockFailedProps) {
           <span>Try again</span>
         </SidebarMenuButton>
       }
+      failure={null}
     />
   );
 }
