@@ -6,10 +6,12 @@ test("each signal of a Game is shown with its name, a readable label and its val
     signalRows([
       { name: "keyPressEvenness", value: 0.9 },
       { name: "superhumanSpeed", value: 0 },
+      { name: "browserHints", value: 1 },
     ]),
   ).toEqual([
     { name: "keyPressEvenness", label: "Even intervals between KeyPresses", value: "0.90" },
     { name: "superhumanSpeed", label: "Speed beyond any person's", value: "0.00" },
+    { name: "browserHints", label: "Keys from a script or an automated browser", value: "1.00" },
   ]);
 });
 

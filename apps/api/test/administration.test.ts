@@ -151,6 +151,7 @@ const signals: GameSignals = {
   missingRollover: 0.7,
   flatWordSpeed: 0.25,
   superhumanSpeed: 0,
+  browserHints: 1,
 };
 
 test("a Review shows the Player's Standing, recent ranked Duels with their Outcomes, the signals of each Game, the Violations and the Sanctions", async () => {
@@ -232,6 +233,7 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
               { name: "missingRollover", value: 0.7 },
               { name: "flatWordSpeed", value: 0.25 },
               { name: "superhumanSpeed", value: 0 },
+              { name: "browserHints", value: 1 },
             ],
           },
         ],

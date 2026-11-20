@@ -8,6 +8,7 @@ const LABELS: Readonly<Record<string, string>> = {
   missingRollover: "No overlap between KeyPresses at speed",
   flatWordSpeed: "Same speed on frequent and rare words",
   superhumanSpeed: "Speed beyond any person's",
+  browserHints: "Keys from a script or an automated browser",
 };
 
 /**
