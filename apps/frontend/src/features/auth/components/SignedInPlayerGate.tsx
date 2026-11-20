@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
-import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
+import { ReadGate } from "../../../shared/components/ReadGate.tsx";
 import { type SignedInPlayer, useSignedInPlayer } from "../hooks/useSignedInPlayer.ts";
 
 interface SignedInPlayerGateProps {
@@ -17,15 +16,10 @@ interface SignedInPlayerGateProps {
 export function SignedInPlayerGate({ pending, guest, failed, children }: SignedInPlayerGateProps) {
   const { player, stage, failure, retry } = useSignedInPlayer();
 
-  if (stage === "loading") return pending;
-  if (stage === "failed" && failure !== null) {
-    if (failed !== undefined) return failed(failure, retry);
-    return (
-      <ErrorPanel title="Session" message={failure}>
-        <TryAgainKey onRetry={retry} />
-      </ErrorPanel>
-    );
-  }
-  if (player === null) return guest;
-  return children(player);
+  if (stage === "failed" && failure !== null && failed !== undefined) return failed(failure, retry);
+  return (
+    <ReadGate stage={stage} pending={pending} title="Session" failure={failure} retry={retry}>
+      {player === null ? guest : children(player)}
+    </ReadGate>
+  );
 }
