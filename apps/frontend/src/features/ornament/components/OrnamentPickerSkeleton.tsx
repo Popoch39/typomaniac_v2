@@ -1,8 +1,10 @@
+import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
 import { Panel } from "../../../shared/components/Panel.tsx";
 import { ornamentOptions } from "../picker/ornamentOptions.ts";
 
 // The choices do not depend on the read: their labels stay, and each key keeps the box of its loaded
-// key, the `sm` Ornament frame and the unlock hint reserved, as every loaded Tier key reserves it.
+// key, the `sm` Ornament frame and the unlock hint reserved, as every loaded Tier key reserves it. The
+// save error's line is reserved below them, as the loaded picker reserves it.
 const OPTIONS = ornamentOptions(null, null);
 
 /** The Ornament picker at its loaded size, a grid of recessed keys in place of the choices. */
@@ -22,6 +24,7 @@ export function OrnamentPickerSkeleton() {
           </li>
         ))}
       </ul>
+      <DangerStatusLine message={null} />
     </Panel>
   );
 }

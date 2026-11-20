@@ -1,46 +1,21 @@
-import { Link } from "@tanstack/react-router";
-import { cn } from "../../../shared/lib/utils.ts";
-import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
+import { useSignOut } from "../../auth/hooks/useSignOut.ts";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
-import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
-import { playerChipClassName } from "../chip/playerChipClassName.ts";
 import { PlayerBlockLayout } from "./PlayerBlockLayout.tsx";
-import { PlayerStandingLine } from "./PlayerStandingLine.tsx";
+import { PlayerChip } from "./PlayerChip.tsx";
 import { SidebarSignOutButton } from "./SidebarSignOutButton.tsx";
 
 interface PlayerIdentityProps {
   player: SignedInPlayer;
 }
 
-// The PlayerChip: on the icon rail it shrinks to the avatar key, its text kept for screen readers.
 export function PlayerIdentity({ player }: PlayerIdentityProps) {
+  const { signOut, isPending, failure } = useSignOut();
+
   return (
     <PlayerBlockLayout
-      chip={
-        <Link
-          to="/profile"
-          className={cn(
-            playerChipClassName,
-            "key-travel text-ink no-underline active:translate-y-[3px] motion-reduce:active:translate-y-0",
-          )}
-        >
-          {/* On the icon rail the chip shrinks to fit the rail's 48px. */}
-          <OrnamentedAvatar
-            player={player}
-            ornament={player.ornament}
-            size="sm"
-            isOwn
-            className="group-data-[collapsible=icon]:[zoom:0.75]"
-          />
-          <span className="flex min-w-0 flex-col gap-0.5 group-data-[collapsible=icon]:sr-only">
-            <span className="truncate font-extrabold">
-              <PlayerNickname player={player} />
-            </span>
-            <PlayerStandingLine player={player} />
-          </span>
-        </Link>
-      }
-      action={<SidebarSignOutButton />}
+      chip={<PlayerChip player={player} />}
+      action={<SidebarSignOutButton onSignOut={signOut} isPending={isPending} />}
+      failure={failure}
     />
   );
 }

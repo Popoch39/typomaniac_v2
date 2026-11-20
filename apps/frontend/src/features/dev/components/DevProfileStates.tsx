@@ -1,4 +1,5 @@
 import { ornamentOptions } from "../../ornament/picker/ornamentOptions.ts";
+import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
 import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
 import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Panel } from "../../../shared/components/Panel.tsx";
@@ -39,6 +40,7 @@ export function DevProfileStates() {
                 isSaving={false}
                 onChoose={() => undefined}
               />
+              <DangerStatusLine message={null} />
             </Panel>
           </div>
         </DevStateColumn>

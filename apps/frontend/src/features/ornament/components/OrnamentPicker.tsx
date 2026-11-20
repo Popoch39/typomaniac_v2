@@ -1,8 +1,7 @@
-import { CircleAlert } from "lucide-react";
+import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
 import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
 import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Panel } from "../../../shared/components/Panel.tsx";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
 import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { useOrnamentPicker } from "../hooks/useOrnamentPicker.ts";
@@ -40,7 +39,7 @@ export function OrnamentPicker({ player }: OrnamentPickerProps) {
         isSaving={isSaving}
         onChoose={choose}
       />
-      {saveFailure && <StatusMessage role="alert" icon={CircleAlert} message={saveFailure} />}
+      <DangerStatusLine message={saveFailure} />
     </Panel>
   );
 }
