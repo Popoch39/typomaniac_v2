@@ -12,6 +12,7 @@ import { createFairPlayRoutes } from "./modules/fair-play/index.ts";
 import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
+import { createOnlineRoutes, type OnlineOptions } from "./modules/online/index.ts";
 import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
 import { createProgressRoutes } from "./modules/progress/index.ts";
@@ -34,6 +35,8 @@ export type AppOptions = {
   readonly rateLimit?: RateLimitOptions;
   /** The entry reads it from the configuration; a test that shows no Sanction may leave it out. */
   readonly fairPlay?: FairPlayConfig;
+  /** Lets a test shorten how long a ping keeps a Player Online. */
+  readonly online?: OnlineOptions;
 };
 
 // Never shown outside tests: the entry refuses to start without a configured address.
@@ -53,6 +56,7 @@ export const createApp = (
     lifecycle = createLifecycle(),
     rateLimit: rateLimitOptions,
     fairPlay = UNCONFIGURED_FAIR_PLAY,
+    online: onlineOptions,
   }: AppOptions = {},
 ) => {
   // Only the categories `@repo/logger` names.
@@ -74,6 +78,7 @@ export const createApp = (
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
       .use(createAdministrationRoutes(db, protection))
+      .use(createOnlineRoutes(protection, redis, onlineOptions))
       .use(
         createDuelRoutes(
           db,

@@ -4,6 +4,8 @@ import { LoadingPixels } from "./LoadingPixels.tsx";
 
 interface PanelProps {
   title?: string;
+  /** Shown right after the title, such as a live count. */
+  titleAside?: ReactNode;
   /** A short mono tag at the top right, such as "Best of 3". */
   tag?: string;
   /** Keeps the tag's room while it is not shown, for a tag that comes and goes, such as "Saving…". */
@@ -19,6 +21,7 @@ interface PanelProps {
 /** A card on the plate, opened by an eyebrow title and, on the right, a tag. */
 export function Panel({
   title,
+  titleAside,
   tag,
   isTagHidden = false,
   isLoading = false,
@@ -35,9 +38,10 @@ export function Panel({
         className,
       )}
     >
-      {(title !== undefined || tag !== undefined || isLoading) && (
+      {(title !== undefined || titleAside !== undefined || tag !== undefined || isLoading) && (
         <div className="flex items-center justify-between gap-3">
           {title !== undefined && <h2 className="m-0 type-eyebrow text-ink-subtle">{title}</h2>}
+          {titleAside}
           {(tag !== undefined || isLoading) && (
             <span
               className={cn(

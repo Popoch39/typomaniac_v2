@@ -1,5 +1,6 @@
 import { Panel } from "../../../shared/components/Panel.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import { OnlinePlayers } from "../../online/components/OnlinePlayers.tsx";
 import { useQueuePanelTag } from "../hooks/useQueuePanelTag.ts";
 import { QueuePanel } from "./QueuePanel.tsx";
 
@@ -13,7 +14,7 @@ export function RankedQueue({ player }: RankedQueueProps) {
   const tag = useQueuePanelTag();
 
   return (
-    <Panel title="Queue" tag={tag}>
+    <Panel title="Queue" titleAside={<OnlinePlayers />} tag={tag}>
       {player.nickname === null ? (
         <p className="m-0 text-ink-muted">Choose a Nickname to enter the Queue.</p>
       ) : (
