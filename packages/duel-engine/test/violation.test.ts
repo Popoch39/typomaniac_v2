@@ -18,7 +18,7 @@ function violationsOf(journal: readonly GameEvent[]) {
 
 /** A word typed one key at a time, each key released before the next goes down. */
 const typed = (word: string): GameEvent[] =>
-  [...word].flatMap((char) => {
+  word.split("").flatMap((char) => {
     const code = char === " " ? "Space" : `Key${char.toUpperCase()}`;
     return [keyDown(code), insert(char), keyUp(code)];
   });

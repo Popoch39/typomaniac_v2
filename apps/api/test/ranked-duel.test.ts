@@ -87,7 +87,7 @@ const typeWord = (
   word: string,
   at: number,
 ) => {
-  for (const [offset, char] of [...`${word} `].entries()) {
+  for (const [offset, char] of `${word} `.split("").entries()) {
     const code = char === " " ? "Space" : `Key${char.toUpperCase()}`;
     const keyAt = at + offset * 100;
     socket.send({ type: "event", round, event: { type: "keyDown", at: keyAt, code } });
@@ -715,7 +715,7 @@ test("a ranked Game typed one key at a time, with key rollover and a held key, r
   const { duelId, players } = await openRankedDuel();
   const [typist, opponent] = players;
   const countdown = await startFirstRound(players);
-  const [first, second] = [...(countdown.words[0] ?? "")];
+  const [first, second] = (countdown.words[0] ?? "").split("");
   const send = (event: ClientMessage & { type: "event" }) => typist.socket.send(event);
   const event = (gameEvent: Extract<ClientMessage, { type: "event" }>["event"]) =>
     send({ type: "event", round: 1, event: gameEvent });
