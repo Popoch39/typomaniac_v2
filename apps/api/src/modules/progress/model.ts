@@ -71,6 +71,12 @@ export const NicknameGet = {
 
 export const NicknameProgressGet = {
   Params: t.Object({ nickname: t.String() }),
+  Query: t.Object({
+    // The Duels read: the last 20 (when left out), those ended in the last 30 days, or all of them.
+    window: t.Optional(t.Union([t.Literal("20-duels"), t.Literal("30-days"), t.Literal("all")])),
+    // Every Duel (when left out), or only ranked or only Custom ones.
+    kind: t.Optional(t.Union([t.Literal("all"), t.Literal("ranked"), t.Literal("custom")])),
+  }),
   Response: {
     // Oldest first.
     200: t.Object({ games: t.Array(progressGame) }),

@@ -33,16 +33,20 @@ export const createProgressRoutes = (db: Db, protection: Protection, rateLimiter
       {
         requester: true,
         params: ProgressModel.NicknameProgressGet.Params,
+        query: ProgressModel.NicknameProgressGet.Query,
         response: ProgressModel.NicknameProgressGet.Response,
       },
-      async ({ params, requesterId, request, server, set, status }) => {
+      async ({ params, query, requesterId, request, server, set, status }) => {
         const refused = await rateLimiter.check(
           "progress",
           requesterId ?? rateLimiter.clientIp(request, server),
           set,
         );
         if (refused) return refused;
-        const progress = await readProgress(db, params.nickname);
+        const progress = await readProgress(db, params.nickname, {
+          window: query.window ?? "20-duels",
+          kind: query.kind ?? "all",
+        });
         if (progress === null) return status(404, { code: "PLAYER_NOT_FOUND" });
         return progress;
       },

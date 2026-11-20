@@ -17,12 +17,18 @@ afterAll(async () => {
 const auth = createTestAuth(testDb.db);
 const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
 
-const readProgress = (nickname: string, cookie?: string) =>
+const readProgress = (nickname: string, query: Record<string, string> = {}) =>
   app.handle(
-    new Request(`http://localhost/api/players/${encodeURIComponent(nickname)}/progress`, {
-      headers: cookie ? { cookie } : {},
-    }),
+    new Request(
+      `http://localhost/api/players/${encodeURIComponent(nickname)}/progress?${new URLSearchParams(query).toString()}`,
+    ),
   );
+
+const wpmsOf = async (response: Response) => {
+  expect(response.status).toBe(200);
+  const { games } = (await response.json()) as { games: { wpm: number }[] };
+  return games.map(({ wpm }) => wpm);
+};
 
 const uniqueNickname = (prefix: string) => `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
 
@@ -126,6 +132,16 @@ const saveDuel = async (
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 10, 1, 12, minutes));
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+// Relative to the real clock, as the 30 days run back from the moment of the read.
+const ago = (days: number, minutes = 0) =>
+  new Date(Date.now() - days * DAY_MS - minutes * MINUTE_MS);
+
+// Duel n of a test plays its only Game at n WPM, so that each Game names its Duel.
+const gameAt = (n: number) => [{ wpm: n, rawWpm: n, accuracy: 90, consistency: 80 }];
+
 test("anyone without a session reads a Player's Games, oldest first, with their Duel's end and kind and the four measures", async () => {
   const nickname = uniqueNickname("Typist");
   const { player } = await playerNamed(nickname);
@@ -196,6 +212,96 @@ test("only the Games of the Player's last 20 Duels are read", async () => {
   expect(games.map(({ wpm }) => wpm)).toEqual([
     3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
   ]);
+});
+
+test("the last 20 Duels window is the one read by default", async () => {
+  const nickname = uniqueNickname("Default");
+  const { player } = await playerNamed(nickname);
+  for (let n = 1; n <= 21; n += 1)
+    await saveDuel(player.id, { kind: "custom", endedAt: at(n), games: gameAt(n) });
+
+  const lastTwenty = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+  expect(await wpmsOf(await readProgress(nickname, { window: "20-duels" }))).toEqual(lastTwenty);
+  expect(await wpmsOf(await readProgress(nickname))).toEqual(lastTwenty);
+});
+
+test("the last 30 days window reads every Duel ended within 30 days, however many, and no older one", async () => {
+  const nickname = uniqueNickname("Monthly");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, { kind: "ranked", endedAt: ago(30, 1), games: gameAt(1) });
+  await saveDuel(player.id, { kind: "ranked", endedAt: ago(30, -1), games: gameAt(2) });
+  // More than 20 Duels in the window: the 30 days are not cut to 20 Duels.
+  for (let n = 3; n <= 23; n += 1)
+    await saveDuel(player.id, { kind: "custom", endedAt: ago(0, 60 - n), games: gameAt(n) });
+
+  expect(await wpmsOf(await readProgress(nickname, { window: "30-days" }))).toEqual([
+    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+  ]);
+});
+
+test("the all window reads every Duel the Player ever played", async () => {
+  const nickname = uniqueNickname("Lifelong");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, { kind: "ranked", endedAt: ago(400), games: gameAt(1) });
+  for (let n = 2; n <= 22; n += 1)
+    await saveDuel(player.id, { kind: "custom", endedAt: ago(0, 60 - n), games: gameAt(n) });
+
+  expect(await wpmsOf(await readProgress(nickname, { window: "all" }))).toEqual([
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+  ]);
+});
+
+test("the kind filter keeps only ranked or only Custom Duels, before the last 20 are taken", async () => {
+  const nickname = uniqueNickname("Mixed");
+  const { player } = await playerNamed(nickname);
+  // 21 ranked Duels, then 5 Custom Duels after them.
+  for (let n = 1; n <= 26; n += 1)
+    await saveDuel(player.id, {
+      kind: n <= 21 ? "ranked" : "custom",
+      endedAt: at(n),
+      games: gameAt(n),
+    });
+
+  expect(await wpmsOf(await readProgress(nickname, { kind: "ranked" }))).toEqual([
+    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+  ]);
+  expect(await wpmsOf(await readProgress(nickname, { kind: "custom" }))).toEqual([
+    22, 23, 24, 25, 26,
+  ]);
+  const everyKind = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
+  expect(await wpmsOf(await readProgress(nickname, { kind: "all" }))).toEqual(everyKind);
+  expect(await wpmsOf(await readProgress(nickname))).toEqual(everyKind);
+});
+
+test("the kind filter applies within the window", async () => {
+  const nickname = uniqueNickname("Recent");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, { kind: "ranked", endedAt: ago(31), games: gameAt(1) });
+  await saveDuel(player.id, { kind: "ranked", endedAt: ago(2), games: gameAt(2) });
+  await saveDuel(player.id, { kind: "custom", endedAt: ago(1), games: gameAt(3) });
+
+  expect(await wpmsOf(await readProgress(nickname, { window: "30-days", kind: "ranked" }))).toEqual(
+    [2],
+  );
+  expect(await wpmsOf(await readProgress(nickname, { window: "all", kind: "ranked" }))).toEqual([
+    1, 2,
+  ]);
+});
+
+test("a window or a kind that is not one of the choices is rejected", async () => {
+  const nickname = uniqueNickname("Strict");
+  await playerNamed(nickname);
+
+  const invalidQueries: Record<string, string>[] = [
+    { window: "week" },
+    { window: "20" },
+    { window: "" },
+    { kind: "practice" },
+    { kind: "Ranked" },
+    { kind: "" },
+  ];
+  for (const query of invalidQueries)
+    expect((await readProgress(nickname, query)).status).toBe(422);
 });
 
 test("a Player who has not played a Duel has no Game", async () => {

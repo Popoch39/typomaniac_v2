@@ -1,9 +1,11 @@
 import { wornOrnament } from "@repo/ranked-engine";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import type { UnwrapSchema } from "elysia";
 import type { Db } from "../../db/client.ts";
 import { duel, duelGame, duelParticipant, standing, user } from "../../db/schema.ts";
 import { readPeakTier } from "../ornament/service.ts";
 import { rankFromStored } from "../standing/service.ts";
+import type * as ProgressModel from "./model.ts";
 
 // Matched as the unique index on lower(nickname) holds Nicknames, so that the index serves it.
 const nicknameIs = (nickname: string) => sql`lower(${user.nickname}) = lower(${nickname})`;
@@ -37,8 +39,12 @@ export const readPublicPlayer = async (db: Db, nickname: string) => {
   };
 };
 
-// The Duels a Progress covers, the most recent ones.
-const PROGRESS_DUELS = 20;
+// The Duels the `20-duels` window covers, the most recent ones.
+const WINDOW_DUELS = 20;
+
+const WINDOW_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+type ProgressFilter = Required<UnwrapSchema<typeof ProgressModel.NicknameProgressGet.Query>>;
 
 // Read from the Result inside the database, so that its histories and key timings never leave it.
 // The driver saves a jsonb value as a JSON string holding the document: `#>> '{}'` unwraps it (and
@@ -47,13 +53,14 @@ const measure = (name: "wpm" | "rawWpm" | "accuracy" | "consistency") =>
   sql<number>`((${duelGame.result} #>> '{}')::jsonb ->> ${name})::float8`.mapWith(Number);
 
 /**
- * The Games of the last Duels of the Player who chose this Nickname, whatever its case, oldest
- * first; `null` when nobody did. Only the measures of each Game: never its journal, nor any MMR.
+ * The Games of the Duels of the Player who chose this Nickname, whatever its case, that the window
+ * and the kind select, oldest first; `null` when nobody did. Only the measures of each Game: never
+ * its journal, nor any MMR.
  */
-export const readProgress = async (db: Db, nickname: string) => {
+export const readProgress = async (db: Db, nickname: string, { window, kind }: ProgressFilter) => {
   const [player] = await db.select({ id: user.id }).from(user).where(nicknameIs(nickname));
   if (!player) return null;
-  const lastDuels = db
+  const filteredDuels = db
     .select({
       duelId: duelParticipant.duelId,
       seat: duelParticipant.seat,
@@ -62,24 +69,33 @@ export const readProgress = async (db: Db, nickname: string) => {
     })
     .from(duelParticipant)
     .innerJoin(duel, eq(duel.id, duelParticipant.duelId))
-    .where(eq(duelParticipant.playerId, player.id))
+    .where(
+      and(
+        eq(duelParticipant.playerId, player.id),
+        kind === "all" ? undefined : eq(duel.kind, kind),
+        // By the Duel's end: a Duel begun before the 30 days and ended within them is in.
+        window === "30-days" ? gte(duel.endedAt, new Date(Date.now() - WINDOW_DAYS_MS)) : undefined,
+      ),
+    )
     .orderBy(desc(duel.endedAt), desc(duel.id))
-    .limit(PROGRESS_DUELS)
-    .as("last_duels");
+    .$dynamic();
+  const selectedDuels = (
+    window === "20-duels" ? filteredDuels.limit(WINDOW_DUELS) : filteredDuels
+  ).as("selected_duels");
   const games = await db
     .select({
-      endedAt: lastDuels.endedAt,
-      kind: lastDuels.kind,
+      endedAt: selectedDuels.endedAt,
+      kind: selectedDuels.kind,
       wpm: measure("wpm"),
       rawWpm: measure("rawWpm"),
       accuracy: measure("accuracy"),
       consistency: measure("consistency"),
     })
-    .from(lastDuels)
+    .from(selectedDuels)
     .innerJoin(
       duelGame,
-      and(eq(duelGame.duelId, lastDuels.duelId), eq(duelGame.seat, lastDuels.seat)),
+      and(eq(duelGame.duelId, selectedDuels.duelId), eq(duelGame.seat, selectedDuels.seat)),
     )
-    .orderBy(asc(lastDuels.endedAt), asc(lastDuels.duelId), asc(duelGame.round));
+    .orderBy(asc(selectedDuels.endedAt), asc(selectedDuels.duelId), asc(duelGame.round));
   return { games: games.map((game) => ({ ...game, endedAt: game.endedAt.getTime() })) };
 };
