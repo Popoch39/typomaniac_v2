@@ -12,9 +12,19 @@ const voidedDuel = t.Object({
   lp: t.Integer(),
 });
 
+// The Suspension that keeps the Player out of the Queue now, as they may see it: its end and where
+// to contest it, never its cause nor any signal (ADR 0014).
+const suspension = t.Object({
+  // Epoch milliseconds; the Queue opens again by itself at that instant.
+  endsAt: t.Number(),
+  appealAddress: t.String(),
+});
+
 export const MeFairPlayGet = {
   Response: t.Object({
     // Newest first.
     voidedDuels: t.Array(voidedDuel),
+    // Null when the Player is not suspended.
+    suspension: t.Nullable(suspension),
   }),
 };

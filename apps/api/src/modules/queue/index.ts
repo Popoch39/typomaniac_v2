@@ -8,6 +8,7 @@ import type { Redis } from "../../redis/client.ts";
 import { type Protection } from "../auth/index.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
+import { readCurrentSuspension } from "../fair-play/service.ts";
 import { mayReconnect } from "../lifecycle/closeCode.ts";
 import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
@@ -65,10 +66,13 @@ export const createQueueRoutes = (
   // The Queue presence of each open socket, set on open and read on close.
   const present = new Map<string, Presence>();
 
-  // One ranked Duel at a time: the Player is sent back to the one they are in.
-  const refuseWhileInRankedDuel = async (playerId: string) => {
+  // One ranked Duel at a time: the Player is sent back to the one they are in. A suspended Player is
+  // told until when; the Queue opens again by itself at that instant.
+  const refuseEntry = async (playerId: string) => {
     const duelId = await readUnfinishedRankedDuel(redis, playerId);
     if (duelId !== null) return status(409, { code: "RANKED_DUEL_UNFINISHED", duelId });
+    const suspension = await readCurrentSuspension(db, playerId, new Date());
+    if (suspension) return status(403, { code: "RANKED_SUSPENDED", endsAt: suspension.endsAt });
   };
 
   return (
@@ -82,7 +86,7 @@ export const createQueueRoutes = (
         "/",
         { nicknameChosen: true, response: QueueModel.RootGet.Response },
         async ({ player }) => {
-          const refused = await refuseWhileInRankedDuel(player.id);
+          const refused = await refuseEntry(player.id);
           if (refused) return refused;
           return { queuedAt: (await readQueueEntry(redis, player.id))?.queuedAt ?? null };
         },
@@ -93,11 +97,11 @@ export const createQueueRoutes = (
         response: QueueModel.Socket.Response,
         async beforeHandle({ body, player, set }) {
           // Also runs before each message, which carries a body: the upgrade alone is counted and
-          // checked against the Duel.
+          // checked against the Duel and the Suspension.
           if (body !== undefined) return;
           const refused = await rateLimiter.check("queueSocket", player.id, set);
           if (refused) return refused;
-          return refuseWhileInRankedDuel(player.id);
+          return refuseEntry(player.id);
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;

@@ -6,6 +6,7 @@ import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
 import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
+import type { FairPlayConfig } from "./modules/fair-play/config.ts";
 import { createFairPlayRoutes } from "./modules/fair-play/index.ts";
 import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
@@ -28,7 +29,12 @@ export type AppOptions = {
   readonly lifecycle?: Lifecycle;
   /** Lets a test lower the limits, and says whether the API sits behind a proxy. */
   readonly rateLimit?: RateLimitOptions;
+  /** The entry reads it from the configuration; a test that shows no Sanction may leave it out. */
+  readonly fairPlay?: FairPlayConfig;
 };
+
+// Never shown outside tests: the entry refuses to start without a configured address.
+const UNCONFIGURED_FAIR_PLAY: FairPlayConfig = { appealAddress: "fair-play@example.invalid" };
 
 // The database, the auth instance and Redis are injected so tests can run each app against its own
 // throwaway Postgres database and Redis namespace, and the logger so tests can read its records.
@@ -43,6 +49,7 @@ export const createApp = (
     dev: devOptions,
     lifecycle = createLifecycle(),
     rateLimit: rateLimitOptions,
+    fairPlay = UNCONFIGURED_FAIR_PLAY,
   }: AppOptions = {},
 ) => {
   // Only the categories `@repo/logger` names.
@@ -60,7 +67,7 @@ export const createApp = (
       .use(createPlayerRoutes(db, protection, rateLimiter))
       .use(createOrnamentRoutes(db, protection))
       .use(createStandingRoutes(db, auth, protection))
-      .use(createFairPlayRoutes(db, protection))
+      .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(
         createDuelRoutes(
           db,

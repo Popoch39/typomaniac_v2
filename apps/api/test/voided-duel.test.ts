@@ -280,14 +280,17 @@ test("each Player of a Voided Duel reads it among their own, with the LP it gave
   expect(forVictim.status).toBe(200);
   expect(await forVictim.json()).toEqual({
     voidedDuels: [{ duelId, voidedAt: VOIDED_AT.getTime(), opponentNickname: "cheater", lp: 17 }],
+    suspension: null,
   });
   expect(await forCheater.json()).toEqual({
     voidedDuels: [{ duelId, voidedAt: VOIDED_AT.getTime(), opponentNickname: "victim", lp: -30 }],
+    suspension: null,
   });
-  expect(await forBystander.json()).toEqual({ voidedDuels: [] });
+  expect(await forBystander.json()).toEqual({ voidedDuels: [], suspension: null });
   expect(await (await readFairPlay(later.second.cookie)).json()).toEqual({
     voidedDuels: [
       { duelId: later.duelId, voidedAt: laterAt.getTime(), opponentNickname: null, lp: 17 },
     ],
+    suspension: null,
   });
 });

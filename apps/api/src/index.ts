@@ -4,6 +4,7 @@ import { migrateDatabase, openDatabase, requireDatabaseUrl } from "./db/client.t
 import { requireAuthConfig } from "./modules/auth/config.ts";
 import { createAuth } from "./modules/auth/service.ts";
 import { readDevOptions } from "./modules/dev/config.ts";
+import { requireFairPlayConfig } from "./modules/fair-play/config.ts";
 import { createLifecycle } from "./modules/lifecycle/service.ts";
 import { readTrustProxy } from "./modules/rate-limit/config.ts";
 import { openRedis, requireRedisUrl } from "./redis/client.ts";
@@ -18,6 +19,7 @@ const migrationsFolder = process.env.MIGRATIONS_DIR ?? "./drizzle";
 const authConfig = requireAuthConfig();
 const redisUrl = requireRedisUrl();
 const devOptions = readDevOptions();
+const fairPlayConfig = requireFairPlayConfig();
 
 const db = openDatabase(requireDatabaseUrl());
 await migrateDatabase(db, migrationsFolder);
@@ -28,6 +30,7 @@ const lifecycle = createLifecycle();
 // Re-exported so Elysia's AOT can discover the app from the process entry.
 export const app = createApp(db, createAuth(db, authConfig, { redis }), redis, logger, {
   dev: devOptions,
+  fairPlay: fairPlayConfig,
   lifecycle,
   rateLimit: { trustProxy: readTrustProxy() },
 });
