@@ -36,16 +36,26 @@ export const voidDuel = (
     at,
   }: { duelId: string; playerId: string; cause: SanctionCause; at: Date },
 ): Promise<VoidDuelResult> =>
-  db.transaction((tx) =>
-    withdrawDuel(tx, { duelId, playerId }, async () => {
-      const [saved] = await tx
-        .insert(sanction)
-        .values({ playerId, kind: "voided_duel", cause, startedAt: at })
-        .returning({ id: sanction.id });
-      if (!saved) throw new Error(`Could not save the Sanction voiding Duel ${duelId}`);
-      return saved.id;
-    }),
-  );
+  db.transaction((tx) => voidDuelIn(tx, { duelId, playerId, cause, at }));
+
+/** `voidDuel`, inside the caller's transaction. */
+export const voidDuelIn = (
+  tx: Transaction,
+  {
+    duelId,
+    playerId,
+    cause,
+    at,
+  }: { duelId: string; playerId: string; cause: SanctionCause; at: Date },
+): Promise<VoidDuelResult> =>
+  withdrawDuel(tx, { duelId, playerId }, async () => {
+    const [saved] = await tx
+      .insert(sanction)
+      .values({ playerId, kind: "voided_duel", cause, startedAt: at })
+      .returning({ id: sanction.id });
+    if (!saved) throw new Error(`Could not save the Sanction voiding Duel ${duelId}`);
+    return saved.id;
+  });
 
 // The voiding itself, under the Sanction that `sanctionOf` saves only once the Duel is known to be
 // voided: its own Voided Duel, or the Suspension or Ban that voids it.
@@ -106,43 +116,43 @@ export type SuspendResult = "suspended" | "already-suspended";
  * this Player starting at that same instant is the same one: it is never saved, nor its Duels voided,
  * twice.
  */
-export const suspendPlayer = (
-  db: Db,
-  {
-    playerId,
-    cause,
-    at,
-    lengthMs,
-  }: { playerId: string; cause: SanctionCause; at: Date; lengthMs: number },
-): Promise<SuspendResult> =>
-  db.transaction(async (tx) => {
-    // Locked first, so that two suspensions of one Player wait on each other and the second sees the first.
-    await tx.select({ id: user.id }).from(user).where(eq(user.id, playerId)).for("update");
-    const [existing] = await tx
-      .select({ id: sanction.id })
-      .from(sanction)
-      .where(
-        and(
-          eq(sanction.playerId, playerId),
-          eq(sanction.kind, "suspension"),
-          eq(sanction.startedAt, at),
-        ),
-      );
-    if (existing) return "already-suspended";
-    const [saved] = await tx
-      .insert(sanction)
-      .values({
-        playerId,
-        kind: "suspension",
-        cause,
-        startedAt: at,
-        endsAt: new Date(at.getTime() + lengthMs),
-      })
-      .returning({ id: sanction.id });
-    if (!saved) throw new Error(`Could not save the Suspension of Player ${playerId}`);
-    await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
-    return "suspended";
-  });
+export const suspendPlayer = (db: Db, suspension: Suspension): Promise<SuspendResult> =>
+  db.transaction((tx) => suspendPlayerIn(tx, suspension));
+
+type Suspension = { playerId: string; cause: SanctionCause; at: Date; lengthMs: number };
+
+/** `suspendPlayer`, inside the caller's transaction. */
+export const suspendPlayerIn = async (
+  tx: Transaction,
+  { playerId, cause, at, lengthMs }: Suspension,
+): Promise<SuspendResult> => {
+  // Locked first, so that two suspensions of one Player wait on each other and the second sees the first.
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, playerId)).for("update");
+  const [existing] = await tx
+    .select({ id: sanction.id })
+    .from(sanction)
+    .where(
+      and(
+        eq(sanction.playerId, playerId),
+        eq(sanction.kind, "suspension"),
+        eq(sanction.startedAt, at),
+      ),
+    );
+  if (existing) return "already-suspended";
+  const [saved] = await tx
+    .insert(sanction)
+    .values({
+      playerId,
+      kind: "suspension",
+      cause,
+      startedAt: at,
+      endsAt: new Date(at.getTime() + lengthMs),
+    })
+    .returning({ id: sanction.id });
+  if (!saved) throw new Error(`Could not save the Suspension of Player ${playerId}`);
+  await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
+  return "suspended";
+};
 
 // Voids, under the Suspension or Ban `sanctionId`, every ranked Duel the Player won in the repair
 // window before `at` that is not voided yet (ADR 0015).
@@ -179,36 +189,41 @@ export type BanResult = "banned" | "already-banned";
  * ranked Duel they won in the repair window before it is voided under it (ADR 0015). A Player
  * already banned is left as they are.
  */
-export const banPlayer = (
-  db: Db,
-  { playerId, cause, at }: { playerId: string; cause: SanctionCause; at: Date },
-): Promise<BanResult> =>
-  db.transaction(async (tx) => {
-    // Locked first, so that two bans of one Player wait on each other and the second sees the first.
-    const [found] = await tx
-      .select({ bannedAt: user.bannedAt, email: user.email })
-      .from(user)
-      .where(eq(user.id, playerId))
-      .for("update");
-    if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
-    if (found.bannedAt) return "already-banned";
-    const [saved] = await tx
-      .insert(sanction)
-      .values({ playerId, kind: "ban", cause, startedAt: at })
-      .returning({ id: sanction.id });
-    if (!saved) throw new Error(`Could not save the Ban of Player ${playerId}`);
-    await tx.update(user).set({ bannedAt: at }).where(eq(user.id, playerId));
-    const accounts = await tx
-      .select({ providerId: account.providerId, accountId: account.accountId })
-      .from(account)
-      .where(eq(account.userId, playerId));
-    await tx
-      .insert(bannedIdentity)
-      .values([
-        ...accounts.map((provided) => ({ sanctionId: saved.id, ...provided })),
-        { sanctionId: saved.id, email: found.email.toLowerCase() },
-      ]);
-    await tx.delete(session).where(eq(session.userId, playerId));
-    await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
-    return "banned";
-  });
+export const banPlayer = (db: Db, ban: Ban): Promise<BanResult> =>
+  db.transaction((tx) => banPlayerIn(tx, ban));
+
+type Ban = { playerId: string; cause: SanctionCause; at: Date };
+
+/** `banPlayer`, inside the caller's transaction. */
+export const banPlayerIn = async (
+  tx: Transaction,
+  { playerId, cause, at }: Ban,
+): Promise<BanResult> => {
+  // Locked first, so that two bans of one Player wait on each other and the second sees the first.
+  const [found] = await tx
+    .select({ bannedAt: user.bannedAt, email: user.email })
+    .from(user)
+    .where(eq(user.id, playerId))
+    .for("update");
+  if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
+  if (found.bannedAt) return "already-banned";
+  const [saved] = await tx
+    .insert(sanction)
+    .values({ playerId, kind: "ban", cause, startedAt: at })
+    .returning({ id: sanction.id });
+  if (!saved) throw new Error(`Could not save the Ban of Player ${playerId}`);
+  await tx.update(user).set({ bannedAt: at }).where(eq(user.id, playerId));
+  const accounts = await tx
+    .select({ providerId: account.providerId, accountId: account.accountId })
+    .from(account)
+    .where(eq(account.userId, playerId));
+  await tx
+    .insert(bannedIdentity)
+    .values([
+      ...accounts.map((provided) => ({ sanctionId: saved.id, ...provided })),
+      { sanctionId: saved.id, email: found.email.toLowerCase() },
+    ]);
+  await tx.delete(session).where(eq(session.userId, playerId));
+  await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
+  return "banned";
+};

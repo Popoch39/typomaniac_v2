@@ -11,7 +11,7 @@ import {
 
 // The steps that apply a Sanction live in @repo/fair-play, shared with the fair-play worker: this is
 // their one import path in the API.
-export { banPlayer, suspendPlayer, voidDuel } from "@repo/fair-play";
+export { banPlayer, runFairPlayPass, suspendPlayer, voidDuel } from "@repo/fair-play";
 export type { BanResult, SanctionCause, SuspendResult, VoidDuelResult } from "@repo/fair-play";
 
 /**

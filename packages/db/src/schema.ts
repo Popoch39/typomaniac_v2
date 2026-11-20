@@ -271,6 +271,9 @@ export const violation = pgTable(
       .$type<ViolationKind>()
       .notNull(),
     committedAt: timestamp("committed_at").defaultNow().notNull(),
+    // When the fair-play pass sanctioned it, once its Duel was saved; null until then. A Violation
+    // counts towards the next one's Sanction from then on, even when its own Duel was not voided.
+    sanctionedAt: timestamp("sanctioned_at"),
   },
   (table) => [index("violation_player_idx").on(table.playerId, table.duelId)],
 );

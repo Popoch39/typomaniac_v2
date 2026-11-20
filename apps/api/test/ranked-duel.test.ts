@@ -666,6 +666,8 @@ test("in a ranked Duel, an insert of several characters is a Violation: never ap
       round: 1,
       kind: "multipleCharacters",
       committedAt: expect.any(Date),
+      // Left for the fair-play pass, which sanctions it once the Duel is saved.
+      sanctionedAt: null,
     },
   ]);
   expect(saved[0]?.committedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);

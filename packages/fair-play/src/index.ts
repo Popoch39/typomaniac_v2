@@ -1,3 +1,4 @@
+export { runFairPlayPass } from "./pass.ts";
 export { banPlayer, suspendPlayer, voidDuel } from "./sanction.ts";
 export type { BanResult, SanctionCause, SuspendResult, VoidDuelResult } from "./sanction.ts";
 export {
