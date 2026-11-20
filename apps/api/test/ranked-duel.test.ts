@@ -8,7 +8,7 @@ import { createApp } from "../src/app.ts";
 import type { DuelOptions } from "../src/modules/duel/index.ts";
 import { createRelay } from "../src/modules/duel/relay.ts";
 import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
-import { duel, duelGame, duelParticipant, duelRound, violation } from "../src/db/client.ts";
+import { duel, duelGame, duelParticipant, duelRound, review, violation } from "../src/db/client.ts";
 import { tickMatchmaker } from "../src/modules/queue/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";
@@ -48,6 +48,8 @@ const signIn = async (origin: string, standing?: Standing, image?: string) => {
   if (standing) await saveStanding(testDb.db, player.id, standing);
   return { id: player.id, cookie };
 };
+
+type Account = Awaited<ReturnType<typeof signIn>>;
 
 const visibleStandingOf = async (origin: string, { cookie }: { cookie: string }) =>
   (await fetch(`${origin}/api/me/standing`, { headers: { cookie } })).json();
@@ -134,6 +136,10 @@ const pairRankedDuel = async (
     db = testDb.db,
     options = { countdownMs: 0, roundPauseMs: 0 } as DuelOptions,
     images = [] as readonly [string?, string?],
+    beforeQueue = (async () => {}) as (
+      origin: string,
+      accounts: readonly Account[],
+    ) => Promise<void>,
   } = {},
 ) => {
   const testRedis = await createTestRedis();
@@ -150,6 +156,7 @@ const pairRankedDuel = async (
     await signIn(origin, standings[0], images[0]),
     await signIn(origin, standings[1], images[1]),
   ] as const;
+  await beforeQueue(origin, accounts);
   const queued = [];
   for (const { cookie } of accounts) {
     const socket = await openSocketOf<QueueServerMessage, QueueClientMessage>(
@@ -230,6 +237,40 @@ test("a Placement Duel moves each Player's MMR and ranked Duels played, leaves b
   expect(await testDb.db.select({ kind: duel.kind }).from(duel).where(eq(duel.id, duelId))).toEqual(
     [{ kind: "ranked" }],
   );
+});
+
+// What every route a Player can read about themselves answers them.
+const ownRoutes = (origin: string, { cookie }: Account) =>
+  Promise.all(
+    ["/api/me", "/api/me/standing", "/api/me/fair-play", "/api/queue", "/api/leaderboard"].map(
+      async (path) => {
+        const response = await fetch(`${origin}${path}`, { headers: { cookie } });
+        return { path, status: response.status, body: await response.json() };
+      },
+    ),
+  );
+
+test("a Player with an open Review enters the Queue and plays a ranked Duel as before, and no route tells them of it", async () => {
+  const { duelId, origins, accounts } = await pairRankedDuel([goldTwo(40), goldTwo(60)], {
+    beforeQueue: async (origin, signedIn) => {
+      for (const account of signedIn) {
+        const before = await ownRoutes(origin, account);
+        await testDb.db
+          .insert(review)
+          .values({ playerId: account.id, reason: "suspicion", openedAt: new Date() });
+        expect(await ownRoutes(origin, account)).toEqual(before);
+      }
+    },
+  });
+  const players = await seat(origins, duelId, accounts);
+  const [first, second] = players;
+
+  const ends = await play(players, ["first", "first"]);
+
+  expect(ends[0].outcomes[first.seat]).toBe("win");
+  // Two Players of Gold II at 1400 MMR: the winner gains 16 MMR, the loser loses as much.
+  expect((await readStanding(testDb.db, first.id))?.mmr).toBe(1416);
+  expect((await readStanding(testDb.db, second.id))?.mmr).toBe(1384);
 });
 
 test("only the Outcome of a ranked Duel counts: a Duel won 2-1 moves both Standings as one won 2-0", async () => {

@@ -1,6 +1,6 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
 import type { Outcome, Seat, ViolationKind } from "@repo/duel-engine";
-import type { GameSignals } from "@repo/fair-play-engine";
+import type { GameSignals, ReviewReason } from "@repo/fair-play-engine";
 import type { OrnamentChoice, RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
@@ -310,6 +310,36 @@ export const suspicion = pgTable("suspicion", {
   value: doublePrecision("value").notNull(),
   computedAt: timestamp("computed_at").notNull(),
 });
+
+// A person's examination of a Player (ADR 0014), opened by the fair-play pass for a reason, open until
+// it is settled with a decision. At most one is open per Player, and reaching Master or the Podium
+// opens one once: both held by unique indexes as well as by the pass.
+export const review = pgTable(
+  "review",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    reason: text("reason", { enum: ["suspicion", "master", "podium"] })
+      .$type<ReviewReason>()
+      .notNull(),
+    openedAt: timestamp("opened_at").notNull(),
+    // Both null while the Review is open. After a settling, only the Games played after it count
+    // towards a new Review by Suspicion.
+    settledAt: timestamp("settled_at"),
+    decision: text("decision", { enum: ["cleared", "voided_duels", "suspension", "ban"] }),
+  },
+  (table) => [
+    check("review_settled_whole", sql`(${table.settledAt} is null) = (${table.decision} is null)`),
+    uniqueIndex("review_open_player_idx")
+      .on(table.playerId)
+      .where(sql`${table.settledAt} is null`),
+    uniqueIndex("review_rank_reason_idx")
+      .on(table.playerId, table.reason)
+      .where(sql`${table.reason} <> 'suspicion'`),
+  ],
+);
 
 // A Sanction applied to a Player for cheating, in rising order: a Voided Duel, a Suspension, a Ban.
 // Its cause says whether a Violation or a Review brought it. Kept once revoked, so that a Player's
