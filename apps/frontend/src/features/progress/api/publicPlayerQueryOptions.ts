@@ -1,6 +1,6 @@
-import { EdenFetchError } from "@elysia/eden";
 import { queryOptions } from "@tanstack/react-query";
 import { apiClient } from "../../../shared/api/apiClient.ts";
+import { retryUnlessNotFound } from "./retryUnlessNotFound.ts";
 
 /** A Player's public page: their Nickname, Avatar, worn Ornament, Rank and Peak Tier. */
 export const publicPlayerQueryOptions = (nickname: string) =>
@@ -12,8 +12,5 @@ export const publicPlayerQueryOptions = (nickname: string) =>
       if (error) throw error;
       return data;
     },
-    // An unknown Nickname stays unknown: asking again would only hold its message back. Otherwise
-    // as many tries as Query's default.
-    retry: (failureCount, error) =>
-      !(error instanceof EdenFetchError && error.status === 404) && failureCount < 3,
+    retry: retryUnlessNotFound,
   });

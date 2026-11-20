@@ -1,15 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
+import { progressQueryOptions } from "../api/progressQueryOptions.ts";
 import { publicPlayerQueryOptions } from "../api/publicPlayerQueryOptions.ts";
 
 export type PublicPlayer = NonNullable<ReturnType<typeof usePlayerPageReads>["player"]>;
 
-/** The reads a Player's public page lays out, so that the page is drawn once they are all back. */
+/** The reads a Player's public page lays out, sent together so that the page is drawn once they are all back. */
 export function usePlayerPageReads(nickname: string) {
-  const { data, isPending, error } = useQuery(publicPlayerQueryOptions(nickname));
+  const player = useQuery(publicPlayerQueryOptions(nickname));
+  const progress = useQuery(progressQueryOptions(nickname));
+  const error = player.error ?? progress.error;
   return {
-    player: data ?? null,
-    isPending,
+    player: player.data ?? null,
+    progress: progress.data ?? null,
+    isPending: player.isPending || progress.isPending,
     failure: error === null ? null : describeApiError(error),
   };
 }
