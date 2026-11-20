@@ -4,7 +4,7 @@ import { loadingOnly, readStage, retryFailed } from "../../../shared/api/readSta
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { ornamentQueryOptions } from "../../ornament/api/ornamentQueryOptions.ts";
 import { progressQueryOptions } from "../../progress/api/progressQueryOptions.ts";
-import { publicPlayerQueryOptions } from "../../progress/api/publicPlayerQueryOptions.ts";
+import { publicPlayerQueryOptions } from "../../player/api/publicPlayerQueryOptions.ts";
 import { useProgressFilterStore } from "../../progress/store/useProgressFilterStore.ts";
 import { useStanding } from "../../ranked/hooks/useStanding.ts";
 

@@ -1,4 +1,4 @@
-import { PlayerPageLink } from "../../progress/components/PlayerPageLink.tsx";
+import { PlayerPageLink } from "../../player/components/PlayerPageLink.tsx";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { LpAmount } from "./LpAmount.tsx";

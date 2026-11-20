@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { readStage, retryFailed } from "../../../shared/api/readStage.ts";
-import { progressQueryOptions } from "../api/progressQueryOptions.ts";
+import { progressQueryOptions } from "../../progress/api/progressQueryOptions.ts";
+import { useProgressFilterStore } from "../../progress/store/useProgressFilterStore.ts";
 import { publicPlayerQueryOptions } from "../api/publicPlayerQueryOptions.ts";
-import { useProgressFilterStore } from "../store/useProgressFilterStore.ts";
 
 export type PublicPlayer = NonNullable<ReturnType<typeof usePlayerPageReads>["player"]>;
 

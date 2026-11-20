@@ -5,7 +5,7 @@ import { ProgressSection } from "../../progress/components/ProgressSection.tsx";
 import { RankCard } from "../../ranked/components/RankCard.tsx";
 import type { OwnStanding } from "../../ranked/standing/describeStanding.ts";
 import type { ProfileProgress } from "../hooks/useProfileReads.ts";
-import { PlayerPanel } from "./PlayerPanel.tsx";
+import { PlayerPanel } from "../../player/components/PlayerPanel.tsx";
 
 interface PlayerProfileProps {
   player: SignedInPlayer;
@@ -25,7 +25,7 @@ export function PlayerProfile({
   return (
     <div className="flex flex-col gap-7 pb-2.5">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7">
-        <PlayerPanel player={player} />
+        <PlayerPanel player={player} isOwn />
         <RankCard standing={standing} />
         {/* Choosing an Ornament takes a Nickname, like everything shown to other Players: one without is
         told so rather than offered the picker. */}

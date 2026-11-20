@@ -6,7 +6,7 @@ import { PlayerPageGate } from "./PlayerPageGate.tsx";
 import { PlayerPageSkeleton } from "./PlayerPageSkeleton.tsx";
 import { PlayerPanel } from "./PlayerPanel.tsx";
 import { PlayerRankCard } from "./PlayerRankCard.tsx";
-import { ProgressSection } from "./ProgressSection.tsx";
+import { ProgressSection } from "../../progress/components/ProgressSection.tsx";
 
 export function PlayerPage() {
   const nickname = usePlayerPageNickname();

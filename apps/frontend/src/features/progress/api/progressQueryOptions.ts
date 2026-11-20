@@ -1,7 +1,7 @@
 import { queryOptions, skipToken } from "@tanstack/react-query";
 import { apiClient } from "../../../shared/api/apiClient.ts";
 import type { ProgressFilter } from "../filter/progressFilter.ts";
-import { retryUnlessNotFound } from "./retryUnlessNotFound.ts";
+import { retryUnlessNotFound } from "../../../shared/api/retryUnlessNotFound.ts";
 
 /**
  * The Games of the Duels of a Player that the period and the kind select, oldest first. Not read

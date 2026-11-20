@@ -1,6 +1,6 @@
 import { OrnamentPickerSkeleton } from "../../ornament/components/OrnamentPickerSkeleton.tsx";
 import { RankCardSkeleton } from "../../ranked/components/RankCardSkeleton.tsx";
-import { PlayerPanelSkeleton } from "./PlayerPanelSkeleton.tsx";
+import { PlayerPanelSkeleton } from "../../player/components/PlayerPanelSkeleton.tsx";
 
 /** The Profile grid at its loaded size, with recessed blocks in place of the Player's data. */
 export function ProfileSkeleton() {

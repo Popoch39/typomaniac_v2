@@ -1,5 +1,5 @@
 import { RankCardSkeleton } from "../../ranked/components/RankCardSkeleton.tsx";
-import { PlayerPanelSkeleton } from "../../profile/components/PlayerPanelSkeleton.tsx";
+import { PlayerPanelSkeleton } from "./PlayerPanelSkeleton.tsx";
 
 /** The Player and Rank Panels of a Player's page, with recessed blocks in place of the Player's data. */
 export function PlayerPageSkeleton() {

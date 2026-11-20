@@ -1,48 +1,15 @@
-import { wornOrnament } from "@repo/ranked-engine";
 import { and, asc, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type { UnwrapSchema } from "elysia";
 import type { Db } from "../../db/client.ts";
-import { duel, duelGame, duelParticipant, standing, user } from "../../db/schema.ts";
-import { readPeakTier } from "../ornament/service.ts";
-import { rankFromStored } from "../standing/service.ts";
+import { duel, duelGame, duelParticipant } from "../../db/schema.ts";
+import { readPlayerIdByNickname } from "../player/service.ts";
 import type * as ProgressModel from "./model.ts";
-
-// Matched as the unique index on lower(nickname) holds Nicknames, so that the index serves it.
-const nicknameIs = (nickname: string) => sql`lower(${user.nickname}) = lower(${nickname})`;
-
-/**
- * The Player who chose this Nickname, whatever its case, as anyone may see them; `null` when nobody
- * did. A Player without a Nickname never appears publicly, so is never found.
- */
-export const readPublicPlayer = async (db: Db, nickname: string) => {
-  const [row] = await db
-    .select({
-      id: user.id,
-      nickname: user.nickname,
-      avatarUrl: user.image,
-      choice: user.ornament,
-      ladderIndex: standing.ladderIndex,
-      lp: standing.lp,
-    })
-    .from(user)
-    // A Player who never played ranked has no Standing row and is Unranked.
-    .leftJoin(standing, eq(standing.playerId, user.id))
-    .where(nicknameIs(nickname));
-  if (!row?.nickname) return null;
-  const rank = rankFromStored(row.ladderIndex, row.lp);
-  return {
-    nickname: row.nickname,
-    avatarUrl: row.avatarUrl,
-    ornament: wornOrnament(row.choice, rank),
-    rank,
-    peakTier: await readPeakTier(db, row.id),
-  };
-};
 
 // The Duels the `20-duels` window covers, the most recent ones.
 const WINDOW_DUELS = 20;
 
-const WINDOW_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+// The span the `30-days` window covers, back from the moment of the read.
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 type ProgressFilter = Required<UnwrapSchema<typeof ProgressModel.NicknameProgressGet.Query>>;
 
@@ -59,12 +26,12 @@ const measure = (name: "wpm" | "rawWpm" | "accuracy" | "consistency") =>
  * never its journal, nor any MMR.
  */
 export const readProgress = async (db: Db, nickname: string, { window, kind }: ProgressFilter) => {
-  const [player] = await db.select({ id: user.id }).from(user).where(nicknameIs(nickname));
-  if (!player) return null;
+  const playerId = await readPlayerIdByNickname(db, nickname);
+  if (playerId === null) return null;
   const [games, summary, rankPoints] = await Promise.all([
-    readGames(db, player.id, { window, kind }),
-    readSummary(db, player.id, { window, kind }),
-    readRankPoints(db, player.id, window),
+    readGames(db, playerId, { window, kind }),
+    readSummary(db, playerId, { window, kind }),
+    readRankPoints(db, playerId, window),
   ]);
   return { games, summary, rankPoints };
 };
@@ -86,7 +53,7 @@ const selectDuels = (db: Db, playerId: string, { window, kind }: ProgressFilter)
         eq(duelParticipant.playerId, playerId),
         kind === "all" ? undefined : eq(duel.kind, kind),
         // By the Duel's end: a Duel begun before the 30 days and ended within them is in.
-        window === "30-days" ? gte(duel.endedAt, new Date(Date.now() - WINDOW_DAYS_MS)) : undefined,
+        window === "30-days" ? gte(duel.endedAt, new Date(Date.now() - THIRTY_DAYS_MS)) : undefined,
       ),
     )
     .orderBy(desc(duel.endedAt), desc(duel.id))

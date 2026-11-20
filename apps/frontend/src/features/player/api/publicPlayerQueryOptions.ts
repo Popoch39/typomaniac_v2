@@ -1,6 +1,6 @@
 import { queryOptions, skipToken } from "@tanstack/react-query";
 import { apiClient } from "../../../shared/api/apiClient.ts";
-import { retryUnlessNotFound } from "./retryUnlessNotFound.ts";
+import { retryUnlessNotFound } from "../../../shared/api/retryUnlessNotFound.ts";
 
 /**
  * A Player's public page: their Nickname, Avatar, worn Ornament, Rank and Peak Tier. Not read without

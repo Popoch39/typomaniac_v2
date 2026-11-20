@@ -6,7 +6,7 @@ import { Panel } from "../../../shared/components/Panel.tsx";
 import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import { OrnamentOptionGrid } from "../../ornament/components/OrnamentOptionGrid.tsx";
 import { OrnamentPickerSkeleton } from "../../ornament/components/OrnamentPickerSkeleton.tsx";
-import { PlayerPanel } from "../../profile/components/PlayerPanel.tsx";
+import { PlayerPanel } from "../../player/components/PlayerPanel.tsx";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton.tsx";
 import { RankCard } from "../../ranked/components/RankCard.tsx";
 import { playerFixture } from "../fixtures/playerFixture.ts";
@@ -30,7 +30,7 @@ export function DevProfileStates() {
         </DevStateColumn>
         <DevStateColumn label="Loaded">
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
-            <PlayerPanel player={playerFixture} />
+            <PlayerPanel player={playerFixture} isOwn />
             <RankCard standing={standingFixture} />
             <Panel title="Ornament" tag="Saving…" isTagHidden>
               <OrnamentOptionGrid
