@@ -16,6 +16,7 @@ import { Route as ShellLeaderboardRouteImport } from './routes/_shell/leaderboar
 import { Route as ShellPracticeRouteImport } from './routes/_shell/practice'
 import { Route as ShellProfileRouteImport } from './routes/_shell/profile'
 import { Route as ShellRankedRouteImport } from './routes/_shell/ranked'
+import { Route as ShellSignInRouteImport } from './routes/_shell/sign-in'
 import { Route as DevRankupRouteImport } from './routes/dev.rankup'
 import { Route as DuelDuelIdRouteImport } from './routes/duel.$duelId'
 
@@ -53,6 +54,11 @@ const ShellRankedRoute = ShellRankedRouteImport.update({
   path: '/ranked',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellSignInRoute = ShellSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => ShellRoute,
+} as any)
 const DevRankupRoute = DevRankupRouteImport.update({
   id: '/dev/rankup',
   path: '/dev/rankup',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/practice': typeof ShellPracticeRoute
   '/profile': typeof ShellProfileRoute
   '/ranked': typeof ShellRankedRoute
+  '/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
 }
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/practice': typeof ShellPracticeRoute
   '/profile': typeof ShellProfileRoute
   '/ranked': typeof ShellRankedRoute
+  '/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
 }
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/_shell/practice': typeof ShellPracticeRoute
   '/_shell/profile': typeof ShellProfileRoute
   '/_shell/ranked': typeof ShellRankedRoute
+  '/_shell/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
 }
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/practice'
     | '/profile'
     | '/ranked'
+    | '/sign-in'
     | '/dev/rankup'
     | '/duel/$duelId'
   fileRoutesByTo: FileRoutesByTo
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
     | '/practice'
     | '/profile'
     | '/ranked'
+    | '/sign-in'
     | '/dev/rankup'
     | '/duel/$duelId'
   id:
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '/_shell/practice'
     | '/_shell/profile'
     | '/_shell/ranked'
+    | '/_shell/sign-in'
     | '/dev/rankup'
     | '/duel/$duelId'
   fileRoutesById: FileRoutesById
@@ -188,6 +200,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellRankedRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/sign-in': {
+      id: '/_shell/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof ShellSignInRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/dev/rankup': {
       id: '/dev/rankup'
       path: '/dev/rankup'
@@ -211,6 +230,7 @@ interface ShellRouteChildren {
   ShellPracticeRoute: typeof ShellPracticeRoute
   ShellProfileRoute: typeof ShellProfileRoute
   ShellRankedRoute: typeof ShellRankedRoute
+  ShellSignInRoute: typeof ShellSignInRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
@@ -219,6 +239,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellPracticeRoute: ShellPracticeRoute,
   ShellProfileRoute: ShellProfileRoute,
   ShellRankedRoute: ShellRankedRoute,
+  ShellSignInRoute: ShellSignInRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)

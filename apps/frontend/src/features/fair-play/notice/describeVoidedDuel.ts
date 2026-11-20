@@ -3,6 +3,7 @@ export type VoidedDuel = {
   readonly duelId: string;
   readonly voidedAt: number;
   readonly opponentNickname: string | null;
+  readonly opponentBanned: boolean;
   readonly lp: number;
 };
 
@@ -13,6 +14,7 @@ const describeLp = (lp: number) => {
 };
 
 /** The sentence telling a Player that a ranked Duel of theirs was voided and what it did to their LP. */
-export function describeVoidedDuel({ opponentNickname, lp }: VoidedDuel): string {
-  return `Your ranked Duel against ${opponentNickname ?? "an Opponent"} was voided: ${describeLp(lp)}.`;
+export function describeVoidedDuel({ opponentNickname, opponentBanned, lp }: VoidedDuel): string {
+  const opponent = `${opponentNickname ?? "an Opponent"}${opponentBanned ? ", since banned," : ""}`;
+  return `Your ranked Duel against ${opponent} was voided: ${describeLp(lp)}.`;
 }
