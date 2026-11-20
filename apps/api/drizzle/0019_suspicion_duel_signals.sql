@@ -1,0 +1,1 @@
+ALTER TABLE "suspicion" ADD COLUMN "duel_signals" jsonb DEFAULT '{"levelJump":0,"errorlessSeries":0,"oneSidedPair":0,"lossWithoutTyping":0}'::jsonb NOT NULL;
