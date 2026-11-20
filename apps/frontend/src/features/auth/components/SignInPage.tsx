@@ -11,10 +11,7 @@ export function SignInPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Sign in"
-        lead="Sign in to play ranked, climb the Leaderboard and keep your Nickname."
-      />
+      <PageHeader title="Sign in" />
       {refusal?.kind === "banned" ? (
         <BanNotice appealAddress={refusal.appealAddress} />
       ) : (

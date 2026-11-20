@@ -63,11 +63,11 @@ The Division's index of LP-1, exported so that a stored Rank can be ordered with
 
 The Ornament a Player wears around their Avatar, drawn for a Tier. It changes no rule above.
 
-| Id         | Rule                                                                                                                                                                                                                                             |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ORNAMENT-1 | Auto wears the Rank's Tier and Division, Master without a Division, and the Unranked plate while Unranked. None wears no Ornament. The Unranked plate or a pinned Tier is worn without a Division, even when the pinned Tier is the current one. |
-| ORNAMENT-2 | Auto, None and the Unranked plate are open to every Player. A Tier's Ornament is unlocked when the Tier is at or below the Peak Tier, and locked without a Peak Tier.                                                                            |
-| ORNAMENT-3 | The Peak Tier is the Tier of the highest ladder index a Player has reached; Master at 20.                                                                                                                                                        |
+| Id         | Rule                                                                                                                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ORNAMENT-1 | Auto wears the Rank's Tier and Division, Master without a Division, and the Unranked plate while Unranked. None wears no Ornament. The Unranked plate is worn without a Division; a pinned Tier is worn with the Rank's Division when it is the current Tier, without one otherwise. |
+| ORNAMENT-2 | Auto, None and the Unranked plate are open to every Player. A Tier's Ornament is unlocked when the Tier is at or below the Peak Tier, and locked without a Peak Tier.                                                                                                                |
+| ORNAMENT-3 | The Peak Tier is the Tier of the highest ladder index a Player has reached; Master at 20.                                                                                                                                                                                            |
 
 ## Promotion and demotion
 

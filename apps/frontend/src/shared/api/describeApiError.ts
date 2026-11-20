@@ -6,6 +6,8 @@ const BY_CODE: Readonly<Record<string, string>> = {
   NICKNAME_REQUIRED: "Choose a Nickname to continue.",
   DUEL_NOT_FOUND: "This Duel does not exist or has expired. Ask for a new link.",
   DUEL_FULL: "This Duel is full: two Participants are already in it.",
+  PLAYER_NOT_FOUND:
+    "No Player goes by this Nickname. Check its spelling, or find them on the Leaderboard.",
 };
 
 const BY_STATUS: Readonly<Record<number, string>> = {

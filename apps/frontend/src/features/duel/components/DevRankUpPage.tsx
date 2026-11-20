@@ -9,7 +9,7 @@ export function DevRankUpPage() {
 
   return (
     <main className="flex min-h-svh flex-col gap-10 bg-surface-plate p-10 plate-dots">
-      <PageHeader title="Rank up" lead="Play the Rank up scene of a Tier promotion." />
+      <PageHeader title="Rank up" />
       <div className="flex flex-wrap gap-4">
         {scenes.map(({ tier, label, onPlay }) => (
           <Keycap key={tier} onClick={onPlay}>

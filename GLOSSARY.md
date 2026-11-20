@@ -220,7 +220,7 @@ The highest Tier a Player has ever reached; a demotion does not lower it.
 _Avoid_: best rank, max tier, highest rank
 
 **Ornament** (`Ornament`):
-What a Player wears around their Avatar, drawn for a Tier. By default it follows their Rank, Division included; they can instead pin the Unranked plate or the Ornament of any Tier up to their Peak Tier, or wear none. A pinned Ornament shows its Tier alone, without a Division.
+What a Player wears around their Avatar, drawn for a Tier. By default it follows their Rank, Division included; they can instead pin the Unranked plate or the Ornament of any Tier up to their Peak Tier, or wear none. A pinned Tier shows the Player's Division when it is their current Tier, and its Tier alone otherwise.
 _Avoid_: frame, border, RankFrame, emblem, badge (reserved for the Tier badge)
 
 ### Progress

@@ -44,7 +44,7 @@ test("without a Peak Tier, every Tier is locked", () => {
   ]);
 });
 
-test("each option previews the Ornament it would put on, Auto with the Division of the Rank", () => {
+test("each option previews the Ornament it would put on, with the Division of the Rank for Auto and its Tier", () => {
   const previews = ornamentOptions("gold", { tier: "silver", division: 2, lp: 10 }).map(
     ({ preview }) => preview,
   );
@@ -54,6 +54,22 @@ test("each option previews the Ornament it would put on, Auto with the Division 
     null,
     { tier: "unranked", division: null },
     { tier: "bronze", division: null },
-    { tier: "silver", division: null },
+    { tier: "silver", division: 2 },
+  ]);
+});
+
+test("every Tier keeps its unlock hint once open, so that its key keeps the room of the hint", () => {
+  const options = ornamentOptions("master", { tier: "master", lp: 10 });
+
+  expect(options.map(({ label, unlockHint }) => [label, unlockHint])).toEqual([
+    ["Auto", null],
+    ["None", null],
+    ["Unranked", null],
+    ["Bronze", "Reach Bronze to unlock"],
+    ["Silver", "Reach Silver to unlock"],
+    ["Gold", "Reach Gold to unlock"],
+    ["Platinum", "Reach Platinum to unlock"],
+    ["Diamond", "Reach Diamond to unlock"],
+    ["Master", "Reach Master to unlock"],
   ]);
 });

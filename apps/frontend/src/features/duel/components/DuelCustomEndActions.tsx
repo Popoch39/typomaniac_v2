@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { useCreateDuel } from "../hooks/useCreateDuel.ts";
 import { DuelEndKeys } from "./DuelEndKeys.tsx";
@@ -16,10 +17,7 @@ export function DuelCustomEndActions() {
           <Link to="/">Back home</Link>
         </Keycap>
       </DuelEndKeys>
-      {/* The line is kept even without a failure, so that one showing moves nothing. */}
-      <p role="alert" className="m-0 min-h-lh text-danger">
-        {failure}
-      </p>
+      <DangerStatusLine message={failure} />
     </div>
   );
 }

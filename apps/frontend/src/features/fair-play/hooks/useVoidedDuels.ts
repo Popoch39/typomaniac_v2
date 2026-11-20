@@ -3,12 +3,14 @@ import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { fairPlayQueryOptions } from "../api/fairPlayQueryOptions.ts";
 
-export function useVoidedDuels(player: SignedInPlayer) {
-  const { data, isPending, error } = useQuery(fairPlayQueryOptions(player.id));
+/** Waits without reading while `player` is null, the session not being known yet. */
+export function useVoidedDuels(player: SignedInPlayer | null) {
+  const read = useQuery(fairPlayQueryOptions(player === null ? null : player.id));
+  const { data, error } = read;
   return {
     voidedDuels: data?.voidedDuels ?? null,
     suspension: data?.suspension ?? null,
-    isPending,
+    read,
     failure: error === null ? null : describeApiError(error),
   };
 }

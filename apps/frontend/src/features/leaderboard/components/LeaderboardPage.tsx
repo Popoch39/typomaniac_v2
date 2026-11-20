@@ -5,7 +5,7 @@ import { LeaderboardContent } from "./LeaderboardContent.tsx";
 export function LeaderboardPage() {
   return (
     <Page>
-      <PageHeader title="Leaderboard" lead="Every ranked Player, ordered by Rank." />
+      <PageHeader title="Leaderboard" />
       <LeaderboardContent />
     </Page>
   );

@@ -1,32 +1,26 @@
-import { Panel } from "../../../shared/components/Panel.tsx";
-import { TierBadge } from "../../ranked/components/TierBadge.tsx";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
+import { SignedInPlayerGate } from "../../auth/components/SignedInPlayerGate.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
-import { useYourPosition } from "../hooks/useYourPosition.ts";
-import { OwnRankedPosition } from "./OwnRankedPosition.tsx";
+import { YourPositionContent } from "./YourPositionContent.tsx";
+import { YourPositionSkeleton } from "./YourPositionSkeleton.tsx";
 
 interface YourPositionProps {
   own: LeaderboardPlayer | null;
 }
 
+// The one section that depends on the session: while it is checked, the Panel keeps its box, and a
+// failed check is said in its place rather than over the whole Leaderboard.
 export function YourPosition({ own }: YourPositionProps) {
-  const view = useYourPosition(own);
-  if (view.kind === "guest") return null;
-  if (view.kind === "ranked") {
-    return (
-      <Panel title="Your position" tag={view.name} flat>
-        <OwnRankedPosition own={view.own} name={view.name} progress={view.progress} />
-      </Panel>
-    );
-  }
-
   return (
-    <Panel title="Your position" tag="Placement" flat>
-      <div className="flex flex-wrap items-center gap-5">
-        <TierBadge tier="unranked" size="sm" />
-        <p className="m-0 flex-[1_1_260px] text-ink-muted">
-          You will appear on the Leaderboard once your Placement is over.
-        </p>
-      </div>
-    </Panel>
+    <SignedInPlayerGate
+      pending={
+        <LoadingState message="Checking your session…">
+          <YourPositionSkeleton />
+        </LoadingState>
+      }
+      guest={null}
+    >
+      {() => <YourPositionContent own={own} />}
+    </SignedInPlayerGate>
   );
 }

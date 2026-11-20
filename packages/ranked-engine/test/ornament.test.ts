@@ -37,14 +37,18 @@ test("ORNAMENT-1: Unranked wears the plate, even for a ranked Player", () => {
   });
 });
 
-test("ORNAMENT-1: a pinned Tier draws its Tier without a Division, even when it is the current Tier", () => {
+test("ORNAMENT-1: a pinned Tier other than the current one draws its Tier without a Division", () => {
   expect(wornOrnament("gold", { tier: "platinum", division: 4, lp: 0 })).toEqual({
     tier: "gold",
     division: null,
   });
+  expect(wornOrnament("gold", null)).toEqual({ tier: "gold", division: null });
+});
+
+test("ORNAMENT-1: a pinned Tier that is the current one wears the Rank's Division", () => {
   expect(wornOrnament("silver", { tier: "silver", division: 1, lp: 80 })).toEqual({
     tier: "silver",
-    division: null,
+    division: 1,
   });
 });
 

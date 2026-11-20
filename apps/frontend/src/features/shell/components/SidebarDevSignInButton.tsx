@@ -1,23 +1,24 @@
-import { CircleAlert, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 import { SidebarMenuButton } from "../../../shared/components/ui/sidebar.tsx";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
-import { type DevPlayerNickname, useDevSignIn } from "../../auth/hooks/useDevSignIn.ts";
+import type { DevPlayerNickname } from "../../auth/hooks/useDevSignIn.ts";
 
 interface SidebarDevSignInButtonProps {
   nickname: DevPlayerNickname;
+  onSignIn: () => void;
+  isPending: boolean;
 }
 
-export function SidebarDevSignInButton({ nickname }: SidebarDevSignInButtonProps) {
-  const { signIn, isPending, failure } = useDevSignIn(nickname);
+export function SidebarDevSignInButton({
+  nickname,
+  onSignIn,
+  isPending,
+}: SidebarDevSignInButtonProps) {
   const label = isPending ? "Signing in…" : `Dev: sign in as ${nickname}`;
 
   return (
-    <>
-      <SidebarMenuButton onClick={signIn} disabled={isPending} tooltip={label}>
-        <FlaskConical aria-hidden="true" />
-        <span>{label}</span>
-      </SidebarMenuButton>
-      {failure && <StatusMessage role="alert" icon={CircleAlert} message={failure} />}
-    </>
+    <SidebarMenuButton onClick={onSignIn} disabled={isPending} tooltip={label}>
+      <FlaskConical aria-hidden="true" />
+      <span>{label}</span>
+    </SidebarMenuButton>
   );
 }

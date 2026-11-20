@@ -9,7 +9,7 @@ export function AdminPage() {
 
   return (
     <Page>
-      <PageHeader title="Admin" lead="The open Reviews, highest Suspicion first." />
+      <PageHeader title="Admin" />
       <ReviewQueue />
       {reviewId !== undefined && <ReviewDetail key={reviewId} reviewId={reviewId} />}
     </Page>

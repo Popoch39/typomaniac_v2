@@ -19,7 +19,9 @@ import { Route as ShellProfileRouteImport } from './routes/_shell/profile'
 import { Route as ShellRankedRouteImport } from './routes/_shell/ranked'
 import { Route as ShellSignInRouteImport } from './routes/_shell/sign-in'
 import { Route as DevRankupRouteImport } from './routes/dev.rankup'
+import { Route as DevStatesRouteImport } from './routes/dev.states'
 import { Route as DuelDuelIdRouteImport } from './routes/duel.$duelId'
+import { Route as ShellPlayersNicknameRouteImport } from './routes/_shell/players.$nickname'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,10 +72,20 @@ const DevRankupRoute = DevRankupRouteImport.update({
   path: '/dev/rankup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevStatesRoute = DevStatesRouteImport.update({
+  id: '/dev/states',
+  path: '/dev/states',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DuelDuelIdRoute = DuelDuelIdRouteImport.update({
   id: '/duel/$duelId',
   path: '/duel/$duelId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ShellPlayersNicknameRoute = ShellPlayersNicknameRouteImport.update({
+  id: '/players/$nickname',
+  path: '/players/$nickname',
+  getParentRoute: () => ShellRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -86,7 +98,9 @@ export interface FileRoutesByFullPath {
   '/ranked': typeof ShellRankedRoute
   '/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
+  '/dev/states': typeof DevStatesRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
+  '/players/$nickname': typeof ShellPlayersNicknameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -98,7 +112,9 @@ export interface FileRoutesByTo {
   '/ranked': typeof ShellRankedRoute
   '/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
+  '/dev/states': typeof DevStatesRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
+  '/players/$nickname': typeof ShellPlayersNicknameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -112,7 +128,9 @@ export interface FileRoutesById {
   '/_shell/ranked': typeof ShellRankedRoute
   '/_shell/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
+  '/dev/states': typeof DevStatesRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
+  '/_shell/players/$nickname': typeof ShellPlayersNicknameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -126,7 +144,9 @@ export interface FileRouteTypes {
     | '/ranked'
     | '/sign-in'
     | '/dev/rankup'
+    | '/dev/states'
     | '/duel/$duelId'
+    | '/players/$nickname'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -138,7 +158,9 @@ export interface FileRouteTypes {
     | '/ranked'
     | '/sign-in'
     | '/dev/rankup'
+    | '/dev/states'
     | '/duel/$duelId'
+    | '/players/$nickname'
   id:
     | '__root__'
     | '/'
@@ -151,13 +173,16 @@ export interface FileRouteTypes {
     | '/_shell/ranked'
     | '/_shell/sign-in'
     | '/dev/rankup'
+    | '/dev/states'
     | '/duel/$duelId'
+    | '/_shell/players/$nickname'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ShellRoute: typeof ShellRouteWithChildren
   DevRankupRoute: typeof DevRankupRoute
+  DevStatesRoute: typeof DevStatesRoute
   DuelDuelIdRoute: typeof DuelDuelIdRoute
 }
 
@@ -233,12 +258,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevRankupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/states': {
+      id: '/dev/states'
+      path: '/dev/states'
+      fullPath: '/dev/states'
+      preLoaderRoute: typeof DevStatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/duel/$duelId': {
       id: '/duel/$duelId'
       path: '/duel/$duelId'
       fullPath: '/duel/$duelId'
       preLoaderRoute: typeof DuelDuelIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_shell/players/$nickname': {
+      id: '/_shell/players/$nickname'
+      path: '/players/$nickname'
+      fullPath: '/players/$nickname'
+      preLoaderRoute: typeof ShellPlayersNicknameRouteImport
+      parentRoute: typeof ShellRoute
     }
   }
 }
@@ -251,6 +290,7 @@ interface ShellRouteChildren {
   ShellProfileRoute: typeof ShellProfileRoute
   ShellRankedRoute: typeof ShellRankedRoute
   ShellSignInRoute: typeof ShellSignInRoute
+  ShellPlayersNicknameRoute: typeof ShellPlayersNicknameRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
@@ -261,6 +301,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellProfileRoute: ShellProfileRoute,
   ShellRankedRoute: ShellRankedRoute,
   ShellSignInRoute: ShellSignInRoute,
+  ShellPlayersNicknameRoute: ShellPlayersNicknameRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
@@ -269,6 +310,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ShellRoute: ShellRouteWithChildren,
   DevRankupRoute: DevRankupRoute,
+  DevStatesRoute: DevStatesRoute,
   DuelDuelIdRoute: DuelDuelIdRoute,
 }
 export const routeTree = rootRouteImport

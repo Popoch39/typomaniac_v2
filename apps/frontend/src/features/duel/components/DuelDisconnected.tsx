@@ -1,12 +1,17 @@
+import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
+import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { useDuelDisconnectionMessage } from "../hooks/useDuelDisconnectionMessage.ts";
+import { useDuelRejoin } from "../hooks/useDuelRejoin.ts";
 
-// Reopening the link is how a Participant gets their seat back, with their Game where they left it.
 export function DuelDisconnected() {
   const message = useDuelDisconnectionMessage();
+  const rejoin = useDuelRejoin();
 
   return (
-    <p role="alert" className="text-danger">
-      {message}
-    </p>
+    <ErrorPanel title="Duel" message={message}>
+      <Keycap size="sm" onClick={rejoin}>
+        Rejoin
+      </Keycap>
+    </ErrorPanel>
   );
 }

@@ -8,11 +8,9 @@ test("a Participant closed for a Violation is told their input is not accepted a
   expect(message).toContain("physical keyboard");
 });
 
-test("any other closing is a lost connection, to get back into by the link", () => {
-  expect(disconnectionMessage("")).toBe(
-    "The connection to the Duel was lost. Reopen the link to get back in.",
-  );
+test("any other closing is a lost connection", () => {
+  expect(disconnectionMessage("")).toBe("The connection to the Duel was lost.");
   expect(disconnectionMessage("message rate exceeded")).toBe(
-    "The connection to the Duel was lost. Reopen the link to get back in.",
+    "The connection to the Duel was lost.",
   );
 });

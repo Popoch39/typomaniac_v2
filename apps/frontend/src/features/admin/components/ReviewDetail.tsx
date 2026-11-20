@@ -1,6 +1,6 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Panel } from "../../../shared/components/Panel.tsx";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
+import { ReadGate } from "../../../shared/components/ReadGate.tsx";
 import { useReview } from "../hooks/useReview.ts";
 import { PlayerSanctions } from "./PlayerSanctions.tsx";
 import { ReviewDuels } from "./ReviewDuels.tsx";
@@ -14,20 +14,30 @@ interface ReviewDetailProps {
 }
 
 export function ReviewDetail({ reviewId }: ReviewDetailProps) {
-  const { review, isPending, failure } = useReview(reviewId);
+  const { review, stage, failure, retry } = useReview(reviewId);
 
-  if (isPending)
-    return <StatusMessage role="status" icon={LoaderCircle} message="Reading the Review…" />;
-  if (failure !== null) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
-  if (review === null) return null;
   return (
-    <Panel title="Review" flat>
-      <ReviewSummary review={review} />
-      <ReviewDuels duels={review.duels} />
-      <ReviewRecords review={review} />
-      <ReviewReports review={review} />
-      <PlayerSanctions review={review} />
-      <ReviewSettlement review={review} />
-    </Panel>
+    <ReadGate
+      stage={stage}
+      pending={
+        <Panel title="Review" flat>
+          <LoadingState message="Reading the Review…" />
+        </Panel>
+      }
+      title="Review"
+      failure={failure}
+      retry={retry}
+    >
+      {review !== null && (
+        <Panel title="Review" flat>
+          <ReviewSummary review={review} />
+          <ReviewDuels duels={review.duels} />
+          <ReviewRecords review={review} />
+          <ReviewReports review={review} />
+          <PlayerSanctions review={review} />
+          <ReviewSettlement review={review} />
+        </Panel>
+      )}
+    </ReadGate>
   );
 }

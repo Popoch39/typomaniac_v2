@@ -1,16 +1,16 @@
-import { SidebarMenu, SidebarMenuItem } from "../../../shared/components/ui/sidebar.tsx";
+import { useSignInWithDiscord } from "../../auth/hooks/useSignInWithDiscord.ts";
+import { GuestChip } from "./GuestChip.tsx";
+import { PlayerBlockLayout } from "./PlayerBlockLayout.tsx";
 import { SidebarSignInButton } from "./SidebarSignInButton.tsx";
 
 export function GuestIdentity() {
+  const { signIn, isPending, failure } = useSignInWithDiscord();
+
   return (
-    <>
-      {/* "Guest" has no icon to shrink to on the rail: it stays for screen readers only. */}
-      <p className="px-2 text-sm text-foreground group-data-[collapsible=icon]:sr-only">Guest</p>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarSignInButton />
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </>
+    <PlayerBlockLayout
+      chip={<GuestChip />}
+      action={<SidebarSignInButton onSignIn={signIn} isPending={isPending} />}
+      failure={failure}
+    />
   );
 }

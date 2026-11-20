@@ -1,29 +1,38 @@
 import { Navigate } from "@tanstack/react-router";
-import { CircleAlert, LoaderCircle } from "lucide-react";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
+import { ReadGate } from "../../../shared/components/ReadGate.tsx";
 import { useLeaderboard } from "../hooks/useLeaderboard.ts";
-import { AllRankedPlayers } from "./AllRankedPlayers.tsx";
-import { LeaderboardPodium } from "./LeaderboardPodium.tsx";
-import { YourPosition } from "./YourPosition.tsx";
+import { LeaderboardSections } from "./LeaderboardSections.tsx";
+import { LeaderboardSkeleton } from "./LeaderboardSkeleton.tsx";
 
+// Until the reader is known to be a Guest, the skeleton reserves the box of "Your position", so that a
+// signed-in reader's Panel never pushes the list down when it arrives.
 export function LeaderboardContent() {
-  const { leaderboard, isPending, failure, replacingPage } = useLeaderboard();
+  const { leaderboard, stage, isGuest, failure, retry, replacingPage } = useLeaderboard();
 
-  if (isPending) {
-    return <StatusMessage role="status" icon={LoaderCircle} message="Reading the Leaderboard…" />;
-  }
-  if (failure) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
-  if (leaderboard === null) return null;
-  if (leaderboard.total === 0)
-    return <p className="m-0 text-ink-muted">No Player is ranked yet.</p>;
   return (
-    <>
-      {replacingPage !== null && (
-        <Navigate to="/leaderboard" search={{ page: replacingPage }} replace />
-      )}
-      <LeaderboardPodium podium={leaderboard.podium} own={leaderboard.own} />
-      <YourPosition own={leaderboard.own} />
-      <AllRankedPlayers leaderboard={leaderboard} />
-    </>
+    <ReadGate
+      stage={stage}
+      pending={
+        <LoadingState message="Reading the Leaderboard…">
+          <LeaderboardSkeleton withYourPosition={!isGuest} />
+        </LoadingState>
+      }
+      title="Leaderboard"
+      failure={failure}
+      retry={retry}
+    >
+      {leaderboard !== null &&
+        (leaderboard.total === 0 ? (
+          <p className="m-0 text-ink-muted">No Player is ranked yet.</p>
+        ) : (
+          <>
+            {replacingPage !== null && (
+              <Navigate to="/leaderboard" search={{ page: replacingPage }} replace />
+            )}
+            <LeaderboardSections leaderboard={leaderboard} />
+          </>
+        ))}
+    </ReadGate>
   );
 }

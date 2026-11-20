@@ -6,10 +6,7 @@ import { CreateDuelButton } from "./CreateDuelButton.tsx";
 export function CustomDuelPage() {
   return (
     <Page>
-      <PageHeader
-        title="Custom"
-        lead="Create a Custom Duel, then send its invite link to your Opponent."
-      />
+      <PageHeader title="Custom" />
       <Panel title="Custom Duel" tag="Best of 3" className="max-w-md">
         <CreateDuelButton />
       </Panel>

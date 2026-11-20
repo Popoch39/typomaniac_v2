@@ -8,10 +8,11 @@ export type OrnamentChoice = "auto" | "none" | "unranked" | Tier;
 /** The Ornament a Player wears, `null` for a bare Avatar. */
 export type Ornament = { tier: Tier | "unranked"; division: Division | null } | null;
 
-/** ORNAMENT-1: Auto follows the Rank, Division included; a pinned Ornament draws its Tier alone. */
+/** ORNAMENT-1: Auto follows the Rank, Division included; a pinned Tier shows the Division only when it is the Rank's. */
 export function wornOrnament(choice: OrnamentChoice, rank: Rank | null): Ornament {
   if (choice === "none") return null;
-  if (choice !== "auto") return { tier: choice, division: null };
+  if (choice === "unranked") return { tier: "unranked", division: null };
+  if (choice !== "auto" && choice !== rank?.tier) return { tier: choice, division: null };
   if (rank === null) return { tier: "unranked", division: null };
   return { tier: rank.tier, division: rank.tier === "master" ? null : rank.division };
 }

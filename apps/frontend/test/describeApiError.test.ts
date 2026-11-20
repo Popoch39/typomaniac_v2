@@ -8,6 +8,12 @@ test("a server code is told in words", () => {
   );
 });
 
+test("an unknown Nickname says no Player goes by it", () => {
+  expect(describeApiError(new EdenFetchError(404, { code: "PLAYER_NOT_FOUND" }))).toBe(
+    "No Player goes by this Nickname. Check its spelling, or find them on the Leaderboard.",
+  );
+});
+
 test("the caller can word a server code for its own action", () => {
   const byCode = { NICKNAME_REQUIRED: "Choose a Nickname to create a Duel." };
   expect(describeApiError(new EdenFetchError(403, { code: "NICKNAME_REQUIRED" }), byCode)).toBe(
