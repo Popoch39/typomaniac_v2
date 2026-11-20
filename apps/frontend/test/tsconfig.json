@@ -30,6 +30,7 @@
     "../src/features/duel/round",
     "../src/features/duel/scene",
     "../src/features/duel/store/useTierPromotionStore.ts",
+    "../src/features/fair-play/notice",
     "../src/features/leaderboard/own",
     "../src/features/leaderboard/page",
     "../src/features/ornament/art",

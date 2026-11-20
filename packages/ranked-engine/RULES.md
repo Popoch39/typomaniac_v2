@@ -80,6 +80,18 @@ The Ornament a Player wears around their Avatar, drawn for a Tier. It changes no
 
 The LP delta reports the gain or loss applied, never the difference between the LP shown before and after a change of Division.
 
+## Correction
+
+A correction gives a Player back, or takes from them, a signed amount of MMR and LP outside any Duel, as when a Duel is voided (ADR 0015). The LP are counted along the whole ladder: a Rank's position is its ladder index (LADDER-1) times the LP per Division, plus the LP held.
+
+| Id        | Rule                                                                                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CORRECT-1 | A correction adds its signed MMR to the MMR and its signed LP to the position of the Rank. The number of Duels played does not change.                                                                                                            |
+| CORRECT-2 | The corrected position gives the Rank back across as many Divisions and Tiers as it takes, either way: up into Master, where the LP grow without limit, and down out of it. There is no demotion landing: what is taken is exactly what is given. |
+| CORRECT-3 | A correction stops at Bronze IV with 0 LP and at an MMR of 0.                                                                                                                                                                                     |
+| CORRECT-4 | An Unranked Player has their MMR corrected and stays without a Rank: the LP of the correction are dropped.                                                                                                                                        |
+| CORRECT-5 | A correction never lowers the Peak Tier (ORNAMENT-3): a Rank reached stays reached. A correction that raises the Rank above the Peak Tier raises it.                                                                                              |
+
 ## Purity
 
 | Id     | Rule                                                                                                                     |
