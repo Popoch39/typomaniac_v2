@@ -9,7 +9,8 @@ interface RankCardProps {
 
 export function RankCard({ standing }: RankCardProps) {
   return (
-    <Panel title="Your Rank" tag={standing.rank === null ? "Placement" : undefined}>
+    // The tag keeps its room once the Rank is revealed, so that the card is as tall as its skeleton.
+    <Panel title="Your Rank" tag="Placement" isTagHidden={standing.rank !== null}>
       {standing.rank === null ? (
         <PlacementSummary placement={standing.placement} />
       ) : (

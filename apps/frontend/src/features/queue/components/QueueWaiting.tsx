@@ -1,7 +1,7 @@
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { useQueueWaiting } from "../hooks/useQueueWaiting.ts";
+import { LoadingPixels } from "../../../shared/components/LoadingPixels.tsx";
 import { LeaveIcon } from "./LeaveIcon.tsx";
-import { SearchingPixels } from "./SearchingPixels.tsx";
 
 export function QueueWaiting() {
   const { status, waitingTime, leave } = useQueueWaiting();
@@ -17,7 +17,7 @@ export function QueueWaiting() {
         >
           {waitingTime}
         </p>
-        <SearchingPixels />
+        <LoadingPixels />
         <p role="status" className="m-0 text-ink-muted">
           {status}
         </p>

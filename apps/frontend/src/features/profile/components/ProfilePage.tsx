@@ -1,8 +1,11 @@
 import { SignInPrompt } from "../../auth/components/SignInPrompt.tsx";
-import { SignedInPlayerGate } from "../../auth/components/SignedInPlayerGate.tsx";
+import { SignedInPlayerChain } from "../../auth/components/SignedInPlayerChain.tsx";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Page } from "../../../shared/components/Page.tsx";
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
 import { PlayerProfile } from "./PlayerProfile.tsx";
+import { ProfileGate } from "./ProfileGate.tsx";
+import { ProfileSkeleton } from "./ProfileSkeleton.tsx";
 
 export function ProfilePage() {
   return (
@@ -11,13 +14,33 @@ export function ProfilePage() {
         title="Profile"
         lead="Your Nickname, your Rank, your Ornament and your Progress."
       />
-      <SignedInPlayerGate
+      <SignedInPlayerChain
         guest={
           <SignInPrompt explanation="Profiles are for signed-in Players. Sign in to see yours." />
         }
       >
-        {(player) => <PlayerProfile player={player} />}
-      </SignedInPlayerGate>
+        {(player) => (
+          <ProfileGate
+            player={player}
+            pending={
+              <LoadingState
+                message={player === null ? "Checking your session…" : "Reading your Profile…"}
+              >
+                <ProfileSkeleton />
+              </LoadingState>
+            }
+          >
+            {(standing, signedIn, progress, isProgressUpdating) => (
+              <PlayerProfile
+                player={signedIn}
+                standing={standing}
+                progress={progress}
+                isProgressUpdating={isProgressUpdating}
+              />
+            )}
+          </ProfileGate>
+        )}
+      </SignedInPlayerChain>
     </Page>
   );
 }

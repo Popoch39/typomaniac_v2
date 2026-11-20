@@ -1,5 +1,6 @@
 import type { OrnamentChoice } from "@repo/ranked-engine";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
+import { cn } from "../../../shared/lib/utils.ts";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import type { OrnamentOption } from "../picker/ornamentOptions.ts";
 import { OrnamentedAvatar } from "./OrnamentedAvatar.tsx";
@@ -15,7 +16,7 @@ interface OrnamentPickerOptionProps {
 // A locked Ornament stays in the list, greyed out, with what it takes to unlock it.
 export function OrnamentPickerOption({
   player,
-  option: { choice, label, preview, lockedHint },
+  option: { choice, label, preview, lockedHint, unlockHint },
   isChosen,
   isSaving,
   onChoose,
@@ -31,7 +32,15 @@ export function OrnamentPickerOption({
     >
       <OrnamentedAvatar player={player} ornament={preview} size="sm" isOwn />
       <span className="font-extrabold">{label}</span>
-      {lockedHint && <span className="type-mono-sm text-center normal-case">{lockedHint}</span>}
+      {/* An open Tier keeps its hint's room, hidden, so that every key is as tall whatever the Peak
+      Tier, and as tall as its skeleton. */}
+      {unlockHint && (
+        <span
+          className={cn("type-mono-sm text-center normal-case", lockedHint === null && "invisible")}
+        >
+          {unlockHint}
+        </span>
+      )}
     </Keycap>
   );
 }

@@ -1,40 +1,45 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
+import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Panel } from "../../../shared/components/Panel.tsx";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
+import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { useOrnamentPicker } from "../hooks/useOrnamentPicker.ts";
-import { OrnamentPickerOption } from "./OrnamentPickerOption.tsx";
+import { OrnamentOptionGrid } from "./OrnamentOptionGrid.tsx";
+import { OrnamentPickerSkeleton } from "./OrnamentPickerSkeleton.tsx";
 
 interface OrnamentPickerProps {
   player: SignedInPlayer;
 }
 
 export function OrnamentPicker({ player }: OrnamentPickerProps) {
-  const { isPending, readFailure, chosen, options, choose, isSaving, saveFailure } =
+  const { stage, readFailure, retry, chosen, options, choose, isSaving, saveFailure } =
     useOrnamentPicker(player);
 
+  if (stage === "loading") {
+    return (
+      <LoadingState message="Reading your Ornaments…">
+        <OrnamentPickerSkeleton />
+      </LoadingState>
+    );
+  }
+  if (stage === "failed" && readFailure !== null) {
+    return (
+      <ErrorPanel title="Ornament" message={readFailure}>
+        <TryAgainKey onRetry={retry} />
+      </ErrorPanel>
+    );
+  }
   return (
     <Panel title="Ornament" tag="Saving…" isTagHidden={!isSaving}>
-      {isPending ? (
-        <StatusMessage role="status" icon={LoaderCircle} message="Reading your Ornaments…" />
-      ) : readFailure ? (
-        <StatusMessage role="alert" icon={CircleAlert} message={readFailure} />
-      ) : (
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-4 p-0 pb-1">
-          {options.map((option) => (
-            <li key={option.choice} className="flex">
-              <OrnamentPickerOption
-                player={player}
-                option={option}
-                isChosen={option.choice === chosen}
-                isSaving={isSaving}
-                onChoose={choose}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-      {saveFailure && <StatusMessage role="alert" icon={CircleAlert} message={saveFailure} />}
+      <OrnamentOptionGrid
+        player={player}
+        options={options}
+        chosen={chosen}
+        isSaving={isSaving}
+        onChoose={choose}
+      />
+      <DangerStatusLine message={saveFailure} />
     </Panel>
   );
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils.ts";
+import { LoadingPixels } from "./LoadingPixels.tsx";
 
 interface PanelProps {
   title?: string;
@@ -7,6 +8,8 @@ interface PanelProps {
   tag?: string;
   /** Keeps the tag's room while it is not shown, for a tag that comes and goes, such as "Saving…". */
   isTagHidden?: boolean;
+  /** Blinks the loading pixels in the tag, in place of a value still being read. */
+  isLoading?: boolean;
   /** Without depth, a panel lies flat on the plate, for a frame that is not a card of its own. */
   flat?: boolean;
   className?: string;
@@ -18,6 +21,7 @@ export function Panel({
   title,
   tag,
   isTagHidden = false,
+  isLoading = false,
   flat = false,
   className,
   children,
@@ -31,17 +35,17 @@ export function Panel({
         className,
       )}
     >
-      {(title !== undefined || tag !== undefined) && (
+      {(title !== undefined || tag !== undefined || isLoading) && (
         <div className="flex items-center justify-between gap-3">
           {title !== undefined && <h2 className="m-0 type-eyebrow text-ink-subtle">{title}</h2>}
-          {tag !== undefined && (
+          {(tag !== undefined || isLoading) && (
             <span
               className={cn(
                 "ml-auto shrink-0 rounded-sm border-2 border-key-outline bg-key-face px-2.5 py-1 type-mono-sm whitespace-nowrap text-ink uppercase",
                 isTagHidden && "invisible",
               )}
             >
-              {tag}
+              {isLoading ? <LoadingPixels size="sm" /> : tag}
             </span>
           )}
         </div>
