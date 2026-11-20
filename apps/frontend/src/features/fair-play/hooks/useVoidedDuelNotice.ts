@@ -1,5 +1,13 @@
-import { describeVoidedDuel, type VoidedDuel } from "../notice/describeVoidedDuel.ts";
+import {
+  describeVoidedDuel,
+  type VoidedDuel,
+  voidedDuelAppeal,
+} from "../notice/describeVoidedDuel.ts";
 
 export function useVoidedDuelNotice(voidedDuels: readonly VoidedDuel[]) {
-  return voidedDuels.map((voided) => ({ key: voided.duelId, text: describeVoidedDuel(voided) }));
+  return voidedDuels.map((voided) => ({
+    key: voided.duelId,
+    text: describeVoidedDuel(voided),
+    appeal: voidedDuelAppeal(voided),
+  }));
 }

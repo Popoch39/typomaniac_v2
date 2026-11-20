@@ -102,8 +102,8 @@ export const makeReport = async (
 
 /**
  * The Voided Duels the Player sat in, newest first: when each was voided, against whom, whether that
- * Opponent has since been banned, and the LP it gave them back or took from them. Never the MMR
- * (ADR 0006), nor who was at fault or why.
+ * Opponent has since been banned, the LP it gave them back or took from them, and whether it was
+ * voided against them as their own Sanction. Never the MMR (ADR 0006), nor why.
  */
 export const readOwnVoidedDuels = async (db: Db, playerId: string) => {
   const rows = await db
@@ -113,6 +113,7 @@ export const readOwnVoidedDuels = async (db: Db, playerId: string) => {
       opponentNickname: user.nickname,
       opponentBannedAt: user.bannedAt,
       lp: voidedDuelCorrection.lp,
+      sanctionedId: sanction.playerId,
     })
     .from(voidedDuelCorrection)
     .innerJoin(
@@ -134,10 +135,11 @@ export const readOwnVoidedDuels = async (db: Db, playerId: string) => {
     .leftJoin(user, eq(user.id, opponentSeat.playerId))
     .where(eq(duelParticipant.playerId, playerId))
     .orderBy(desc(sanction.startedAt));
-  return rows.map(({ voidedAt, opponentBannedAt, ...row }) => ({
+  return rows.map(({ voidedAt, opponentBannedAt, sanctionedId, ...row }) => ({
     ...row,
     voidedAt: voidedAt.getTime(),
     opponentBanned: opponentBannedAt !== null,
+    sanctioned: sanctionedId === playerId,
   }));
 };
 

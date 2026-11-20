@@ -1,7 +1,16 @@
 import { expect, test } from "bun:test";
-import { describeVoidedDuel } from "../src/features/fair-play/notice/describeVoidedDuel.ts";
+import {
+  describeVoidedDuel,
+  voidedDuelAppeal,
+} from "../src/features/fair-play/notice/describeVoidedDuel.ts";
 
-const voided = { duelId: "d1", voidedAt: 0, opponentNickname: "ada", opponentBanned: false };
+const voided = {
+  duelId: "d1",
+  voidedAt: 0,
+  opponentNickname: "ada",
+  opponentBanned: false,
+  appealAddress: null,
+};
 
 test("the Opponent of the Player at fault is told the Duel was voided and the LP they got back", () => {
   expect(describeVoidedDuel({ ...voided, lp: 17 })).toBe(
@@ -31,4 +40,15 @@ test("an Opponent banned since is marked as banned", () => {
   expect(describeVoidedDuel({ ...voided, opponentBanned: true, lp: 17 })).toBe(
     "Your ranked Duel against ada, since banned, was voided: you got 17 LP back.",
   );
+});
+
+test("the Player at fault is given the address to contest a Duel voided against them", () => {
+  expect(voidedDuelAppeal({ ...voided, lp: -30, appealAddress: "appeal@example.org" })).toEqual({
+    appealAddress: "appeal@example.org",
+    appealLink: "mailto:appeal@example.org",
+  });
+});
+
+test("the Opponent repaired by a voiding is given no address to contest it", () => {
+  expect(voidedDuelAppeal({ ...voided, lp: 17 })).toBeNull();
 });

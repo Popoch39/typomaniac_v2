@@ -21,7 +21,10 @@ afterAll(async () => {
   await testDb.drop();
 });
 const auth = createTestAuth(testDb.db);
-const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"));
+const APPEAL_ADDRESS = "appeal@example.org";
+const app = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+  fairPlay: { appealAddress: APPEAL_ADDRESS },
+});
 
 const readFairPlay = (cookie?: string) =>
   app.handle(
@@ -250,7 +253,7 @@ test("a Guest asking for their Voided Duels is told they are not signed in", asy
   expect(await response.json()).toEqual({ code: "UNAUTHORIZED" });
 });
 
-test("each Player of a Voided Duel reads it among their own, with the LP it gave back or took; a Player who took no part reads none", async () => {
+test("each Player of a Voided Duel reads it among their own, with the LP it gave back or took, and the Player at fault where to contest it; a Player who took no part reads none", async () => {
   const older = await playRankedDuel(["win", "loss"]);
   const { duelId, first: cheater, second: victim } = older;
   await testDb.db.update(user).set({ nickname: "cheater" }).where(eq(user.id, cheater.player.id));
@@ -286,6 +289,7 @@ test("each Player of a Voided Duel reads it among their own, with the LP it gave
         opponentNickname: "cheater",
         opponentBanned: false,
         lp: 17,
+        appealAddress: null,
       },
     ],
     suspension: null,
@@ -298,6 +302,7 @@ test("each Player of a Voided Duel reads it among their own, with the LP it gave
         opponentNickname: "victim",
         opponentBanned: false,
         lp: -30,
+        appealAddress: APPEAL_ADDRESS,
       },
     ],
     suspension: null,
@@ -311,6 +316,7 @@ test("each Player of a Voided Duel reads it among their own, with the LP it gave
         opponentNickname: null,
         opponentBanned: false,
         lp: 17,
+        appealAddress: null,
       },
     ],
     suspension: null,

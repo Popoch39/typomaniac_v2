@@ -51,7 +51,13 @@ export const createFairPlayRoutes = (
           readOwnVoidedDuels(db, player.id),
           readCurrentSuspension(db, player.id, new Date()),
         ]);
-        return { voidedDuels, suspension: suspension && { ...suspension, appealAddress } };
+        return {
+          voidedDuels: voidedDuels.map(({ sanctioned, ...voided }) => ({
+            ...voided,
+            appealAddress: sanctioned ? appealAddress : null,
+          })),
+          suspension: suspension && { ...suspension, appealAddress },
+        };
       },
     )
     .get(

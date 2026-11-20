@@ -2,7 +2,7 @@ import { t } from "elysia";
 import { RateLimited } from "../rate-limit/index.ts";
 
 // A ranked Duel withdrawn where the cheating paid, as one of its Players may see it: never the MMR
-// (ADR 0006), nor who was at fault or why.
+// (ADR 0006), nor why, nor to the Opponent who was at fault.
 const voidedDuel = t.Object({
   duelId: t.String(),
   // Epoch milliseconds.
@@ -13,6 +13,9 @@ const voidedDuel = t.Object({
   opponentBanned: t.Boolean(),
   // The LP the voiding gave back (positive) or took (negative), signed.
   lp: t.Integer(),
+  // Where to contest it, for a Duel voided against the Player as their Sanction; null for the
+  // Opponent's repair.
+  appealAddress: t.Nullable(t.String()),
 });
 
 // The Suspension that keeps the Player out of the Queue now, as they may see it: its end and where
