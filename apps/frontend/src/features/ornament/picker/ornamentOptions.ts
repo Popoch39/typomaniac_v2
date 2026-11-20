@@ -18,6 +18,8 @@ export type OrnamentOption = {
   readonly preview: Ornament;
   /** Why the choice cannot be picked yet, `null` when it can. */
   readonly lockedHint: string | null;
+  /** What it takes to unlock a choice that can be locked, kept once open so that its key keeps the room. */
+  readonly unlockHint: string | null;
 };
 
 const CHOICES: readonly OrnamentChoice[] = ["auto", "none", "unranked", ...TIERS];
@@ -29,10 +31,14 @@ const labelOf = (choice: OrnamentChoice) =>
 
 /** Every Ornament a Player may choose from, the Tiers above their Peak Tier locked. */
 export function ornamentOptions(peakTier: Tier | null, rank: Rank | null): OrnamentOption[] {
-  return CHOICES.map((choice) => ({
-    choice,
-    label: labelOf(choice),
-    preview: wornOrnament(choice, rank),
-    lockedHint: isOrnamentUnlocked(choice, peakTier) ? null : `Reach ${labelOf(choice)} to unlock`,
-  }));
+  return CHOICES.map((choice) => {
+    const unlockHint = isTierChoice(choice) ? `Reach ${labelOf(choice)} to unlock` : null;
+    return {
+      choice,
+      label: labelOf(choice),
+      preview: wornOrnament(choice, rank),
+      lockedHint: isOrnamentUnlocked(choice, peakTier) ? null : unlockHint,
+      unlockHint,
+    };
+  });
 }

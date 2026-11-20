@@ -14,6 +14,7 @@ export function useStanding(player: SignedInPlayer | null) {
   return {
     standing: data ?? null,
     isPending,
+    read,
     stage: readStage([read]),
     failure: error === null ? null : describeApiError(error),
     retry: () => void read.refetch(),
