@@ -58,6 +58,8 @@ export function RankChart({ rows }: RankChartProps) {
           stroke="var(--color-ladder)"
           strokeWidth={2}
           dot={RankChartDot}
+          // The hovered Duel keeps its own marker, so that a Promotion or demotion stays readable.
+          activeDot={RankChartDot}
           isAnimationActive={false}
         />
       </LineChart>

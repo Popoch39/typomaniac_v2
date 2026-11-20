@@ -1,4 +1,4 @@
-import type { DotItemDotProps } from "recharts";
+import type { RankChange } from "@repo/ranked-engine";
 
 // The marker's half size, so that a Promotion or a demotion stands out from the other Duels.
 const MARK = 7;
@@ -7,7 +7,13 @@ const MARK = 7;
  * A ranked Duel on the Rank curve: a Promotion is a triangle pointing up in the action colour, a
  * demotion one pointing down in danger, any other Duel a dot.
  */
-export function RankChartDot({ cx, cy, payload }: DotItemDotProps) {
+interface RankChartDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: { rankChange?: RankChange };
+}
+
+export function RankChartDot({ cx, cy, payload }: RankChartDotProps) {
   if (cx === undefined || cy === undefined) return null;
   if (payload?.rankChange === "promoted") {
     return (
