@@ -206,3 +206,28 @@ test("a first Violation in a Duel the Player lost is saved as a Voided Duel with
     "revoked",
   );
 });
+
+test("a revoked Sanction no longer counts on the Violation ladder: after a revoked first Suspension, the next Violation gives a 3-day Suspension again", async () => {
+  const cheaterId = await signInRanked();
+  for (let repeat = 0; repeat < 2; repeat++) {
+    await winWithViolation(cheaterId);
+    await runFairPlayPass(testDb.db, Date.now());
+  }
+  const [, suspension] = await sanctionsOf(cheaterId);
+  await revokeSanction(testDb.db, { sanctionId: suspension?.id ?? "", at: new Date() });
+
+  await winWithViolation(cheaterId);
+  await runFairPlayPass(testDb.db, Date.now());
+
+  const sanctions = await sanctionsOf(cheaterId);
+  expect(
+    sanctions.map(({ kind, startedAt, endsAt }) => ({
+      kind,
+      lengthMs: endsAt === null ? null : endsAt.getTime() - startedAt.getTime(),
+    })),
+  ).toEqual([
+    { kind: "voided_duel", lengthMs: null },
+    { kind: "suspension", lengthMs: 3 * DAY_MS },
+    { kind: "suspension", lengthMs: 3 * DAY_MS },
+  ]);
+});

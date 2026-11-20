@@ -12,7 +12,7 @@ import {
   voidedDuelCorrection,
 } from "@repo/db";
 import { REPAIR_WINDOW_MS } from "@repo/fair-play-engine";
-import { and, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import { correctStandings, storedRank } from "./standing.ts";
 
 /** What brought a Sanction: a Violation, sanctioned automatically, or a Review settled by a person. */
@@ -59,7 +59,8 @@ export const voidDuelIn = (
 
 /**
  * Voids a Duel for one step of the Violation ladder, inside the caller's transaction: a Sanction of
- * kind Voided Duel with cause Violation is saved and the Duel voided under it. Unlike `voidDuelIn`, the
+ * kind Voided Duel with cause Violation is saved, the Duel voided under it, and the Sanction's id
+ * returned. Unlike `voidDuelIn`, the
  * Sanction is saved even when the Duel is left alone, lost or drawn by the Player at fault or voided
  * already, so that their history has every step of the ladder and each can be revoked. The caller
  * keeps it from being saved twice.
@@ -74,6 +75,7 @@ export const voidDuelForViolation = async (
     .returning({ id: sanction.id });
   if (!saved) throw new Error(`Could not save the Sanction voiding Duel ${duelId}`);
   await withdrawDuel(tx, { duelId, playerId }, () => Promise.resolve(saved.id));
+  return saved.id;
 };
 
 // The voiding itself, under the Sanction that `sanctionOf` saves only once the Duel is known to be
@@ -158,6 +160,19 @@ export const suspendPlayerIn = async (
       ),
     );
   if (existing) return "already-suspended";
+  await saveSuspension(tx, { playerId, cause, at, lengthMs });
+  return "suspended";
+};
+
+/**
+ * Saves a Suspension and voids under it every ranked Duel the Player won in the repair window before
+ * it, inside the caller's transaction, and returns its id. The caller has locked the Player and keeps
+ * it from being saved twice.
+ */
+export const saveSuspension = async (
+  tx: Transaction,
+  { playerId, cause, at, lengthMs }: Suspension,
+) => {
   const [saved] = await tx
     .insert(sanction)
     .values({
@@ -170,7 +185,7 @@ export const suspendPlayerIn = async (
     .returning({ id: sanction.id });
   if (!saved) throw new Error(`Could not save the Suspension of Player ${playerId}`);
   await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
-  return "suspended";
+  return saved.id;
 };
 
 // Voids, under the Suspension or Ban `sanctionId`, every ranked Duel the Player won in the repair
@@ -220,12 +235,41 @@ export const banPlayerIn = async (
 ): Promise<BanResult> => {
   // Locked first, so that two bans of one Player wait on each other and the second sees the first.
   const [found] = await tx
-    .select({ bannedAt: user.bannedAt, email: user.email })
+    .select({ bannedAt: user.bannedAt })
     .from(user)
     .where(eq(user.id, playerId))
     .for("update");
   if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
   if (found.bannedAt) return "already-banned";
+  await saveBan(tx, { playerId, cause, at });
+  return "banned";
+};
+
+/**
+ * Bans a Player for one step of the Violation ladder, inside the caller's transaction, and returns
+ * the id of the Ban: a new one with cause Violation, or the one that holds already when the Player
+ * was banned in the meantime. The caller has locked the Player and keeps it from being saved twice.
+ */
+export const banForViolation = async (
+  tx: Transaction,
+  { playerId, at }: { playerId: string; at: Date },
+) => {
+  const [holding] = await tx
+    .select({ id: sanction.id })
+    .from(sanction)
+    .where(
+      and(eq(sanction.playerId, playerId), eq(sanction.kind, "ban"), isNull(sanction.revokedAt)),
+    )
+    .orderBy(desc(sanction.startedAt))
+    .limit(1);
+  return holding?.id ?? (await saveBan(tx, { playerId, cause: "violation", at }));
+};
+
+// Saves a Ban and applies it, as `banPlayerIn` describes, and returns its id. The caller has locked
+// the Player and checked they are not banned.
+const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban) => {
+  const [found] = await tx.select({ email: user.email }).from(user).where(eq(user.id, playerId));
+  if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
   const [saved] = await tx
     .insert(sanction)
     .values({ playerId, kind: "ban", cause, startedAt: at })
@@ -244,5 +288,5 @@ export const banPlayerIn = async (
     ]);
   await tx.delete(session).where(eq(session.userId, playerId));
   await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
-  return "banned";
+  return saved.id;
 };

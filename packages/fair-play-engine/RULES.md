@@ -25,9 +25,9 @@ A throwaway GitHub or Discord account must cost time before it can play ranked (
 
 A Violation is proof, so it is the only cheating sanctioned automatically, one step up the Sanctions at each repeat (ADR 0014). A first one only voids the Duel: a browser extension can produce one for a Player who is not cheating (ADR 0016).
 
-| Id          | Rule                                                                                                                                                                                          |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| VIOLATION-1 | A Player's first sanctioned Violation voids its Duel, the second suspends them for 3 days, the third for 14 days, and the fourth and any after it ban them. Several in one Duel count as one. |
+| Id          | Rule                                                                                                                                                                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| VIOLATION-1 | A Player's first sanctioned Violation voids its Duel, the second suspends them for 3 days, the third for 14 days, and the fourth and any after it ban them. Several in one Duel count as one, and a Violation whose Sanction was revoked no longer counts. |
 
 ## Signals
 
