@@ -48,6 +48,7 @@ test("a Player chooses their Nickname and reads it back with the case they typed
     nickname: "Ada_Lovelace-1815",
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
 });
 
@@ -78,6 +79,7 @@ test.each([
     nickname: null,
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
 });
 
@@ -118,6 +120,7 @@ test.each(["admin", "Admin", "TYPOMANIAC", "Guest", "nUlL", "mod"])(
       nickname: null,
       avatarUrl: null,
       ornament: unrankedPlate,
+      isAdministrator: false,
     });
   },
 );
@@ -138,12 +141,14 @@ test("a Nickname already taken by another Player is refused, whatever the case",
     nickname: null,
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
   expect(await readProfile(first.cookie)).toEqual({
     id: first.player.id,
     nickname: "Hopper",
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
 });
 
@@ -174,6 +179,7 @@ test("a Player changes their Nickname, which frees the old one for another Playe
     nickname: "Hedy",
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
   const taken = await chooseNickname("lamarr", second.cookie);
   expect(taken.status).toBe(200);
@@ -182,6 +188,7 @@ test("a Player changes their Nickname, which frees the old one for another Playe
     nickname: "lamarr",
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
 });
 
@@ -197,6 +204,7 @@ test("a Player takes their own Nickname again with another case", async () => {
     nickname: "JohnSon",
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
 });
 
@@ -217,6 +225,7 @@ test("Better Auth's own routes cannot set the Nickname", async () => {
     nickname: null,
     avatarUrl: null,
     ornament: unrankedPlate,
+    isAdministrator: false,
   });
 });
 
