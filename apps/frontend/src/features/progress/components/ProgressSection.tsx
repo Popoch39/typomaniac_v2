@@ -11,28 +11,27 @@ import { RankChartPanel } from "./RankChartPanel.tsx";
 import { WpmChartPanel } from "./WpmChartPanel.tsx";
 
 interface ProgressSectionProps {
-  games: readonly ProgressGame[];
-  /** The Duels of the same period and kind as `games`, by their Duel Outcome. */
-  summary: ProgressSummary;
-  /** Of all time, from the public Player read. */
-  peakTier: Tier | null;
-  /** The Games shown are the previous period's or kind's, while the chosen one is read. */
+  progress: {
+    games: readonly ProgressGame[];
+    /** The Duels of the same period and kind as `games`, by their Duel Outcome. */
+    summary: ProgressSummary;
+    rankPoints: readonly RankPoint[];
+    /** Of all time, from the public Player read. */
+    peakTier: Tier | null;
+  };
+  /** The Progress shown is the previous period's or kind's, while the chosen one is read. */
   isUpdating: boolean;
   /** Said instead of empty axes while no Duel was played. */
   emptyMessage: string;
-  rankPoints: readonly RankPoint[];
   /** The Rank chart waits for the end of the Placement. */
   isUnranked: boolean;
 }
 
 // Every Panel stays drawn, even without a Game, so that choosing another period or kind moves nothing.
 export function ProgressSection({
-  games,
-  summary,
-  peakTier,
+  progress: { games, summary, rankPoints, peakTier },
   isUpdating,
   emptyMessage,
-  rankPoints,
   isUnranked,
 }: ProgressSectionProps) {
   const section = useProgressSection(games, emptyMessage);

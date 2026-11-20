@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { describeDuelEnd } from "../chart/describeDuelEnd.ts";
-
-type HoveredPoint = { payload?: { endedAt?: number } };
+import type { HoveredPoint } from "../chart/hoveredPoint.ts";
 
 /** The title of a hovered point's tooltip: the end of its Game's Duel. */
 export function useProgressTooltipLabel() {

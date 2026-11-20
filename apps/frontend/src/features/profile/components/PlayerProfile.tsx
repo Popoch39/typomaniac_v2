@@ -44,12 +44,9 @@ export function PlayerProfile({
         </Panel>
       ) : (
         <ProgressSection
-          games={progress.games}
-          summary={progress.summary}
-          peakTier={progress.peakTier}
+          progress={progress}
           isUpdating={isProgressUpdating}
           emptyMessage="Your Progress fills as you play Duels."
-          rankPoints={progress.rankPoints}
           isUnranked={standing.rank === null}
         />
       )}

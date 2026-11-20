@@ -29,12 +29,9 @@ export function PlayerPage() {
               <PlayerRankCard rank={player.rank} />
             </div>
             <ProgressSection
-              games={progress.games}
-              summary={progress.summary}
-              peakTier={player.peakTier}
+              progress={progress}
               isUpdating={isProgressUpdating}
               emptyMessage={`${player.nickname}'s Progress fills as they play Duels.`}
-              rankPoints={progress.rankPoints}
               isUnranked={player.rank === null}
             />
           </div>

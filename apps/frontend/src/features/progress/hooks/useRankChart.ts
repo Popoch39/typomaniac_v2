@@ -1,8 +1,7 @@
 import { tierName } from "../../ranked/standing/rankName.ts";
+import type { HoveredPoint } from "../chart/hoveredPoint.ts";
 import { ladderDomain, tierBands } from "../rank/tierBands.ts";
 import type { RankChartRow } from "./useRankChartPanel.ts";
-
-type HoveredPoint = { payload?: { line?: string } };
 
 /** The ladder the Rank chart shows, its Tier bands, and an axis that names each Tier where it starts. */
 export function useRankChart(rows: readonly RankChartRow[]) {

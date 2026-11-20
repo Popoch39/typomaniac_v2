@@ -1,7 +1,7 @@
 import { DEFAULT_RANKED_CONFIG } from "@repo/ranked-engine";
 
 // The LP of a whole Division, so that a Division's top meets the next one's bottom.
-const DIVISION_SPAN = DEFAULT_RANKED_CONFIG.lpPerDivision;
+export const DIVISION_SPAN = DEFAULT_RANKED_CONFIG.lpPerDivision;
 
 /**
  * A Rank as one number to plot: the Divisions below it, each worth its LP span, then its LP. Master,

@@ -21,7 +21,11 @@ export function usePlayerPageReads(nickname: string) {
   const error = player.error ?? progress.error;
   return {
     player: player.data ?? null,
-    progress: progress.data ?? null,
+    // With the Peak Tier of all time, which the Progress shows beside its own period.
+    progress:
+      player.data === undefined || progress.data === undefined
+        ? null
+        : { ...progress.data, peakTier: player.data.peakTier },
     isProgressUpdating: progress.isPlaceholderData,
     stage: readStage([player, progress]),
     failure: error === null ? null : describeApiError(error),

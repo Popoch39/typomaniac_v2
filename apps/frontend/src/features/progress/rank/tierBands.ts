@@ -1,7 +1,5 @@
-import { DEFAULT_RANKED_CONFIG, ladderIndex, TIERS, type Tier } from "@repo/ranked-engine";
-import { ladderValue } from "./ladderValue.ts";
-
-const DIVISION_SPAN = DEFAULT_RANKED_CONFIG.lpPerDivision;
+import { ladderIndex, TIERS, type Tier } from "@repo/ranked-engine";
+import { DIVISION_SPAN, ladderValue } from "./ladderValue.ts";
 
 export interface TierBand {
   tier: Tier;
