@@ -1,5 +1,5 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
-import type { Outcome, Seat, ViolationKind } from "@repo/duel-engine";
+import type { BrowserHints, Outcome, Seat, ViolationKind } from "@repo/duel-engine";
 import type { DuelSignals, GameSignals, ReviewReason } from "@repo/fair-play-engine";
 import type { OrnamentChoice, RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
@@ -210,6 +210,9 @@ export const duelGame = pgTable(
     // The average Multiplier the server judged the Game with: the Result does not hold what each
     // word was. A Game saved before the Multiplier reads as ×1, and its Outcome stays as judged.
     multiplier: doublePrecision("multiplier").notNull().default(1),
+    // What the browser told of how the Game was typed, a signal of the Suspicion (ADR 0014); null
+    // when its client sent none, and always in a Custom Duel.
+    hints: jsonb("hints").$type<BrowserHints>(),
   },
   (table) => [
     primaryKey({ columns: [table.duelId, table.round, table.seat] }),

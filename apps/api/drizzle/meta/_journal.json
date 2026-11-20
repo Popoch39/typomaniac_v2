@@ -148,6 +148,13 @@
       "when": 1795192718436,
       "tag": "0020_suspicion_duel_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795193140099,
+      "tag": "0021_duel_game_hints",
+      "breakpoints": true
     }
   ]
 }

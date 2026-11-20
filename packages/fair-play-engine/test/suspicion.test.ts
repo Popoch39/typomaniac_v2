@@ -13,6 +13,7 @@ const botGame: GameSignals = {
   missingRollover: 1,
   flatWordSpeed: 1,
   superhumanSpeed: 1,
+  browserHints: 1,
 };
 const ordinaryGame: GameSignals = {
   keyPressEvenness: 0,
@@ -20,6 +21,7 @@ const ordinaryGame: GameSignals = {
   missingRollover: 0,
   flatWordSpeed: 0,
   superhumanSpeed: 0,
+  browserHints: 0,
 };
 const ordinaryDuels: DuelSignals = {
   levelJump: 0,

@@ -71,6 +71,7 @@ const analysePlayer = async (tx: Transaction, playerId: string, at: Date) => {
       round: duelGame.round,
       seat: duelGame.seat,
       journal: duelGame.journal,
+      hints: duelGame.hints,
       config: duel.config,
       targetWords: duelRound.words,
     })
@@ -84,10 +85,10 @@ const analysePlayer = async (tx: Transaction, playerId: string, at: Date) => {
     )
     .where(and(eq(duelParticipant.playerId, playerId), pendingGames(at)));
   if (games.length === 0) return;
-  for (const { duelId, round, seat, journal, config, targetWords } of games) {
+  for (const { duelId, round, seat, journal, hints, config, targetWords } of games) {
     const analysis = {
       signalsVersion: SIGNALS_VERSION,
-      signals: readGameSignals({ config, targetWords, journal }),
+      signals: readGameSignals({ config, targetWords, journal, hints }),
       analysedAt: at,
     };
     await tx

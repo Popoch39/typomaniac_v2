@@ -1,4 +1,5 @@
 import {
+  type BrowserHints,
   type ClientMessage,
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
@@ -434,6 +435,42 @@ export const isEventAccepted = (
 const journalKey = (redis: Redis, duelId: string, round: number, seat: Seat) =>
   redis.name("duel", duelId, "round", String(round), "journal", String(seat));
 
+const hintsKey = (redis: Redis, duelId: string, round: number, seat: Seat) =>
+  redis.name("duel", duelId, "round", String(round), "hints", String(seat));
+
+/**
+ * Keeps the browser's hints on the Game played on `seat` in `round` until the Duel is saved. The
+ * first hints sent stand: a client sends them once per Round, and a later message changes nothing.
+ */
+export const recordHints = async (
+  redis: Redis,
+  duelId: string,
+  round: number,
+  seat: Seat,
+  { hints, expiryMs }: { readonly hints: BrowserHints; readonly expiryMs: number },
+) => {
+  await redis.client.send("SET", [
+    hintsKey(redis, duelId, round, seat),
+    JSON.stringify(hints),
+    "PX",
+    String(expiryMs),
+    "NX",
+  ]);
+};
+
+/** The browser's hints on both Games of `round`, indexed by seat, `null` for a Game without any. */
+const readHints = async (
+  redis: Redis,
+  duelId: string,
+  round: number,
+): Promise<[BrowserHints | null, BrowserHints | null]> => {
+  const read = async (seat: Seat) => {
+    const hints = await redis.client.get(hintsKey(redis, duelId, round, seat));
+    return hints === null ? null : (JSON.parse(hints) as BrowserHints);
+  };
+  return [await read(0), await read(1)];
+};
+
 // One script, so a journal never lives on without its expiry, and nothing is appended to a Game
 // that has ended, whichever instance ended it, nor to a Game of a Round that is not the Duel's
 // current one. The anchor is kept with the start it comes with, so that an instance never reads a
@@ -631,6 +668,8 @@ type PlayedRound = FinishedRound & {
   readonly startAt: number;
   readonly endedAt: number;
   readonly journals: readonly [GameEvent[], GameEvent[]];
+  /** The browser's hints on both Games, indexed by seat; left out when neither client sent any. */
+  readonly hints?: readonly [BrowserHints | null, BrowserHints | null];
 };
 
 // The ranked columns of a participant: the Standing before and after, and what the Duel changed.
@@ -737,6 +776,7 @@ export const saveDuel = async (
           journal: round.journals[seat],
           outcome: round.outcomes[seat],
           multiplier: round.multipliers[seat],
+          hints: round.hints?.[seat] ?? null,
         })),
       ),
     );
@@ -813,7 +853,8 @@ const finaliseDuel = async (
       if (startAt === null || end === null)
         throw new Error(`Round ${number} of Duel ${duelId} has not ended`);
       const journals = await readJournals(redis, duelId, number);
-      rounds.push({ number, words, startAt, journals, ...end });
+      const hints = await readHints(redis, duelId, number);
+      rounds.push({ number, words, startAt, journals, hints, ...end });
     }
     const outcomes = getDuelOutcomes(rounds.map((round) => round.outcomes));
     if (outcomes === null) throw new Error(`Duel ${duelId} is not decided`);

@@ -1,5 +1,6 @@
 import { eventTime } from "../clock/eventTime.ts";
 import { translateInput } from "../input/translateInput.ts";
+import { useBrowserHintsStore } from "../store/useBrowserHintsStore.ts";
 import { useGameStore } from "../store/useGameStore.ts";
 
 /**
@@ -19,6 +20,7 @@ function placeCaretAfterSentinel(input: HTMLInputElement) {
  */
 export function useTypingInput() {
   const applyEvent = useGameStore((state) => state.applyEvent);
+  const countKey = useBrowserHintsStore((state) => state.countKey);
 
   return (input: HTMLInputElement | null) => {
     if (input === null) return;
@@ -33,7 +35,10 @@ export function useTypingInput() {
         { inputType: event.inputType, data: event.data },
         eventTime(),
       );
-      if (gameEvent !== null) applyEvent(gameEvent);
+      if (gameEvent === null) return;
+      // A script can type without a single key going down: its input counts as a key it generated.
+      countKey(event.isTrusted);
+      applyEvent(gameEvent);
     };
     input.addEventListener("beforeinput", onBeforeInput);
     input.addEventListener("focus", onFocus);

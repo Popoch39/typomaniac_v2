@@ -10,11 +10,13 @@ export const SUSPICION_GAMES = 20;
  * Speed weighs the least: a fast honest typist must never be brought to a Review by speed alone.
  */
 export const SIGNAL_WEIGHTS: GameSignals & DuelSignals = {
-  keyPressEvenness: 0.2,
-  holdEvenness: 0.15,
-  missingRollover: 0.15,
-  flatWordSpeed: 0.15,
+  keyPressEvenness: 0.18,
+  holdEvenness: 0.13,
+  missingRollover: 0.12,
+  flatWordSpeed: 0.12,
   superhumanSpeed: 0.05,
+  // A hint is as easy to forge as to leave out: it catches the laziest bots, never a careful one.
+  browserHints: 0.1,
   levelJump: 0.05,
   errorlessSeries: 0.05,
   oneSidedPair: 0.12,
