@@ -5,6 +5,7 @@ import { ladderIndex, type Rank } from "@repo/ranked-engine";
 import { createApp } from "../src/app.ts";
 import { eq } from "drizzle-orm";
 import { duel, duelParticipant, user } from "../src/db/client.ts";
+import { banPlayer } from "../src/modules/fair-play/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -140,6 +141,22 @@ test("a Player without a Nickname is never found", async () => {
   await testDb.db.update(user).set({ name: "nameless" }).where(eq(user.id, player.id));
 
   const response = await readPlayer("nameless");
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ code: "PLAYER_NOT_FOUND" });
+});
+
+test("a banned Player's page is no longer found, as they left the Leaderboard", async () => {
+  const nickname = uniqueNickname("Banned");
+  const { player } = await playerNamed(nickname);
+  await saveStanding(testDb.db, player.id, {
+    mmr: 1500,
+    duelsPlayed: 20,
+    rank: { tier: "gold", division: 2, lp: 40 },
+  });
+  await banPlayer(testDb.db, { playerId: player.id, cause: "review", at: new Date() });
+
+  const response = await readPlayer(nickname);
 
   expect(response.status).toBe(404);
   expect(await response.json()).toEqual({ code: "PLAYER_NOT_FOUND" });

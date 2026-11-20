@@ -5,6 +5,7 @@ import type { RankChange } from "@repo/ranked-engine";
 import type { GameEvent, Result } from "@repo/typing-engine";
 import { createApp } from "../src/app.ts";
 import { duel, duelGame, duelParticipant, duelRound } from "../src/db/client.ts";
+import { banPlayer } from "../src/modules/fair-play/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
@@ -406,6 +407,18 @@ test("the Nickname is looked up whatever its case", async () => {
 
 test("an unknown Nickname answers 404 with its own code", async () => {
   const response = await readProgress(uniqueNickname("Nobody"));
+
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ code: "PLAYER_NOT_FOUND" });
+});
+
+test("a banned Player's Progress is no longer found, as they left the Leaderboard", async () => {
+  const nickname = uniqueNickname("Banned");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, { kind: "custom", endedAt: new Date(), games: [OPPONENT_MEASURES] });
+  await banPlayer(testDb.db, { playerId: player.id, cause: "review", at: new Date() });
+
+  const response = await readProgress(nickname);
 
   expect(response.status).toBe(404);
   expect(await response.json()).toEqual({ code: "PLAYER_NOT_FOUND" });
