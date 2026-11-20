@@ -19,10 +19,18 @@ import { readStanding } from "../standing/service.ts";
 
 // The steps that apply a Sanction live in @repo/fair-play, shared with the fair-play worker: this is
 // their one import path in the API.
-export { banPlayer, runFairPlayPass, settleReview, suspendPlayer, voidDuel } from "@repo/fair-play";
+export {
+  banPlayer,
+  revokeSanction,
+  runFairPlayPass,
+  settleReview,
+  suspendPlayer,
+  voidDuel,
+} from "@repo/fair-play";
 export type {
   BanResult,
   ReviewSettlement,
+  RevokeSanctionResult,
   SanctionCause,
   SettleReviewResult,
   SuspendResult,
@@ -154,18 +162,7 @@ export const readReview = async (db: Db, reviewId: string) => {
       .from(violation)
       .where(eq(violation.playerId, playerId))
       .orderBy(desc(violation.committedAt)),
-    db
-      .select({
-        id: sanction.id,
-        kind: sanction.kind,
-        cause: sanction.cause,
-        startedAt: sanction.startedAt,
-        endsAt: sanction.endsAt,
-        revokedAt: sanction.revokedAt,
-      })
-      .from(sanction)
-      .where(eq(sanction.playerId, playerId))
-      .orderBy(desc(sanction.startedAt)),
+    readSanctions(db, playerId),
   ]);
   return {
     id: found.id,
@@ -179,13 +176,39 @@ export const readReview = async (db: Db, reviewId: string) => {
       ...row,
       committedAt: committedAt.getTime(),
     })),
-    sanctions: sanctions.map(({ startedAt, endsAt, revokedAt, ...row }) => ({
-      ...row,
-      startedAt: startedAt.getTime(),
-      endsAt: endsAt?.getTime() ?? null,
-      revokedAt: revokedAt?.getTime() ?? null,
-    })),
+    sanctions,
   };
+};
+
+// Every Sanction of the Player, revoked ones included, newest first.
+const readSanctions = async (db: Db, playerId: string) => {
+  const rows = await db
+    .select({
+      id: sanction.id,
+      kind: sanction.kind,
+      cause: sanction.cause,
+      startedAt: sanction.startedAt,
+      endsAt: sanction.endsAt,
+      revokedAt: sanction.revokedAt,
+    })
+    .from(sanction)
+    .where(eq(sanction.playerId, playerId))
+    .orderBy(desc(sanction.startedAt), asc(sanction.id));
+  return rows.map(({ startedAt, endsAt, revokedAt, ...row }) => ({
+    ...row,
+    startedAt: startedAt.getTime(),
+    endsAt: endsAt?.getTime() ?? null,
+    revokedAt: revokedAt?.getTime() ?? null,
+  }));
+};
+
+/**
+ * Every Sanction of a Player, revoked ones included, newest first, for the administrator to revoke one
+ * after an appeal; null when there is no such Player.
+ */
+export const readPlayerSanctions = async (db: Db, playerId: string) => {
+  const [found] = await db.select({ id: user.id }).from(user).where(eq(user.id, playerId));
+  return found ? readSanctions(db, playerId) : null;
 };
 
 // The Player's recent ranked Duels, newest first, each with its Games in Round order.

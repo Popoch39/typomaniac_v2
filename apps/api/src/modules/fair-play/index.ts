@@ -7,7 +7,9 @@ import {
   readCurrentSuspension,
   readOpenReviews,
   readOwnVoidedDuels,
+  readPlayerSanctions,
   readReview,
+  revokeSanction,
   settleReview,
 } from "./service.ts";
 
@@ -61,6 +63,30 @@ export const createFairPlayRoutes = (
         if (settled === "not-found") return status(404, { code: "REVIEW_NOT_FOUND" });
         if (settled === "duel-not-found") return status(404, { code: "DUEL_NOT_FOUND" });
         if (settled === "already-settled") return status(409, { code: "REVIEW_ALREADY_SETTLED" });
+        return status(204, undefined);
+      },
+    )
+    .get(
+      "/admin/players/:id/sanctions",
+      {
+        administrator: true,
+        params: FairPlayModel.AdminPlayersIdSanctionsGet.Params,
+        response: FairPlayModel.AdminPlayersIdSanctionsGet.Response,
+      },
+      async ({ params, status }) =>
+        (await readPlayerSanctions(db, params.id)) ?? status(404, { code: "PLAYER_NOT_FOUND" }),
+    )
+    .post(
+      "/admin/sanctions/:id/revocation",
+      {
+        administrator: true,
+        params: FairPlayModel.AdminSanctionsIdRevocationPost.Params,
+        response: FairPlayModel.AdminSanctionsIdRevocationPost.Response,
+      },
+      async ({ params, status }) => {
+        const revoked = await revokeSanction(db, { sanctionId: params.id, at: new Date() });
+        if (revoked === "not-found") return status(404, { code: "SANCTION_NOT_FOUND" });
+        if (revoked === "already-revoked") return status(409, { code: "SANCTION_ALREADY_REVOKED" });
         return status(204, undefined);
       },
     );

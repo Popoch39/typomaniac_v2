@@ -68,6 +68,17 @@ const rank = t.Union([
   t.Object({ tier: t.Literal("master"), lp }),
 ]);
 
+// A Sanction as the administrator reads it. Instants in epoch milliseconds; `endsAt` only for a
+// Suspension, `revokedAt` null until it is revoked after an appeal.
+const sanctionRecord = t.Object({
+  id: t.String(),
+  kind: t.Union([t.Literal("voided_duel"), t.Literal("suspension"), t.Literal("ban")]),
+  cause: t.Union([t.Literal("violation"), t.Literal("review")]),
+  startedAt: t.Number(),
+  endsAt: t.Nullable(t.Number()),
+  revokedAt: t.Nullable(t.Number()),
+});
+
 // One saved ranked Game of the reviewed Player, with what each signal said of it, in the order of the
 // fair-play engine's signals; null while the fair-play pass has not read it yet.
 const reviewedGame = t.Object({
@@ -112,17 +123,8 @@ export const AdminReviewsIdGet = {
           committedAt: t.Number(),
         }),
       ),
-      // Every Sanction, revoked ones included, newest first. Instants in epoch milliseconds.
-      sanctions: t.Array(
-        t.Object({
-          id: t.String(),
-          kind: t.Union([t.Literal("voided_duel"), t.Literal("suspension"), t.Literal("ban")]),
-          cause: t.Union([t.Literal("violation"), t.Literal("review")]),
-          startedAt: t.Number(),
-          endsAt: t.Nullable(t.Number()),
-          revokedAt: t.Nullable(t.Number()),
-        }),
-      ),
+      // Every Sanction, revoked ones included, newest first.
+      sanctions: t.Array(sanctionRecord),
     }),
     403: forbidden,
     404: t.Object({ code: t.Literal("REVIEW_NOT_FOUND") }),
@@ -149,6 +151,26 @@ export const AdminReviewsIdSettlementPost = {
     403: forbidden,
     404: t.Union([reviewNotFound, t.Object({ code: t.Literal("DUEL_NOT_FOUND") })]),
     409: t.Object({ code: t.Literal("REVIEW_ALREADY_SETTLED") }),
+  },
+};
+
+export const AdminPlayersIdSanctionsGet = {
+  Params: t.Object({ id: t.String() }),
+  Response: {
+    // Revoked ones included, newest first.
+    200: t.Array(sanctionRecord),
+    403: forbidden,
+    404: t.Object({ code: t.Literal("PLAYER_NOT_FOUND") }),
+  },
+};
+
+export const AdminSanctionsIdRevocationPost = {
+  Params: t.Object({ id: t.String({ format: "uuid" }) }),
+  Response: {
+    204: t.Void(),
+    403: forbidden,
+    404: t.Object({ code: t.Literal("SANCTION_NOT_FOUND") }),
+    409: t.Object({ code: t.Literal("SANCTION_ALREADY_REVOKED") }),
   },
 };
 

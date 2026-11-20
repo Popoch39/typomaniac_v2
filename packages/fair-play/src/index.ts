@@ -1,4 +1,6 @@
 export { runFairPlayPass } from "./pass.ts";
+export { revokeSanction } from "./revocation.ts";
+export type { RevokeSanctionResult } from "./revocation.ts";
 export { settleReview } from "./settlement.ts";
 export type { ReviewSettlement, SettleReviewResult } from "./settlement.ts";
 export { banPlayer, suspendPlayer, voidDuel } from "./sanction.ts";
