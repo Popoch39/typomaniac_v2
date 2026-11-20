@@ -10,7 +10,7 @@ import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-
 import { and, count, eq } from "drizzle-orm";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
-import { duel, duelGame, duelParticipant, duelRound, user } from "../src/db/client.ts";
+import { duel, duelGame, duelParticipant, duelRound, user, violation } from "../src/db/client.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -753,6 +753,28 @@ test("the Events a Participant sends are kept in their Game's journal, handed ba
         [],
       ],
     });
+  } finally {
+    await stop();
+  }
+});
+
+test("a Custom Duel accepts an insert of several characters and one no keyDown accounts for, which a ranked Duel refuses as Violations", async () => {
+  const { creator, opponent, duelId, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
+    creator.send({ type: "event", round: 1, event: { type: "insert", at: 20, text: "word " } });
+    creator.send({ type: "event", round: 1, event: { type: "insert", at: 30, text: "a" } });
+    const relayed = [await opponent.next(), await opponent.next(), await opponent.next()];
+
+    expect(relayed).toEqual([
+      { type: "opponentEvent", event: { type: "start", at: 10 } },
+      { type: "opponentEvent", event: { type: "insert", at: 20, text: "word " } },
+      { type: "opponentEvent", event: { type: "insert", at: 30, text: "a" } },
+    ]);
+    expect(await Promise.race([creator.closed, Bun.sleep(100).then(() => "open")])).toBe("open");
+    expect(await testDb.db.select().from(violation).where(eq(violation.duelId, duelId))).toEqual(
+      [],
+    );
   } finally {
     await stop();
   }

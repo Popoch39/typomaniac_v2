@@ -14,6 +14,7 @@ export {
   START_WINDOW_MS,
   TIMESTAMP_TOLERANCE_MS,
 } from "./constants.ts";
+export { VIOLATION_CLOSE_REASON } from "./messages.ts";
 export type {
   ClientMessage,
   FinishedRound,

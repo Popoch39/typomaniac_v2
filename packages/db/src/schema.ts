@@ -1,5 +1,5 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
-import type { Outcome, Seat } from "@repo/duel-engine";
+import type { Outcome, Seat, ViolationKind } from "@repo/duel-engine";
 import type { OrnamentChoice, RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
@@ -248,4 +248,23 @@ export const duelParticipant = pgTable(
     // A Player's ranked Duels in the order they played them, for the Outcomes of their Placement.
     index("duel_participant_player_idx").on(table.playerId, table.duelsPlayedBefore),
   ],
+);
+
+// One row per Violation refused live in a ranked Duel (ADR 0014, ADR 0016), counted per Player to
+// pick their automatic Sanction. Written as it is refused, before the Duel is saved: no key to `duel`.
+export const violation = pgTable(
+  "violation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    duelId: uuid("duel_id").notNull(),
+    round: smallint("round").notNull(),
+    kind: text("kind", { enum: ["multipleCharacters", "noKeyPress"] })
+      .$type<ViolationKind>()
+      .notNull(),
+    committedAt: timestamp("committed_at").defaultNow().notNull(),
+  },
+  (table) => [index("violation_player_idx").on(table.playerId, table.duelId)],
 );
