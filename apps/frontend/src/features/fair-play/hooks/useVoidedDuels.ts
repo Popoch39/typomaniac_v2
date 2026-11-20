@@ -7,6 +7,7 @@ export function useVoidedDuels(player: SignedInPlayer) {
   const { data, isPending, error } = useQuery(fairPlayQueryOptions(player.id));
   return {
     voidedDuels: data?.voidedDuels ?? null,
+    suspension: data?.suspension ?? null,
     isPending,
     failure: error === null ? null : describeApiError(error),
   };

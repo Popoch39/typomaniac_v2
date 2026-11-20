@@ -1,5 +1,6 @@
 import { SignInPrompt } from "../../auth/components/SignInPrompt.tsx";
 import { SignedInPlayerGate } from "../../auth/components/SignedInPlayerGate.tsx";
+import { SuspensionNotice } from "../../fair-play/components/SuspensionNotice.tsx";
 import { VoidedDuelNotice } from "../../fair-play/components/VoidedDuelNotice.tsx";
 import { Page } from "../../../shared/components/Page.tsx";
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
@@ -24,8 +25,9 @@ export function RankedPage() {
             a Queue already drawn. */}
         {(player) => (
           <StandingGate player={player}>
-            {(standing, voidedDuels) => (
+            {(standing, voidedDuels, suspension) => (
               <>
+                {suspension && <SuspensionNotice suspension={suspension} />}
                 {voidedDuels.length > 0 && <VoidedDuelNotice voidedDuels={voidedDuels} />}
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
                   <RankCard standing={standing} />

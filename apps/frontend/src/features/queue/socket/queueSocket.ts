@@ -22,6 +22,7 @@ const REFUSALS = {
   UNAUTHORIZED: "Sign in to enter the Queue.",
   NICKNAME_REQUIRED: "Choose a Nickname to enter the Queue.",
   RANKED_DUEL_UNFINISHED: "Finish your ranked Duel before entering the Queue again.",
+  RANKED_SUSPENDED: "You are suspended from ranked play: the Queue opens again when it ends.",
 };
 const UNREACHABLE = "The Queue could not be reached. Try again in a moment.";
 
