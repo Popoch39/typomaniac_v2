@@ -53,6 +53,17 @@ How strongly a Player's ranked Games look like they were not typed by a person. 
 | SUSPICION-2 | A Game's Suspicion is the sum of its signals, each weighted by a constant share (`SIGNAL_WEIGHTS`), the shares adding up to 1. Speed weighs the least: it must never bring a fast typist to a Review alone. |
 | SUSPICION-3 | A Player's Suspicion is the mean of their Games' over the full window of 20, a missing Game counting as an ordinary one: one unusual Game among ordinary ones, or a few Games alone, leave it low.          |
 
+## Reviews
+
+When a person looks at a Player (ADR 0014). A Review never sanctions by itself, and a Player under Review plays ranked as usual and is told nothing.
+
+| Id       | Rule                                                                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| REVIEW-1 | A Player whose Suspicion passes `SUSPICION_THRESHOLD` (0.6), a starting value kept high, gets a Review with reason Suspicion.                                                        |
+| REVIEW-2 | A Player whose Rank is Master gets a Review with reason Master, and one on the Podium (the first `PODIUM_POSITIONS`, 3) one with reason Podium, whatever their Suspicion; each once. |
+| REVIEW-3 | At most one Review is open per Player: none opens, whatever the reason, while one is.                                                                                                |
+| REVIEW-4 | The Suspicion that opens a Review is read only from the Games played after the Player's last settled Review, the missing ones counting as ordinary: no Game is judged twice.         |
+
 ## Purity
 
 | Id     | Rule                                                                                                                                              |

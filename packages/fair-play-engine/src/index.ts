@@ -1,5 +1,7 @@
 export { MIN_ACCOUNT_AGE_MS, rankedOpensAt } from "./account-age.ts";
 export { FIRST_SUSPENSION_MS, LONGER_SUSPENSION_MS, REPAIR_WINDOW_MS } from "./constants.ts";
+export { PODIUM_POSITIONS, reviewToOpen, SUSPICION_THRESHOLD } from "./review.ts";
+export type { ReviewCandidate, ReviewReason } from "./review.ts";
 export { readGameSignals, SIGNAL_NAMES, SIGNALS_VERSION } from "./signals.ts";
 export type { GameSignals, PlayedGame, SignalName } from "./signals.ts";
 export { playerSuspicion, SIGNAL_WEIGHTS, SUSPICION_GAMES } from "./suspicion.ts";

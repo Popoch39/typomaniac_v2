@@ -5,6 +5,7 @@ import {
   playerSuspicion,
   rankedOpensAt,
   readGameSignals,
+  reviewToOpen,
 } from "../src/index.ts";
 import { person, targetWords, typeJournal } from "./helpers/journal.ts";
 
@@ -63,4 +64,20 @@ test("PURE-1: Suspicion never modifies the signals it is read from and is the sa
   expect(recentGames).toEqual(untouched);
   expect(playerSuspicion(structuredClone(recentGames))).toBe(suspicion);
   expect(JSON.parse(JSON.stringify(suspicion))).toBe(suspicion);
+});
+
+test("PURE-1: deciding a Review never modifies what it is given, is the same for the same Player and passes through JSON unchanged", () => {
+  const candidate = {
+    underReview: false,
+    reasonsOpenedBefore: ["master" as const],
+    master: true,
+    position: 2,
+    gamesSinceLastReview: [readGameSignals(played)],
+  };
+  const untouched = structuredClone(candidate);
+  const reason = reviewToOpen(candidate);
+
+  expect(candidate).toEqual(untouched);
+  expect(reviewToOpen(structuredClone(candidate))).toBe(reason);
+  expect(JSON.parse(JSON.stringify(reason))).toBe(reason);
 });
