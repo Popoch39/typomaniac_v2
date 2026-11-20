@@ -14,6 +14,9 @@ export const onlineQueryOptions = () =>
       return data;
     },
     refetchInterval: PING_INTERVAL_MS,
+    // A missed ping is tried again at the next one, so the count fails only after two in a row.
+    retry: 1,
+    retryDelay: PING_INTERVAL_MS,
     // A Player with Typomaniac in a background tab still has it open.
     refetchIntervalInBackground: true,
   });

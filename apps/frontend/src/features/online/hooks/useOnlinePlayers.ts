@@ -3,10 +3,11 @@ import { onlineQueryOptions } from "../api/onlineQueryOptions.ts";
 
 /**
  * How many Players are Online, as the last ping heard, or null while unknown. Reads what the heartbeat
- * fetches without pinging itself. A failed ping is not shown as an error: the count is ambient, so it
- * goes blank until a ping succeeds rather than showing a number that may be stale.
+ * fetches without pinging itself. The last count stays through one missed ping and goes blank after
+ * two: a deliberate exception to showing every error, since the count is ambient and no action of the
+ * Player's failed.
  */
 export function useOnlinePlayers() {
   const { data, isError } = useQuery({ ...onlineQueryOptions(), enabled: false });
-  return isError ? null : (data?.players ?? null);
+  return isError ? null : (data?.count ?? null);
 }

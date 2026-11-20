@@ -44,7 +44,7 @@ test("a Player who pings is told they are the one Player Online", async () => {
   const response = await ping(cookie);
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ players: 1 });
+  expect(await response.json()).toEqual({ count: 1 });
 });
 
 test("two Players who pinged are both Online", async () => {
@@ -55,7 +55,7 @@ test("two Players who pinged are both Online", async () => {
   await ping(first.cookie);
   const response = await ping(second.cookie);
 
-  expect(await response.json()).toEqual({ players: 2 });
+  expect(await response.json()).toEqual({ count: 2 });
 });
 
 test("a Player who pings again, from another tab or later, still counts once", async () => {
@@ -65,7 +65,7 @@ test("a Player who pings again, from another tab or later, still counts once", a
   await ping(cookie);
   const response = await ping(cookie);
 
-  expect(await response.json()).toEqual({ players: 1 });
+  expect(await response.json()).toEqual({ count: 1 });
 });
 
 test("a Player whose last ping is older than the window is no longer Online", async () => {
@@ -77,5 +77,5 @@ test("a Player whose last ping is older than the window is no longer Online", as
   await Bun.sleep(100);
   const response = await ping(present.cookie);
 
-  expect(await response.json()).toEqual({ players: 1 });
+  expect(await response.json()).toEqual({ count: 1 });
 });

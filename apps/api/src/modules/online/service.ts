@@ -20,7 +20,7 @@ export const pingOnline = async (
   playerId: string,
   { now, windowMs }: { now: number; windowMs: number },
 ) => {
-  const players: number = await redis.client.send("EVAL", [
+  const count: number = await redis.client.send("EVAL", [
     PING_ONLINE,
     "1",
     redis.name("online"),
@@ -28,5 +28,5 @@ export const pingOnline = async (
     playerId,
     String(windowMs),
   ]);
-  return { players };
+  return { count };
 };
