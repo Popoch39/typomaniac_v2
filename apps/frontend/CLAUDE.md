@@ -45,7 +45,7 @@ Aucun layout shift n'est toléré : ni au chargement, ni après une action, ni q
 - réaction à une action utilisateur → la gérer dans le handler de l'événement ;
 - synchronisation entre stores ou avec l'extérieur → l'action du store ou `subscribe` de Zustand (ou `useSyncExternalStore` pour une source du navigateur, comme `matchMedia`).
 
-Seule exception validée : les fichiers générés par shadcn (`src/shared/components/ui/`, `src/shared/hooks/use-mobile.ts`) gardent leurs `useEffect`. Pour eux seuls, `apps/frontend/.oxlintrc.json` coupe `react/set-state-in-effect` et `react/only-export-components`. Notre propre code n'en écrit toujours pas.
+Seule exception validée : les fichiers générés par shadcn (`src/shared/components/ui/`, `src/shared/hooks/use-mobile.ts`) gardent leurs `useEffect`. Pour eux seuls, `apps/frontend/.oxlintrc.json` coupe `react/set-state-in-effect` et `react/only-export-components`. Notre propre code n'en écrit toujours pas. Le même fichier coupe aussi `typescript/restrict-template-expressions`, pour le seul `src/shared/components/ui/chart.tsx` (généré par shadcn, il interpole des valeurs non textuelles dans ses classes et variables CSS) : ne pas élargir l'exception à tout `ui/`.
 
 ## Appels API
 

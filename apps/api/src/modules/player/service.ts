@@ -1,7 +1,10 @@
+import { wornOrnament } from "@repo/ranked-engine";
 import { SQL } from "bun";
-import { DrizzleQueryError, eq, inArray } from "drizzle-orm";
+import { DrizzleQueryError, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../../db/client.ts";
-import { nicknameUniqueIndex, user } from "../../db/schema.ts";
+import { nicknameUniqueIndex, standing, user } from "../../db/schema.ts";
+import { readPeakTier } from "../ornament/service.ts";
+import { rankFromStored } from "../standing/service.ts";
 import { nicknameFormat } from "./model.ts";
 
 const reservedNicknames = new Set([
@@ -59,6 +62,47 @@ export const readPublicPlayers = async (db: Db, playerIds: readonly string[]) =>
       nickname === null ? [] : [[id, { nickname, avatarUrl }] as const],
     ),
   );
+};
+
+// Matched as the unique index on lower(nickname) holds Nicknames, so that the index serves it.
+const nicknameIs = (nickname: string) => sql`lower(${user.nickname}) = lower(${nickname})`;
+
+/**
+ * The id of the Player who chose this Nickname, whatever its case; `null` when nobody did. A Player
+ * without a Nickname is never found.
+ */
+export const readPlayerIdByNickname = async (db: Db, nickname: string) => {
+  const [player] = await db.select({ id: user.id }).from(user).where(nicknameIs(nickname));
+  return player?.id ?? null;
+};
+
+/**
+ * The Player who chose this Nickname, whatever its case, as anyone may see them; `null` when nobody
+ * did. A Player without a Nickname never appears publicly, so is never found.
+ */
+export const readPublicPlayer = async (db: Db, nickname: string) => {
+  const [row] = await db
+    .select({
+      id: user.id,
+      nickname: user.nickname,
+      avatarUrl: user.image,
+      choice: user.ornament,
+      ladderIndex: standing.ladderIndex,
+      lp: standing.lp,
+    })
+    .from(user)
+    // A Player who never played ranked has no Standing row and is Unranked.
+    .leftJoin(standing, eq(standing.playerId, user.id))
+    .where(nicknameIs(nickname));
+  if (!row?.nickname) return null;
+  const rank = rankFromStored(row.ladderIndex, row.lp);
+  return {
+    nickname: row.nickname,
+    avatarUrl: row.avatarUrl,
+    ornament: wornOrnament(row.choice, rank),
+    rank,
+    peakTier: await readPeakTier(db, row.id),
+  };
 };
 
 const nicknamePattern = new RegExp(nicknameFormat.pattern);

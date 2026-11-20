@@ -10,7 +10,10 @@ import { ProfileSkeleton } from "./ProfileSkeleton.tsx";
 export function ProfilePage() {
   return (
     <Page>
-      <PageHeader title="Profile" lead="Your Nickname, your Rank and your Ornament." />
+      <PageHeader
+        title="Profile"
+        lead="Your Nickname, your Rank, your Ornament and your Progress."
+      />
       <SignedInPlayerChain
         guest={
           <SignInPrompt explanation="Profiles are for signed-in Players. Sign in to see yours." />
@@ -27,7 +30,14 @@ export function ProfilePage() {
               </LoadingState>
             }
           >
-            {(standing, signedIn) => <PlayerProfile player={signedIn} standing={standing} />}
+            {(standing, signedIn, progress, isProgressUpdating) => (
+              <PlayerProfile
+                player={signedIn}
+                standing={standing}
+                progress={progress}
+                isProgressUpdating={isProgressUpdating}
+              />
+            )}
           </ProfileGate>
         )}
       </SignedInPlayerChain>

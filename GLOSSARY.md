@@ -223,6 +223,12 @@ _Avoid_: best rank, max tier, highest rank
 What a Player wears around their Avatar, drawn for a Tier. By default it follows their Rank, Division included; they can instead pin the Unranked plate or the Ornament of any Tier up to their Peak Tier, or wear none. A pinned Ornament shows its Tier alone, without a Division.
 _Avoid_: frame, border, RankFrame, emblem, badge (reserved for the Tier badge)
 
+### Progress
+
+**Progress**:
+How a Player's measures and Rank have moved over the Games and Duels they have played, ranked and Custom alike; Practice Games, of which nothing is kept, are not part of it. Anyone can see a Player's Progress.
+_Avoid_: stats, history (reserved for the WPM history of a Game), career, record
+
 ### Matchmaking
 
 **Queue**:

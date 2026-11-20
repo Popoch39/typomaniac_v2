@@ -4,12 +4,12 @@ import type { Protection } from "../auth/index.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
 import * as PlayerModel from "./model.ts";
-import { isReservedNickname, saveNickname } from "./service.ts";
+import { isReservedNickname, readPublicPlayer, saveNickname } from "./service.ts";
 
 export const createPlayerRoutes = (db: Db, protection: Protection, rateLimiter: RateLimiter) =>
-  new Elysia({ prefix: "/api/me" })
+  new Elysia({ prefix: "/api" })
     .use(protection)
-    .get("/", { signedIn: true }, async ({ player }) => ({
+    .get("/me", { signedIn: true }, async ({ player }) => ({
       id: player.id,
       nickname: player.nickname ?? null,
       // The picture Better Auth stored from the provider at creation, loaded straight from its CDN.
@@ -17,8 +17,8 @@ export const createPlayerRoutes = (db: Db, protection: Protection, rateLimiter: 
       ornament: (await readWornOrnaments(db, [player.id])).get(player.id) ?? null,
     }))
     .put(
-      "/nickname",
-      { signedIn: true, body: PlayerModel.NicknamePut.Body },
+      "/me/nickname",
+      { signedIn: true, body: PlayerModel.MeNicknamePut.Body },
       async ({ player, body, status, set }) => {
         const refused = await rateLimiter.check("nickname", player.id, set);
         if (refused) return refused;
@@ -26,5 +26,19 @@ export const createPlayerRoutes = (db: Db, protection: Protection, rateLimiter: 
         if ((await saveNickname(db, player.id, body.nickname)) === "taken")
           return status(409, { code: "NICKNAME_TAKEN" });
         return { id: player.id, nickname: body.nickname };
+      },
+    )
+    // Public: anyone, a Guest or a visitor without any session, may read a Player's page.
+    .get(
+      "/players/:nickname",
+      {
+        publicRead: true,
+        params: PlayerModel.PlayersNicknameGet.Params,
+        response: PlayerModel.PlayersNicknameGet.Response,
+      },
+      async ({ params, status }) => {
+        const player = await readPublicPlayer(db, params.nickname);
+        if (player === null) return status(404, { code: "PLAYER_NOT_FOUND" });
+        return player;
       },
     );

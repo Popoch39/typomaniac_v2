@@ -11,6 +11,12 @@
         "react/only-export-components": "off",
         "react/set-state-in-effect": "off"
       }
+    },
+    {
+      "files": ["src/shared/components/ui/chart.tsx"],
+      "rules": {
+        "typescript/restrict-template-expressions": "off"
+      }
     }
   ]
 }

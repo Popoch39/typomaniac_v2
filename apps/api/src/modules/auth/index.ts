@@ -42,6 +42,22 @@ export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
   const guestCookies = createGuestCookies(auth.$context.then(({ secret }) => secret));
 
   return new Elysia({ name: "protection" }).macro({
+    // Anyone, a Player, a Guest or a visitor without any session, issued no cookie: only the reads are
+    // counted, on the Player or Guest when known and always on the IP, as a Guest cookie costs nothing
+    // to drop. A route that takes it answers the 429.
+    publicRead: {
+      async beforeHandle({ request, server, set }) {
+        const { headers } = request;
+        const requesterId =
+          (await auth.api.getSession({ headers }))?.user.id ??
+          (await guestCookies.read(headers))?.id ??
+          null;
+        const refused =
+          (await rateLimiter.check("publicReadPerRequester", requesterId, set)) ??
+          (await rateLimiter.check("publicReadPerIp", rateLimiter.clientIp(request, server), set));
+        if (refused) return refused;
+      },
+    },
     signedIn: {
       async derive({ request: { headers } }) {
         const found = await findSession(headers);
