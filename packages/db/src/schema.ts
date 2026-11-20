@@ -362,3 +362,13 @@ export const bannedIdentity = pgTable(
     index("banned_identity_sanction_idx").on(table.sanctionId),
   ],
 );
+
+// The lease of a worker that must run alone, such as the fair-play worker: the instance named as its
+// holder leads until it expires, and renews it while it runs. One that stops or dies just lets it
+// expire, so that another takes over.
+export const leaderLease = pgTable("leader_lease", {
+  name: text("name").primaryKey(),
+  holder: text("holder").notNull(),
+  // With its time zone, as it is compared with the database's own clock, the one every holder shares.
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});

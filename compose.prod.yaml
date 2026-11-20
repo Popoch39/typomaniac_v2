@@ -61,5 +61,20 @@ services:
       redis:
         condition: service_healthy
 
+  # One is enough: a second one started by a deployment overlap waits for the leader lock. It never
+  # migrates the database: until the API has, its passes fail and are tried again.
+  fair-play-worker:
+    build:
+      context: .
+      dockerfile: apps/fair-play-worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-typomaniac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-typomaniac}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
 volumes:
   postgres-data:

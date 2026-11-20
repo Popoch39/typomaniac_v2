@@ -20,6 +20,7 @@
     { "path": "packages/logger" },
     { "path": "packages/queue" },
     { "path": "apps/api" },
-    { "path": "apps/matchmaker" }
+    { "path": "apps/matchmaker" },
+    { "path": "apps/fair-play-worker" }
   ]
 }

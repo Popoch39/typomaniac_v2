@@ -14,7 +14,7 @@ export type { Logger, LogLevel, LogRecord, Sink } from "@logtape/logtape";
 /** The modules of the API that log under a category of their own, below `api`. */
 export type ApiModule = "http" | "duel" | "queue" | "rate-limit";
 
-export type Category = "api" | `api.${ApiModule}` | "matchmaker";
+export type Category = "api" | `api.${ApiModule}` | "matchmaker" | "fair-play-worker";
 
 export const getLogger = (category: Category) => getCategoryLogger(category.split("."));
 

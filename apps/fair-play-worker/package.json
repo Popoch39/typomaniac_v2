@@ -1,0 +1,21 @@
+{
+  "name": "fair-play-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@repo/db": "*",
+    "@repo/fair-play": "*",
+    "@repo/logger": "*",
+    "drizzle-orm": "0.45.4"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "typescript": "7.0.2"
+  }
+}
