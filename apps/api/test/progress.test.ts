@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { DUEL_GAME_CONFIG, type Seat } from "@repo/duel-engine";
 import { getLogger } from "@repo/logger";
+import type { RankChange } from "@repo/ranked-engine";
 import type { GameEvent, Result } from "@repo/typing-engine";
 import { createApp } from "../src/app.ts";
 import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
@@ -65,9 +66,13 @@ const JOURNAL: GameEvent[] = [{ type: "keyDown", at: 1, code: "KeyQ" }];
 
 const OPPONENT_MEASURES: Measures = { wpm: 1, rawWpm: 2, accuracy: 3, consistency: 4 };
 
+// The Rank a ranked Duel ended with, as the ladder stores it.
+type RankAfter = { ladderIndex: number; lp: number; rankChange: RankChange };
+
 /**
  * A finished Duel the Player sat in seat `seat`, one Game per entry of `games`, ended at `endedAt`.
- * The other seat is a Guest whose Games must never show in the Player's Progress.
+ * The other seat is a Guest whose Games must never show in the Player's Progress. A ranked Duel without
+ * `rank` is one of the Player's Placement, which ended without a Rank.
  */
 const saveDuel = async (
   playerId: string,
@@ -76,7 +81,8 @@ const saveDuel = async (
     endedAt,
     games,
     seat = 0,
-  }: { kind: "ranked" | "custom"; endedAt: Date; games: Measures[]; seat?: Seat },
+    rank,
+  }: { kind: "ranked" | "custom"; endedAt: Date; games: Measures[]; seat?: Seat; rank?: RankAfter },
 ) => {
   const duelId = crypto.randomUUID();
   const opponentSeat: Seat = seat === 0 ? 1 : 0;
@@ -95,6 +101,14 @@ const saveDuel = async (
       outcome: "win",
       ...(kind === "ranked"
         ? { mmrBefore: 1987, mmrAfter: 2011, duelsPlayedBefore: 12, duelsPlayedAfter: 13 }
+        : {}),
+      ...(rank
+        ? {
+            ladderIndexAfter: rank.ladderIndex,
+            lpAfter: rank.lp,
+            lpDelta: 20,
+            rankChange: rank.rankChange,
+          }
         : {}),
     },
     { duelId, seat: opponentSeat, playerId: null, outcome: "loss" },
@@ -141,6 +155,19 @@ const ago = (days: number, minutes = 0) =>
 
 // Duel n of a test plays its only Game at n WPM, so that each Game names its Duel.
 const gameAt = (n: number) => [{ wpm: n, rawWpm: n, accuracy: 90, consistency: 80 }];
+
+// The Rank a ranked Duel ends with: `ladderIndex` Divisions above Bronze IV, and `lp` LP.
+const rankAt = (ladderIndex: number, lp: number, rankChange: RankChange = "none") => ({
+  ladderIndex,
+  lp,
+  rankChange,
+});
+
+const rankPointsOf = async (response: Response) => {
+  expect(response.status).toBe(200);
+  const { rankPoints } = (await response.json()) as { rankPoints: unknown[] };
+  return rankPoints;
+};
 
 test("anyone without a session reads a Player's Games, oldest first, with their Duel's end and kind and the four measures", async () => {
   const nickname = uniqueNickname("Typist");
@@ -191,6 +218,8 @@ test("anyone without a session reads a Player's Games, oldest first, with their 
         consistency: 81.2,
       },
     ],
+    // Its ranked Duel was one of its Placement.
+    rankPoints: [],
   });
 });
 
@@ -311,16 +340,17 @@ test("a Player who has not played a Duel has no Game", async () => {
   const response = await readProgress(nickname);
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ games: [] });
+  expect(await response.json()).toEqual({ games: [], rankPoints: [] });
 });
 
-test("neither the journal nor the MMR is in the Progress", async () => {
+test("neither the journal nor the MMR is in the Progress, its Rank points included", async () => {
   const nickname = uniqueNickname("Secret");
   const { player } = await playerNamed(nickname);
   await saveDuel(player.id, {
     kind: "ranked",
     endedAt: at(5),
     games: [{ wpm: 70, rawWpm: 72, accuracy: 95, consistency: 80 }],
+    rank: rankAt(4, 40, "placed"),
   });
 
   const body = await (await readProgress(nickname)).text();
@@ -364,4 +394,97 @@ test("a Player reading Progress beyond the progress limit is refused with 429 an
   } finally {
     await limitedRedis.drop();
   }
+});
+
+test("the Rank points are the ranked Duels that ended with a Rank, oldest first, from the end of Placement, with each Promotion and demotion", async () => {
+  const nickname = uniqueNickname("Climber");
+  const { player } = await playerNamed(nickname);
+  // Placement: no Rank until its last Duel places the Player.
+  await saveDuel(player.id, { kind: "ranked", endedAt: at(1), games: gameAt(1) });
+  await saveDuel(player.id, { kind: "ranked", endedAt: at(2), games: gameAt(2) });
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(3),
+    games: gameAt(3),
+    rank: rankAt(6, 0, "placed"),
+  });
+  await saveDuel(player.id, { kind: "custom", endedAt: at(4), games: gameAt(4) });
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(6),
+    games: gameAt(6),
+    rank: rankAt(7, 5, "promoted"),
+  });
+  // Saved out of order: the Rank points follow the Duels' ends.
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(5),
+    games: gameAt(5),
+    rank: rankAt(6, 85),
+  });
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(7),
+    games: gameAt(7),
+    rank: rankAt(6, 75, "demoted"),
+  });
+
+  expect(await rankPointsOf(await readProgress(nickname))).toEqual([
+    { endedAt: at(3).getTime(), ladderIndex: 6, lp: 0, rankChange: "placed" },
+    { endedAt: at(5).getTime(), ladderIndex: 6, lp: 85, rankChange: "none" },
+    { endedAt: at(6).getTime(), ladderIndex: 7, lp: 5, rankChange: "promoted" },
+    { endedAt: at(7).getTime(), ladderIndex: 6, lp: 75, rankChange: "demoted" },
+  ]);
+});
+
+test("the kind filter leaves the Rank points as they are: a Custom Duel never gives one", async () => {
+  const nickname = uniqueNickname("Steady");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(1),
+    games: gameAt(1),
+    rank: rankAt(3, 0, "placed"),
+  });
+  await saveDuel(player.id, { kind: "custom", endedAt: at(2), games: gameAt(2) });
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(3),
+    games: gameAt(3),
+    rank: rankAt(3, 22),
+  });
+  await saveDuel(player.id, { kind: "custom", endedAt: at(4), games: gameAt(4) });
+
+  const rankPoints = [
+    { endedAt: at(1).getTime(), ladderIndex: 3, lp: 0, rankChange: "placed" },
+    { endedAt: at(3).getTime(), ladderIndex: 3, lp: 22, rankChange: "none" },
+  ];
+  for (const kind of ["all", "ranked", "custom"])
+    expect(await rankPointsOf(await readProgress(nickname, { kind }))).toEqual(rankPoints);
+});
+
+test("the Rank points follow the window: the last 20 ranked Duels, those of the last 30 days, or all", async () => {
+  const nickname = uniqueNickname("Ladder");
+  const { player } = await playerNamed(nickname);
+  // Ranked Duel n ends with n LP; the first four ended over 30 days ago.
+  for (let n = 1; n <= 26; n += 1)
+    await saveDuel(player.id, {
+      kind: "ranked",
+      endedAt: n <= 4 ? ago(40, -n) : ago(0, 60 - n),
+      games: gameAt(n),
+      rank: rankAt(2, n),
+    });
+  // Custom Duels after them do not push ranked Duels out of the last 20.
+  for (let n = 27; n <= 29; n += 1)
+    await saveDuel(player.id, { kind: "custom", endedAt: ago(0, 60 - n), games: gameAt(n) });
+
+  const lpsOf = async (window: string) =>
+    ((await rankPointsOf(await readProgress(nickname, { window }))) as { lp: number }[]).map(
+      ({ lp }) => lp,
+    );
+  // Every LP from `first` to the last ranked Duel's, 26.
+  const from = (first: number) => Array.from({ length: 27 - first }, (_, index) => first + index);
+  expect(await lpsOf("20-duels")).toEqual(from(7));
+  expect(await lpsOf("30-days")).toEqual(from(5));
+  expect(await lpsOf("all")).toEqual(from(1));
 });

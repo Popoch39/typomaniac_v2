@@ -60,6 +60,21 @@ const progressGame = t.Object({
   consistency: t.Number(),
 });
 
+// One point of the Rank chart: the Rank a ranked Duel ended with, as the ladder holds it. Never the MMR.
+const rankPoint = t.Object({
+  // The end of the Duel, in milliseconds since the epoch.
+  endedAt: t.Number(),
+  // The Division's steps above Bronze IV, Master one step above Diamond I.
+  ladderIndex: t.Integer(),
+  lp,
+  rankChange: t.Union([
+    t.Literal("placed"),
+    t.Literal("promoted"),
+    t.Literal("demoted"),
+    t.Literal("none"),
+  ]),
+});
+
 export const NicknameGet = {
   Params: t.Object({ nickname: t.String() }),
   Response: {
@@ -78,8 +93,9 @@ export const NicknameProgressGet = {
     kind: t.Optional(t.Union([t.Literal("all"), t.Literal("ranked"), t.Literal("custom")])),
   }),
   Response: {
-    // Oldest first.
-    200: t.Object({ games: t.Array(progressGame) }),
+    // Oldest first. The Rank points come from the ranked Duels of the window whatever the kind, as
+    // a Custom Duel never moves the Rank, from the one that ended the Placement on.
+    200: t.Object({ games: t.Array(progressGame), rankPoints: t.Array(rankPoint) }),
     404: t.Object({ code: t.Literal("PLAYER_NOT_FOUND") }),
     429: RateLimited,
   },
