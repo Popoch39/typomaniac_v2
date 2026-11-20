@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ShellAdminRouteImport } from './routes/_shell/admin'
 import { Route as ShellCustomRouteImport } from './routes/_shell/custom'
 import { Route as ShellLeaderboardRouteImport } from './routes/_shell/leaderboard'
 import { Route as ShellPracticeRouteImport } from './routes/_shell/practice'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ShellAdminRoute = ShellAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => ShellRoute,
 } as any)
 const ShellCustomRoute = ShellCustomRouteImport.update({
   id: '/custom',
@@ -72,6 +78,7 @@ const DuelDuelIdRoute = DuelDuelIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof ShellAdminRoute
   '/custom': typeof ShellCustomRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof ShellAdminRoute
   '/custom': typeof ShellCustomRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_shell': typeof ShellRouteWithChildren
+  '/_shell/admin': typeof ShellAdminRoute
   '/_shell/custom': typeof ShellCustomRoute
   '/_shell/leaderboard': typeof ShellLeaderboardRoute
   '/_shell/practice': typeof ShellPracticeRoute
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/custom'
     | '/leaderboard'
     | '/practice'
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/custom'
     | '/leaderboard'
     | '/practice'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_shell'
+    | '/_shell/admin'
     | '/_shell/custom'
     | '/_shell/leaderboard'
     | '/_shell/practice'
@@ -164,6 +176,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_shell/admin': {
+      id: '/_shell/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof ShellAdminRouteImport
+      parentRoute: typeof ShellRoute
     }
     '/_shell/custom': {
       id: '/_shell/custom'
@@ -225,6 +244,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface ShellRouteChildren {
+  ShellAdminRoute: typeof ShellAdminRoute
   ShellCustomRoute: typeof ShellCustomRoute
   ShellLeaderboardRoute: typeof ShellLeaderboardRoute
   ShellPracticeRoute: typeof ShellPracticeRoute
@@ -234,6 +254,7 @@ interface ShellRouteChildren {
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
+  ShellAdminRoute: ShellAdminRoute,
   ShellCustomRoute: ShellCustomRoute,
   ShellLeaderboardRoute: ShellLeaderboardRoute,
   ShellPracticeRoute: ShellPracticeRoute,
