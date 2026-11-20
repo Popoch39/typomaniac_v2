@@ -6,6 +6,7 @@ import {
   duel,
   duelGame,
   duelParticipant,
+  duelRound,
   gameAnalysis,
   review,
   sanction,
@@ -114,7 +115,8 @@ export const REVIEW_RECENT_DUELS = 20;
 
 /**
  * A Review as the administrator reads it, or null when there is none with this id: the Player, their
- * Suspicion and whole Standing, their recent ranked Duels with what each signal said of each Game,
+ * Suspicion and whole Standing, their recent ranked Duels with what each signal said of each Game and
+ * what it is replayed from,
  * their Violations and every Sanction they were given, revoked ones included.
  */
 export const readReview = async (db: Db, reviewId: string) => {
@@ -215,8 +217,15 @@ const readReviewedDuels = async (db: Db, playerId: string) => {
             seat: duelGame.seat,
             outcome: duelGame.outcome,
             signals: gameAnalysis.signals,
+            words: duelRound.words,
+            journal: duelGame.journal,
+            result: duelGame.result,
           })
           .from(duelGame)
+          .innerJoin(
+            duelRound,
+            and(eq(duelRound.duelId, duelGame.duelId), eq(duelRound.round, duelGame.round)),
+          )
           .leftJoin(
             gameAnalysis,
             and(
@@ -238,10 +247,13 @@ const readReviewedDuels = async (db: Db, playerId: string) => {
     ...row,
     games: games
       .filter((game) => game.duelId === duelId && game.seat === seat)
-      .map(({ round, outcome, signals }) => ({
+      .map(({ round, outcome, signals, words, journal, result }) => ({
         round,
         outcome,
         signals: signals && SIGNAL_NAMES.map((name) => ({ name, value: signals[name] })),
+        words,
+        journal,
+        result,
       })),
   }));
 };
