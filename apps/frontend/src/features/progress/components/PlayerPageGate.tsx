@@ -1,19 +1,16 @@
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
-import type { ProgressGame } from "../chart/progressChartRows.ts";
-import type { RankPoint } from "../rank/rankChartRows.ts";
-import { type PublicPlayer, usePlayerPageReads } from "../hooks/usePlayerPageReads.ts";
+import {
+  type Progress,
+  type PublicPlayer,
+  usePlayerPageReads,
+} from "../hooks/usePlayerPageReads.ts";
 
 interface PlayerPageGateProps {
   nickname: string;
-  /** `isProgressUpdating` while the Games shown are those of the previous period or kind. */
-  children: (
-    player: PublicPlayer,
-    games: readonly ProgressGame[],
-    isProgressUpdating: boolean,
-    rankPoints: readonly RankPoint[],
-  ) => ReactNode;
+  /** `isProgressUpdating` while the Progress shown is that of the previous period or kind. */
+  children: (player: PublicPlayer, progress: Progress, isProgressUpdating: boolean) => ReactNode;
 }
 
 // Holds the page back until every panel can be drawn whole, so that none is pushed in or grows later.
@@ -25,5 +22,5 @@ export function PlayerPageGate({ nickname, children }: PlayerPageGateProps) {
   }
   if (failure) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
   if (player === null || progress === null) return null;
-  return children(player, progress.games, isProgressUpdating, progress.rankPoints);
+  return children(player, progress, isProgressUpdating);
 }

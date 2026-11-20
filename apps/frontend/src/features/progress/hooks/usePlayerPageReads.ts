@@ -6,6 +6,8 @@ import { useProgressFilterStore } from "../store/useProgressFilterStore.ts";
 
 export type PublicPlayer = NonNullable<ReturnType<typeof usePlayerPageReads>["player"]>;
 
+export type Progress = NonNullable<ReturnType<typeof usePlayerPageReads>["progress"]>;
+
 /**
  * The reads a Player's public page lays out, sent together so that the page is drawn once they are all
  * back. Another period or kind of Duels keeps the Progress already read until its own is back.

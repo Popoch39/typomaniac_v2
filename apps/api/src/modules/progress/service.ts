@@ -54,17 +54,19 @@ const measure = (name: "wpm" | "rawWpm" | "accuracy" | "consistency") =>
 
 /**
  * The Games of the Duels of the Player who chose this Nickname, whatever its case, that the window
- * and the kind select, oldest first; `null` when nobody did. Only the measures of each Game: never
- * its journal, nor any MMR.
+ * and the kind select, oldest first, with how many of those Duels they won, lost and drew, and their
+ * Rank after each ranked Duel of the window; `null` when nobody did. Only the measures of each Game:
+ * never its journal, nor any MMR.
  */
 export const readProgress = async (db: Db, nickname: string, { window, kind }: ProgressFilter) => {
   const [player] = await db.select({ id: user.id }).from(user).where(nicknameIs(nickname));
   if (!player) return null;
-  const [games, rankPoints] = await Promise.all([
+  const [games, summary, rankPoints] = await Promise.all([
     readGames(db, player.id, { window, kind }),
+    readSummary(db, player.id, { window, kind }),
     readRankPoints(db, player.id, window),
   ]);
-  return { games, rankPoints };
+  return { games, summary, rankPoints };
 };
 
 // The Duels of the Player the window and the kind select, the most recent first.
@@ -73,6 +75,7 @@ const selectDuels = (db: Db, playerId: string, { window, kind }: ProgressFilter)
     .select({
       duelId: duelParticipant.duelId,
       seat: duelParticipant.seat,
+      outcome: duelParticipant.outcome,
       endedAt: duel.endedAt,
       kind: duel.kind,
     })
@@ -111,6 +114,17 @@ const readGames = async (db: Db, playerId: string, filter: ProgressFilter) => {
     )
     .orderBy(asc(selectedDuels.endedAt), asc(selectedDuels.duelId), asc(duelGame.round));
   return games.map((game) => ({ ...game, endedAt: game.endedAt.getTime() }));
+};
+
+// Counted by the Duel's Outcome, once per Duel: a Duel won 2-1 is one win, not two.
+const readSummary = async (db: Db, playerId: string, filter: ProgressFilter) => {
+  const selectedDuels = selectDuels(db, playerId, filter);
+  const countOf = (outcome: "win" | "loss" | "draw") =>
+    sql<number>`count(*) filter (where ${selectedDuels.outcome} = ${outcome})`.mapWith(Number);
+  const [summary] = await db
+    .select({ won: countOf("win"), lost: countOf("loss"), drawn: countOf("draw") })
+    .from(selectedDuels);
+  return summary ?? { won: 0, lost: 0, drawn: 0 };
 };
 
 // The Rank after each ranked Duel of the window that ended with one: a Placement Duel before the first

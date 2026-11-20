@@ -60,6 +60,13 @@ const progressGame = t.Object({
   consistency: t.Number(),
 });
 
+// The Duels of the Progress by their Duel Outcome for the Player, each counted once.
+const progressSummary = t.Object({
+  won: t.Integer(),
+  lost: t.Integer(),
+  drawn: t.Integer(),
+});
+
 // One point of the Rank chart: the Rank a ranked Duel ended with, as the ladder holds it. Never the MMR.
 const rankPoint = t.Object({
   // The end of the Duel, in milliseconds since the epoch.
@@ -95,7 +102,11 @@ export const NicknameProgressGet = {
   Response: {
     // Oldest first. The Rank points come from the ranked Duels of the window whatever the kind, as
     // a Custom Duel never moves the Rank, from the one that ended the Placement on.
-    200: t.Object({ games: t.Array(progressGame), rankPoints: t.Array(rankPoint) }),
+    200: t.Object({
+      games: t.Array(progressGame),
+      summary: progressSummary,
+      rankPoints: t.Array(rankPoint),
+    }),
     404: t.Object({ code: t.Literal("PLAYER_NOT_FOUND") }),
     429: RateLimited,
   },
