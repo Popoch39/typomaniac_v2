@@ -1,18 +1,31 @@
 import { Navigate } from "@tanstack/react-router";
-import { CircleAlert, LoaderCircle } from "lucide-react";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
+import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
+import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import { useLeaderboard } from "../hooks/useLeaderboard.ts";
-import { AllRankedPlayers } from "./AllRankedPlayers.tsx";
-import { LeaderboardPodium } from "./LeaderboardPodium.tsx";
-import { YourPosition } from "./YourPosition.tsx";
+import { LeaderboardSections } from "./LeaderboardSections.tsx";
+import { LeaderboardSkeleton } from "./LeaderboardSkeleton.tsx";
 
+// The skeleton waits for the session, which decides whether it lays out "Your position": guessing
+// would make the list below it jump when the session arrives.
 export function LeaderboardContent() {
-  const { leaderboard, isPending, failure, replacingPage } = useLeaderboard();
+  const { leaderboard, stage, isSessionKnown, isSignedIn, failure, retry, replacingPage } =
+    useLeaderboard();
 
-  if (isPending) {
-    return <StatusMessage role="status" icon={LoaderCircle} message="Reading the Leaderboard…" />;
+  if (stage === "loading") {
+    return (
+      <LoadingState message="Reading the Leaderboard…">
+        {isSessionKnown && <LeaderboardSkeleton withYourPosition={isSignedIn} />}
+      </LoadingState>
+    );
   }
-  if (failure) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
+  if (stage === "failed" && failure !== null) {
+    return (
+      <ErrorPanel title="Leaderboard" message={failure}>
+        <TryAgainKey onRetry={retry} />
+      </ErrorPanel>
+    );
+  }
   if (leaderboard === null) return null;
   if (leaderboard.total === 0)
     return <p className="m-0 text-ink-muted">No Player is ranked yet.</p>;
@@ -21,9 +34,7 @@ export function LeaderboardContent() {
       {replacingPage !== null && (
         <Navigate to="/leaderboard" search={{ page: replacingPage }} replace />
       )}
-      <LeaderboardPodium podium={leaderboard.podium} own={leaderboard.own} />
-      <YourPosition own={leaderboard.own} />
-      <AllRankedPlayers leaderboard={leaderboard} />
+      <LeaderboardSections leaderboard={leaderboard} />
     </>
   );
 }
