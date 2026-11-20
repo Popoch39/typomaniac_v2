@@ -11,10 +11,7 @@ import { DevSidebarStates } from "./DevSidebarStates.tsx";
 export function DevStatesPage() {
   return (
     <main className="flex min-h-svh flex-col gap-14 bg-surface-plate p-10 plate-dots">
-      <PageHeader
-        title="States"
-        lead="Every loading and error state, beside what it stands in for."
-      />
+      <PageHeader title="States" />
       <DevRankedStates />
       <DevProfileStates />
       <DevLeaderboardStates />

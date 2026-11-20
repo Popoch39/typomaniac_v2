@@ -12,10 +12,7 @@ import { TierLadder } from "./TierLadder.tsx";
 export function RankedPage() {
   return (
     <Page>
-      <PageHeader
-        title="Ranked"
-        lead="1v1 Duels, best of three Rounds. Win to earn LP and climb from Bronze to Master."
-      />
+      <PageHeader title="Ranked" />
       <SignedInPlayerChain
         guest={
           <SignInPrompt explanation="Ranked play is for signed-in Players. Sign in to get access." />

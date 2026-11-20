@@ -13,7 +13,7 @@ export function PlayerPage() {
 
   return (
     <Page>
-      <PageHeader title="Player" lead="A Player's Nickname, Ornament, Rank and Progress." />
+      <PageHeader title="Player" />
       <PlayerPageGate
         nickname={nickname}
         pending={
