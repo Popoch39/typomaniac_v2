@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { SidebarMenu, SidebarMenuItem } from "../../../shared/components/ui/sidebar.tsx";
+import { cn } from "../../../shared/lib/utils.ts";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
+import { playerChipClassName } from "../chip/playerChipClassName.ts";
+import { PlayerBlockLayout } from "./PlayerBlockLayout.tsx";
 import { PlayerStandingLine } from "./PlayerStandingLine.tsx";
 import { SidebarSignOutButton } from "./SidebarSignOutButton.tsx";
 
@@ -13,11 +15,14 @@ interface PlayerIdentityProps {
 // The PlayerChip: on the icon rail it shrinks to the avatar key, its text kept for screen readers.
 export function PlayerIdentity({ player }: PlayerIdentityProps) {
   return (
-    <SidebarMenu className="gap-2">
-      <SidebarMenuItem>
+    <PlayerBlockLayout
+      chip={
         <Link
           to="/profile"
-          className="key-travel flex min-w-0 items-center gap-3 rounded-lg border-2 border-key-outline bg-surface-raised p-2.5 pb-3 text-ink no-underline active:translate-y-[3px] motion-reduce:active:translate-y-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
+          className={cn(
+            playerChipClassName,
+            "key-travel text-ink no-underline active:translate-y-[3px] motion-reduce:active:translate-y-0",
+          )}
         >
           {/* On the icon rail the chip shrinks to fit the rail's 48px. */}
           <OrnamentedAvatar
@@ -34,10 +39,8 @@ export function PlayerIdentity({ player }: PlayerIdentityProps) {
             <PlayerStandingLine player={player} />
           </span>
         </Link>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarSignOutButton />
-      </SidebarMenuItem>
-    </SidebarMenu>
+      }
+      action={<SidebarSignOutButton />}
+    />
   );
 }
