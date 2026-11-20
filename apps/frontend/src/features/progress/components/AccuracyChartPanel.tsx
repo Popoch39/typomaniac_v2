@@ -13,12 +13,19 @@ interface AccuracyChartPanelProps {
   rows: readonly ProgressChartRow[];
   /** Said instead of empty axes while there is no Game. */
   emptyMessage: string;
+  className?: string;
 }
 
-export function AccuracyChartPanel({ rows, emptyMessage }: AccuracyChartPanelProps) {
+export function AccuracyChartPanel({ rows, emptyMessage, className }: AccuracyChartPanelProps) {
   return (
-    <Panel title="Accuracy and Consistency">
-      <ProgressChart rows={rows} config={CONFIG} series={SERIES} emptyMessage={emptyMessage} />
+    <Panel title="Accuracy and Consistency" className={className}>
+      <ProgressChart
+        rows={rows}
+        config={CONFIG}
+        series={SERIES}
+        emptyMessage={emptyMessage}
+        className="h-64"
+      />
     </Panel>
   );
 }

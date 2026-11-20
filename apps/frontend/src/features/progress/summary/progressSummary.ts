@@ -8,9 +8,12 @@ export interface ProgressSummary {
   drawn: number;
 }
 
+export type DuelOutcome = keyof ProgressSummary;
+
 export interface ProgressSummaryLine {
+  outcome: DuelOutcome;
   label: string;
-  value: string;
+  count: number;
 }
 
 /** The Duels won over every Duel played, draws included, from 0 to 1; `null` without any Duel. */
@@ -19,17 +22,18 @@ export function winRate({ won, lost, drawn }: ProgressSummary) {
   return played === 0 ? null : won / played;
 }
 
-/**
- * The summary's lines, always the same four, so that its box holds whatever the period: the win rate
- * reads as a dash without any Duel.
- */
-export function progressSummaryLines(summary: ProgressSummary): ProgressSummaryLine[] {
+/** The win rate in whole percents, or a dash without any Duel, so that its line is never empty. */
+export function winRateLabel(summary: ProgressSummary) {
   const rate = winRate(summary);
+  return rate === null ? "–" : `${Math.round(rate * 100)}%`;
+}
+
+/** The Duels won, lost and drawn, always the same three, so that the summary's box holds whatever the period. */
+export function progressSummaryLines(summary: ProgressSummary): ProgressSummaryLine[] {
   return [
-    { label: "Won", value: String(summary.won) },
-    { label: "Lost", value: String(summary.lost) },
-    { label: "Drawn", value: String(summary.drawn) },
-    { label: "Win rate", value: rate === null ? "–" : `${Math.round(rate * 100)}%` },
+    { outcome: "won", label: "Won", count: summary.won },
+    { outcome: "lost", label: "Lost", count: summary.lost },
+    { outcome: "drawn", label: "Drawn", count: summary.drawn },
   ];
 }
 

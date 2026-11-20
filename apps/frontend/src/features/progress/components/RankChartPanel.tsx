@@ -11,20 +11,26 @@ interface RankChartPanelProps {
   isUnranked: boolean;
   /** Said instead of empty axes while no Duel was played. */
   neverPlayedMessage: string;
+  className?: string;
 }
 
 // The message takes the chart's height and the legend keeps its room, so that the Panel keeps one box
 // with or without a curve.
-export function RankChartPanel({ points, isUnranked, neverPlayedMessage }: RankChartPanelProps) {
+export function RankChartPanel({
+  points,
+  isUnranked,
+  neverPlayedMessage,
+  className,
+}: RankChartPanelProps) {
   const { rows, message } = useRankChartPanel(points, isUnranked, neverPlayedMessage);
 
   return (
-    <Panel title="Rank">
+    <Panel title="Rank" className={className}>
       <div className="flex flex-col gap-3">
         {message === null ? (
           <RankChart rows={rows} />
         ) : (
-          <p className="m-0 flex h-72 items-center justify-center text-center text-ink-muted">
+          <p className="m-0 flex h-64 items-center justify-center text-center text-ink-muted">
             {message}
           </p>
         )}

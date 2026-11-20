@@ -23,7 +23,7 @@ export function RankChart({ rows }: RankChartProps) {
 
   return (
     // A fixed height, whatever the width, so that the page below never moves.
-    <ChartContainer config={CONFIG} className="aspect-auto h-72 w-full">
+    <ChartContainer config={CONFIG} className="aspect-auto h-64 w-full">
       <LineChart
         data={[...rows]}
         margin={{ top: 12, right: 12, bottom: 0, left: 0 }}

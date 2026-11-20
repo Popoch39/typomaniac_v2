@@ -3,6 +3,7 @@ import {
   peakTierLine,
   progressSummaryLines,
   winRate,
+  winRateLabel,
 } from "../src/features/progress/summary/progressSummary.ts";
 
 test("the win rate is the Duels won over every Duel played, draws included", () => {
@@ -15,28 +16,26 @@ test("without any Duel played there is no win rate", () => {
   expect(winRate({ won: 0, lost: 0, drawn: 0 })).toBeNull();
 });
 
-test("the summary lines give the Duels won, lost and drawn, then the win rate in whole percents", () => {
+test("the win rate reads in whole percents", () => {
+  expect(winRateLabel({ won: 2, lost: 1, drawn: 0 })).toBe("67%");
+  expect(winRateLabel({ won: 20, lost: 0, drawn: 0 })).toBe("100%");
+});
+
+test("without any Duel played, the win rate reads as a dash", () => {
+  expect(winRateLabel({ won: 0, lost: 0, drawn: 0 })).toBe("–");
+});
+
+test("the summary lines give the Duels won, lost and drawn, in that order", () => {
   expect(progressSummaryLines({ won: 2, lost: 1, drawn: 0 })).toEqual([
-    { label: "Won", value: "2" },
-    { label: "Lost", value: "1" },
-    { label: "Drawn", value: "0" },
-    { label: "Win rate", value: "67%" },
+    { outcome: "won", label: "Won", count: 2 },
+    { outcome: "lost", label: "Lost", count: 1 },
+    { outcome: "drawn", label: "Drawn", count: 0 },
   ]);
 });
 
-test("a period where every Duel was won reads 100%", () => {
-  expect(progressSummaryLines({ won: 20, lost: 0, drawn: 0 }).at(-1)).toEqual({
-    label: "Win rate",
-    value: "100%",
-  });
-});
-
-test("without any Duel played, the summary keeps every line, the win rate shown as a dash", () => {
-  expect(progressSummaryLines({ won: 0, lost: 0, drawn: 0 })).toEqual([
-    { label: "Won", value: "0" },
-    { label: "Lost", value: "0" },
-    { label: "Drawn", value: "0" },
-    { label: "Win rate", value: "–" },
+test("without any Duel played, the summary keeps every line", () => {
+  expect(progressSummaryLines({ won: 0, lost: 0, drawn: 0 }).map((line) => line.count)).toEqual([
+    0, 0, 0,
   ]);
 });
 

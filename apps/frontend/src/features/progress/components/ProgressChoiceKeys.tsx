@@ -8,7 +8,7 @@ interface ProgressChoiceKeysProps<Value extends string> {
   onChoose: (value: Value) => void;
 }
 
-// The chosen key stays sunk, as if held down. The row leaves room below for the keys' edge.
+// The chosen key stays sunk, as if held down. The keys leave room below for their edge.
 export function ProgressChoiceKeys<Value extends string>({
   label,
   options,
@@ -16,21 +16,23 @@ export function ProgressChoiceKeys<Value extends string>({
   onChoose,
 }: ProgressChoiceKeysProps<Value>) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2.5 pb-1">
-      <span aria-hidden className="mr-1.5 type-eyebrow text-ink-subtle">
+    <div role="group" aria-label={label} className="flex flex-col gap-3">
+      <span aria-hidden className="type-eyebrow text-ink-subtle">
         {label}
       </span>
-      {options.map((option) => (
-        <Keycap
-          key={option.value}
-          size="sm"
-          aria-pressed={option.value === chosen}
-          onClick={() => onChoose(option.value)}
-          className={cn(option.value === chosen && "keycap-pressed")}
-        >
-          {option.label}
-        </Keycap>
-      ))}
+      <div className="flex flex-wrap items-center gap-2.5 pb-1.5">
+        {options.map((option) => (
+          <Keycap
+            key={option.value}
+            size="sm"
+            aria-pressed={option.value === chosen}
+            onClick={() => onChoose(option.value)}
+            className={cn(option.value === chosen && "keycap-pressed")}
+          >
+            {option.label}
+          </Keycap>
+        ))}
+      </div>
     </div>
   );
 }

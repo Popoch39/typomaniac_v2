@@ -6,7 +6,7 @@ export function ProgressToolbar() {
   const { windows, kinds, window, kind, chooseWindow, chooseKind } = useProgressToolbar();
 
   return (
-    <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
+    <div className="flex flex-wrap items-end gap-x-12 gap-y-5">
       <ProgressChoiceKeys
         label="Period"
         options={windows}
