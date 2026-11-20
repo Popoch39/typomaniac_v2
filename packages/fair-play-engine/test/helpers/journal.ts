@@ -7,7 +7,8 @@ export type Typist = {
   readonly hold: (index: number, word: string) => number;
 };
 
-const ROUND_MS = 30_000;
+/** The length of a Duel Round, which every journal here fills. */
+export const ROUND_MS = 30_000;
 
 /** Target words that alternate a frequent word with a rare one, from the list the Duel draws from. */
 export const targetWords: readonly string[] = Array.from({ length: 250 }, (_, index) =>
