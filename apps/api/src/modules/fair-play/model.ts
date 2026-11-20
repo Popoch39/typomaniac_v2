@@ -1,4 +1,5 @@
 import { t } from "elysia";
+import { RateLimited } from "../rate-limit/index.ts";
 
 // A ranked Duel withdrawn where the cheating paid, as one of its Players may see it: never the MMR
 // (ADR 0006), nor who was at fault or why.
@@ -79,12 +80,39 @@ const sanctionRecord = t.Object({
   revokedAt: t.Nullable(t.Number()),
 });
 
+// Written again from the `duel` module: the journal as saved, to be replayed by the typing engine.
+const at = t.Number();
+const gameEvent = t.Union([
+  t.Object({ type: t.Literal("start"), at }),
+  t.Object({ type: t.Literal("keyDown"), at, code: t.String() }),
+  t.Object({ type: t.Literal("keyUp"), at, code: t.String() }),
+  t.Object({ type: t.Literal("insert"), at, text: t.String() }),
+  t.Object({
+    type: t.Literal("delete"),
+    at,
+    unit: t.Union([t.Literal("char"), t.Literal("word")]),
+  }),
+  t.Object({ type: t.Literal("tick"), at }),
+  t.Object({ type: t.Literal("addWords"), words: t.Immutable(t.Array(t.String())) }),
+]);
+
 // One saved ranked Game of the reviewed Player, with what each signal said of it, in the order of the
 // fair-play engine's signals; null while the fair-play pass has not read it yet.
 const reviewedGame = t.Object({
   round: t.Integer(),
   outcome,
   signals: t.Nullable(t.Array(t.Object({ name: t.String(), value: t.Number() }))),
+  // What the replay is drawn from: the Target words of the Round and the journal of the seat.
+  words: t.Array(t.String()),
+  journal: t.Array(gameEvent),
+  // The part of the saved Result the replay ends on.
+  result: t.Object({
+    duration: t.Number(),
+    wpm: t.Number(),
+    rawWpm: t.Number(),
+    accuracy: t.Number(),
+    consistency: t.Number(),
+  }),
 });
 
 export const AdminReviewsIdGet = {
@@ -125,6 +153,16 @@ export const AdminReviewsIdGet = {
       ),
       // Every Sanction, revoked ones included, newest first.
       sanctions: t.Array(sanctionRecord),
+      // The Reports made against the Player, newest first: weighed with the signals, never shown to them.
+      reports: t.Array(
+        t.Object({
+          duelId: t.String(),
+          // Null when the reporting Player has no Nickname.
+          reporterNickname: t.Nullable(t.String()),
+          // Epoch milliseconds.
+          reportedAt: t.Number(),
+        }),
+      ),
     }),
     403: forbidden,
     404: t.Object({ code: t.Literal("REVIEW_NOT_FOUND") }),
@@ -171,6 +209,19 @@ export const AdminSanctionsIdRevocationPost = {
     403: forbidden,
     404: t.Object({ code: t.Literal("SANCTION_NOT_FOUND") }),
     409: t.Object({ code: t.Literal("SANCTION_ALREADY_REVOKED") }),
+  },
+};
+
+export const DuelsIdReportPost = {
+  Params: t.Object({ id: t.String({ format: "uuid" }) }),
+  Response: {
+    // Received: nothing more is said, the reported Player least of all.
+    204: t.Void(),
+    // Refused alike to a Player who took no part in it and for a Custom Duel, so that a Report tells
+    // nothing of a Duel to a stranger.
+    404: t.Object({ code: t.Literal("DUEL_NOT_FOUND") }),
+    409: t.Object({ code: t.Literal("REPORT_ALREADY_MADE") }),
+    429: RateLimited,
   },
 };
 

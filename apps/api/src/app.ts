@@ -67,7 +67,7 @@ export const createApp = (
       .use(createPlayerRoutes(db, protection, rateLimiter))
       .use(createOrnamentRoutes(db, protection))
       .use(createStandingRoutes(db, auth, protection))
-      .use(createFairPlayRoutes(db, protection, fairPlay))
+      .use(createFairPlayRoutes(db, protection, rateLimiter, fairPlay))
       .use(
         createDuelRoutes(
           db,

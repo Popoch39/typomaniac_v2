@@ -4,11 +4,16 @@ import type { Result } from "@repo/typing-engine";
 /** One of a Player's Games in a ranked Duel, as its saved Result gives it. */
 export type RankedGame = Pick<Result, "wpm" | "accuracy" | "history">;
 
-/** One of a Player's ranked Duels, seen from them: who they met, its Outcome, and their Games in Round order. */
+/**
+ * One of a Player's ranked Duels, seen from them: who they met, its Outcome, whether that Opponent
+ * reported them, and their Games in Round order.
+ */
 export type RankedDuel = {
   /** Null for an Opponent whose account no longer exists. */
   readonly opponentId: string | null;
   readonly outcome: Outcome;
+  /** Whether the Opponent made a Report against the Player on this Duel. */
+  readonly reported: boolean;
   readonly games: readonly RankedGame[];
 };
 
@@ -18,6 +23,7 @@ export const DUEL_SIGNAL_NAMES = [
   "errorlessSeries",
   "oneSidedPair",
   "lossWithoutTyping",
+  "reports",
 ] as const;
 
 export type DuelSignalName = (typeof DUEL_SIGNAL_NAMES)[number];
@@ -48,6 +54,9 @@ const ONE_SIDED = 1;
 // handing their losses to someone.
 const CALLED_AWAY = 1;
 const HANDED_LOSSES = 3;
+// Reported Duels from which the Report signal reads 1: a sore loser's one Report says little, many
+// Opponents reporting the same Player say more.
+const REPORTED_DUELS = 5;
 
 /** 1 at or past `full`, 0 at or past `none`, linear between: works in either direction. */
 const ramp = (value: number, full: number, none: number) =>
@@ -112,7 +121,11 @@ const lossWithoutTyping = (duels: readonly RankedDuel[]) => {
   return ramp(handed, HANDED_LOSSES, CALLED_AWAY);
 };
 
-/** ACROSS-1 to ACROSS-6: what every signal across Duels says of a Player, given their ranked Duels newest first. */
+/** REPORT-1: ranked Duels in which the Opponent reported the Player. */
+const reports = (duels: readonly RankedDuel[]) =>
+  ramp(duels.filter(({ reported }) => reported).length, REPORTED_DUELS, 0);
+
+/** ACROSS-1 to ACROSS-5 and REPORT-1: what every signal across Duels says of a Player, given their ranked Duels newest first. */
 export const readDuelSignals = (allDuels: readonly RankedDuel[]): DuelSignals => {
   const recentDuels = allDuels.slice(0, SUSPICION_DUELS);
   const oldestFirst = [...recentDuels].reverse();
@@ -121,5 +134,6 @@ export const readDuelSignals = (allDuels: readonly RankedDuel[]): DuelSignals =>
     errorlessSeries: errorlessSeries(oldestFirst),
     oneSidedPair: oneSidedPair(recentDuels),
     lossWithoutTyping: lossWithoutTyping(recentDuels),
+    reports: reports(recentDuels),
   };
 };

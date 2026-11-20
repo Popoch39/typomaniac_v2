@@ -6,7 +6,9 @@ import {
   duel,
   duelGame,
   duelParticipant,
+  duelRound,
   gameAnalysis,
+  report,
   review,
   sanction,
   suspicion,
@@ -60,6 +62,43 @@ export const readCurrentSuspension = async (db: Db, playerId: string, now: Date)
 };
 
 const opponentSeat = alias(duelParticipant, "opponent_seat");
+
+/**
+ * Saves the Player's Report against their Opponent in a ranked Duel, at `at`: "not_found" when the
+ * Player took no part in a saved ranked Duel with this id, or their Opponent has no account any more,
+ * and "already_made" when they reported on this Duel before. It only raises Suspicion, at the next
+ * fair-play pass.
+ */
+export const makeReport = async (
+  db: Db,
+  { duelId, playerId, at }: { duelId: string; playerId: string; at: Date },
+): Promise<"made" | "already_made" | "not_found"> => {
+  const [seated] = await db
+    .select({ opponentId: opponentSeat.playerId })
+    .from(duelParticipant)
+    .innerJoin(duel, eq(duel.id, duelParticipant.duelId))
+    .innerJoin(
+      opponentSeat,
+      and(
+        eq(opponentSeat.duelId, duelParticipant.duelId),
+        ne(opponentSeat.seat, duelParticipant.seat),
+      ),
+    )
+    .where(
+      and(
+        eq(duelParticipant.duelId, duelId),
+        eq(duelParticipant.playerId, playerId),
+        eq(duel.kind, "ranked"),
+      ),
+    );
+  if (!seated?.opponentId) return "not_found";
+  const made = await db
+    .insert(report)
+    .values({ duelId, reporterId: playerId, reportedId: seated.opponentId, reportedAt: at })
+    .onConflictDoNothing({ target: [report.duelId, report.reporterId] })
+    .returning({ id: report.id });
+  return made.length === 0 ? "already_made" : "made";
+};
 
 /**
  * The Voided Duels the Player sat in, newest first: when each was voided, against whom, whether that
@@ -129,7 +168,8 @@ export const REVIEW_RECENT_DUELS = 20;
 
 /**
  * A Review as the administrator reads it, or null when there is none with this id: the Player, their
- * Suspicion and whole Standing, their recent ranked Duels with what each signal said of each Game,
+ * Suspicion and whole Standing, their recent ranked Duels with what each signal said of each Game and
+ * what it is replayed from,
  * their Violations and every Sanction they were given, revoked ones included.
  */
 export const readReview = async (db: Db, reviewId: string) => {
@@ -149,7 +189,7 @@ export const readReview = async (db: Db, reviewId: string) => {
     .where(eq(review.id, reviewId));
   if (!found) return null;
   const { playerId } = found;
-  const [standing, duels, violations, sanctions] = await Promise.all([
+  const [standing, duels, violations, sanctions, reports] = await Promise.all([
     readStanding(db, playerId),
     readReviewedDuels(db, playerId),
     db
@@ -163,6 +203,7 @@ export const readReview = async (db: Db, reviewId: string) => {
       .where(eq(violation.playerId, playerId))
       .orderBy(desc(violation.committedAt)),
     readSanctions(db, playerId),
+    readReviewedReports(db, playerId),
   ]);
   return {
     id: found.id,
@@ -177,6 +218,7 @@ export const readReview = async (db: Db, reviewId: string) => {
       committedAt: committedAt.getTime(),
     })),
     sanctions,
+    reports,
   };
 };
 
@@ -209,6 +251,21 @@ const readSanctions = async (db: Db, playerId: string) => {
 export const readPlayerSanctions = async (db: Db, playerId: string) => {
   const [found] = await db.select({ id: user.id }).from(user).where(eq(user.id, playerId));
   return found ? readSanctions(db, playerId) : null;
+};
+
+// The Reports made against the Player, newest first, with the Duel each concerns and who made it.
+const readReviewedReports = async (db: Db, playerId: string) => {
+  const rows = await db
+    .select({
+      duelId: report.duelId,
+      reporterNickname: user.nickname,
+      reportedAt: report.reportedAt,
+    })
+    .from(report)
+    .innerJoin(user, eq(user.id, report.reporterId))
+    .where(eq(report.reportedId, playerId))
+    .orderBy(desc(report.reportedAt), asc(report.id));
+  return rows.map(({ reportedAt, ...row }) => ({ ...row, reportedAt: reportedAt.getTime() }));
 };
 
 // The Player's recent ranked Duels, newest first, each with its Games in Round order.
@@ -245,8 +302,15 @@ const readReviewedDuels = async (db: Db, playerId: string) => {
             seat: duelGame.seat,
             outcome: duelGame.outcome,
             signals: gameAnalysis.signals,
+            words: duelRound.words,
+            journal: duelGame.journal,
+            result: duelGame.result,
           })
           .from(duelGame)
+          .innerJoin(
+            duelRound,
+            and(eq(duelRound.duelId, duelGame.duelId), eq(duelRound.round, duelGame.round)),
+          )
           .leftJoin(
             gameAnalysis,
             and(
@@ -268,10 +332,13 @@ const readReviewedDuels = async (db: Db, playerId: string) => {
     ...row,
     games: games
       .filter((game) => game.duelId === duelId && game.seat === seat)
-      .map(({ round, outcome, signals }) => ({
+      .map(({ round, outcome, signals, words, journal, result }) => ({
         round,
         outcome,
         signals: signals && SIGNAL_NAMES.map((name) => ({ name, value: signals[name] })),
+        words,
+        journal,
+        result,
       })),
   }));
 };

@@ -162,6 +162,13 @@
       "when": 1795193528607,
       "tag": "0022_administrator",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795193931650,
+      "tag": "0023_report",
+      "breakpoints": true
     }
   ]
 }

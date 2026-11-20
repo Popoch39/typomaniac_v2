@@ -215,7 +215,7 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
         outcome: "loss",
         lpDelta: expect.any(Number),
         opponentNickname: "opponent",
-        games: [{ round: 1, outcome: "loss", signals: null }],
+        games: [expect.objectContaining({ round: 1, outcome: "loss", signals: null })],
       },
       {
         duelId: older,
@@ -224,7 +224,7 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
         lpDelta: expect.any(Number),
         opponentNickname: "opponent",
         games: [
-          {
+          expect.objectContaining({
             round: 1,
             outcome: "win",
             signals: [
@@ -235,7 +235,7 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
               { name: "superhumanSpeed", value: 0 },
               { name: "browserHints", value: 1 },
             ],
-          },
+          }),
         ],
       },
     ],
@@ -248,6 +248,38 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
         startedAt: 4_000_000,
         endsAt: 5_000_000,
         revokedAt: null,
+      },
+    ],
+    reports: [],
+  });
+});
+
+test("a Review gives the journal, the Target words and the saved Result of each Game, so that it can be replayed", async () => {
+  const { cookie } = await signInAdministrator();
+  const suspect = await underReview("suspect", { reason: "suspicion", openedAt: 5000, value: 0.8 });
+  const { player: opponent } = await signInPlayer(auth);
+  await saveRankedWin([suspect.playerId, opponent.id], 1_000_000);
+  const saved = resultOf(machineJournal());
+
+  const response = await get(`/api/admin/reviews/${suspect.reviewId}`, cookie);
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    duels: [
+      {
+        games: [
+          {
+            words: [...targetWords],
+            journal: machineJournal(),
+            result: {
+              duration: saved.duration,
+              wpm: saved.wpm,
+              rawWpm: saved.rawWpm,
+              accuracy: saved.accuracy,
+              consistency: saved.consistency,
+            },
+          },
+        ],
       },
     ],
   });

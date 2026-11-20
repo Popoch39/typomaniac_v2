@@ -5,6 +5,7 @@ import { useReview } from "../hooks/useReview.ts";
 import { PlayerSanctions } from "./PlayerSanctions.tsx";
 import { ReviewDuels } from "./ReviewDuels.tsx";
 import { ReviewRecords } from "./ReviewRecords.tsx";
+import { ReviewReports } from "./ReviewReports.tsx";
 import { ReviewSettlement } from "./ReviewSettlement.tsx";
 import { ReviewSummary } from "./ReviewSummary.tsx";
 
@@ -24,6 +25,7 @@ export function ReviewDetail({ reviewId }: ReviewDetailProps) {
       <ReviewSummary review={review} />
       <ReviewDuels duels={review.duels} />
       <ReviewRecords review={review} />
+      <ReviewReports review={review} />
       <PlayerSanctions review={review} />
       <ReviewSettlement review={review} />
     </Panel>

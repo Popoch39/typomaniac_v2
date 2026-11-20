@@ -5,6 +5,7 @@ import {
   duelParticipant,
   duelRound,
   gameAnalysis,
+  report,
   review,
   suspicion,
   type Transaction,
@@ -20,6 +21,7 @@ import {
   SUSPICION_GAMES,
 } from "@repo/fair-play-engine";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 // A ranked Game of a Player, saved by `at`, that no analysis of the current signals has read yet:
@@ -43,10 +45,20 @@ const analysisOfGame = and(
   eq(gameAnalysis.seat, duelGame.seat),
 );
 
+// A Report made by `at` that the Suspicion of the Player it is against has not read yet: made after
+// it was last computed, or before it ever was.
+const unreadReports = (at: Date, ofPlayer?: SQL) =>
+  and(
+    lte(report.reportedAt, at),
+    or(isNull(suspicion.computedAt), gt(report.reportedAt, suspicion.computedAt)),
+    ofPlayer,
+  );
+
 /**
  * Reads the signals of every saved ranked Game not read yet by the current signals, then updates the
- * Suspicion of each Player who played one, one Player per transaction. A Game already read by the
- * current signals is never read again, so a second pass changes nothing.
+ * Suspicion of each Player who played one, or who was reported since it was last computed, one Player
+ * per transaction. A Game already read by the current signals is never read again, nor a Report
+ * already counted, so a second pass changes nothing.
  */
 export const analyseGames = async (db: Db, at: Date) => {
   const players = await db
@@ -57,8 +69,18 @@ export const analyseGames = async (db: Db, at: Date) => {
     .leftJoin(gameAnalysis, analysisOfGame)
     .where(pendingGames(at))
     .groupBy(duelParticipant.playerId);
-  for (const { playerId } of players)
-    if (playerId !== null) await db.transaction((tx) => analysePlayer(tx, playerId, at));
+  // A Report raises the reported Player's Suspicion at the next pass, even when every Game of theirs
+  // was read before it was made.
+  const reported = await db
+    .selectDistinct({ playerId: report.reportedId })
+    .from(report)
+    .leftJoin(suspicion, eq(suspicion.playerId, report.reportedId))
+    .where(unreadReports(at));
+  const playerIds = new Set([
+    ...players.flatMap(({ playerId }) => (playerId === null ? [] : [playerId])),
+    ...reported.map(({ playerId }) => playerId),
+  ]);
+  for (const playerId of playerIds) await db.transaction((tx) => analysePlayer(tx, playerId, at));
 };
 
 const analysePlayer = async (tx: Transaction, playerId: string, at: Date) => {
@@ -84,7 +106,13 @@ const analysePlayer = async (tx: Transaction, playerId: string, at: Date) => {
       and(eq(duelRound.duelId, duelGame.duelId), eq(duelRound.round, duelGame.round)),
     )
     .where(and(eq(duelParticipant.playerId, playerId), pendingGames(at)));
-  if (games.length === 0) return;
+  const [unread] = await tx
+    .select({ id: report.id })
+    .from(report)
+    .leftJoin(suspicion, eq(suspicion.playerId, report.reportedId))
+    .where(unreadReports(at, eq(report.reportedId, playerId)))
+    .limit(1);
+  if (games.length === 0 && !unread) return;
   for (const { duelId, round, seat, journal, hints, config, targetWords } of games) {
     const analysis = {
       signalsVersion: SIGNALS_VERSION,
@@ -153,7 +181,8 @@ export const lastSettledReviewAt = async (tx: Transaction, playerId: string) => 
 
 /**
  * ACROSS-5: the Player's most recent ranked Duels saved by `at` and started after `since`, their last
- * settled Review, newest first, each with its Opponent and the Player's own Games in Round order. The
+ * settled Review, newest first, each with its Opponent, whether that Opponent reported them by `at`
+ * (REPORT-1), and the Player's own Games in Round order. The
  * same window as the Games of REVIEW-4, so that no Duel is judged twice either.
  */
 export const recentDuels = async (
@@ -168,12 +197,23 @@ export const recentDuels = async (
       seat: duelParticipant.seat,
       outcome: duelParticipant.outcome,
       opponentId: opponent.playerId,
+      reportId: report.id,
     })
     .from(duelParticipant)
     .innerJoin(duel, eq(duel.id, duelParticipant.duelId))
     .innerJoin(
       opponent,
       and(eq(opponent.duelId, duelParticipant.duelId), ne(opponent.seat, duelParticipant.seat)),
+    )
+    // One Report at most per Duel and reporting Player: the join never doubles a Duel.
+    .leftJoin(
+      report,
+      and(
+        eq(report.duelId, duelParticipant.duelId),
+        eq(report.reportedId, playerId),
+        eq(report.reporterId, opponent.playerId),
+        lte(report.reportedAt, at),
+      ),
     )
     .where(
       and(
@@ -196,9 +236,10 @@ export const recentDuels = async (
       ),
     )
     .orderBy(asc(duelGame.round));
-  return duels.map(({ duelId, seat, outcome, opponentId }) => ({
+  return duels.map(({ duelId, seat, outcome, opponentId, reportId }) => ({
     opponentId,
     outcome,
+    reported: reportId !== null,
     games: games
       .filter((game) => game.duelId === duelId && game.seat === seat)
       .map(({ result }) => result),

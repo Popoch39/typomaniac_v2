@@ -18,7 +18,12 @@ test("ACROSS-1: ordinary progress from one ranked Duel to the next does not read
 });
 
 test("ACROSS-1: a Duel in which the Player typed nothing is no level to jump from", () => {
-  const away = { opponentId: null, outcome: "loss" as const, games: [idleGame, idleGame] };
+  const away = {
+    opponentId: null,
+    outcome: "loss" as const,
+    reported: false,
+    games: [idleGame, idleGame],
+  };
   const duels = history(played(60), away, played(64));
 
   expect(readDuelSignals(duels).levelJump).toBe(0);
@@ -39,7 +44,7 @@ test("ACROSS-2: a few Games without an incorrect Keystroke among Games with mist
 });
 
 test("ACROSS-2: a Game in which the Player typed nothing breaks a series", () => {
-  const away = { opponentId: null, outcome: "loss" as const, games: [idleGame] };
+  const away = { opponentId: null, outcome: "loss" as const, reported: false, games: [idleGame] };
   const series = Array.from({ length: 2 }, () => clean(70));
 
   expect(readDuelSignals(history(...series, away, ...series)).errorlessSeries).toBe(0);
@@ -73,6 +78,7 @@ test("ACROSS-3: two Players who meet often with Outcomes shared between them do 
 const thrown = (opponentId: string | null = null) => ({
   opponentId,
   outcome: "loss" as const,
+  reported: false,
   games: [idleGame, idleGame],
 });
 
