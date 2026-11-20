@@ -7,12 +7,16 @@ const rankedDuelUnfinished = t.Object({
   duelId: t.String(),
 });
 
-// The Player is suspended from ranked play until the instant given, in epoch milliseconds; never why.
-const rankedSuspended = t.Object({ code: t.Literal("RANKED_SUSPENDED"), endsAt: t.Number() });
-
-// A 403 is also what the Nickname protection answers: a declared status validates every response
-// that carries it.
-const forbidden = t.Union([t.Object({ code: t.Literal("NICKNAME_REQUIRED") }), rankedSuspended]);
+// The Player is suspended from ranked play until `endsAt`, in epoch milliseconds; never why. Or their
+// GitHub or Discord account is too young for ranked: it opens at `opensAt`. Or its age is not recorded
+// yet, and signing in again records it.
+// The protection's own refusal of a Player without a Nickname shares the status, so it is listed too.
+const forbidden = t.Union([
+  t.Object({ code: t.Literal("RANKED_SUSPENDED"), endsAt: t.Number() }),
+  t.Object({ code: t.Literal("ACCOUNT_TOO_YOUNG"), opensAt: t.Number() }),
+  t.Object({ code: t.Literal("ACCOUNT_AGE_UNKNOWN") }),
+  t.Object({ code: t.Literal("NICKNAME_REQUIRED") }),
+]);
 
 const lp = t.Integer();
 

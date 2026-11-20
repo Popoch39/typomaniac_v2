@@ -1,0 +1,1 @@
+ALTER TABLE "account" ADD COLUMN "provider_created_at" timestamp;

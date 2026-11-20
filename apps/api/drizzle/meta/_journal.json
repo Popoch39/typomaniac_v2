@@ -99,6 +99,13 @@
       "when": 1795188672124,
       "tag": "0013_voided_duel",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795188715729,
+      "tag": "0014_account_provider_created_at",
+      "breakpoints": true
     }
   ]
 }

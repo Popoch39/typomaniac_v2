@@ -1,8 +1,10 @@
 import type { Logger } from "@repo/logger";
 import type { PairingSide } from "@repo/matchmaking-engine";
 import type { EntryHolder } from "@repo/queue";
+import { rankedOpensAt } from "@repo/fair-play-engine";
 import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
-import type { Db } from "../../db/client.ts";
+import { eq } from "drizzle-orm";
+import { account, type Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { draftRankedDuel } from "../duel/service.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
@@ -145,4 +147,18 @@ export const createEntryRefreshes = (
     /** Refreshes no entry any more, as if this instance had crashed. */
     stop,
   };
+};
+
+/**
+ * The instant from which the Player may queue, given when the provider made each of their accounts;
+ * `null` while none has its creation date recorded.
+ */
+export const readRankedOpensAt = async (db: Db, playerId: string) => {
+  const accounts = await db
+    .select({ providerCreatedAt: account.providerCreatedAt })
+    .from(account)
+    .where(eq(account.userId, playerId));
+  return rankedOpensAt(
+    accounts.map(({ providerCreatedAt }) => providerCreatedAt?.getTime() ?? null),
+  );
 };
