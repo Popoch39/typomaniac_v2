@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { loadingOnly, readStage } from "../src/shared/api/readStage.ts";
+import { loadingOnly, readStage, retryFailed } from "../src/shared/api/readStage.ts";
 
 const read = { isPending: false, isError: false, isFetching: false };
 const pending = { isPending: true, isError: false, isFetching: true };
@@ -29,4 +29,14 @@ test("a read whose failure another part shows never fails the page", () => {
 test("a read whose failure another part shows still keeps the page loading while it is read", () => {
   expect(readStage([read, loadingOnly(pending)])).toBe("loading");
   expect(readStage([read, loadingOnly(retrying)])).toBe("loading");
+});
+
+test("trying again refetches the failed reads only", () => {
+  const refetched: string[] = [];
+  const query = (name: string, isError: boolean) => ({
+    isError,
+    refetch: () => refetched.push(name),
+  });
+  retryFailed([query("leaderboard", true), query("session", false), query("ornament", true)]);
+  expect(refetched).toEqual(["leaderboard", "ornament"]);
 });

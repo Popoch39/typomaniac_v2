@@ -5,12 +5,15 @@ export interface ReadStatus {
   isFetching: boolean;
 }
 
+export type ReadStage = "loading" | "failed" | "ready";
+
+const isRetrying = (read: ReadStatus) => read.isError && read.isFetching;
+
 /**
  * Where a page stands across the reads its layout waits on. A failed read being tried again counts
  * as loading, so that "Try again" brings the skeleton back rather than leaving the error up.
  */
-export function readStage(reads: readonly ReadStatus[]): "loading" | "failed" | "ready" {
-  const isRetrying = (read: ReadStatus) => read.isError && read.isFetching;
+export function readStage(reads: readonly ReadStatus[]): ReadStage {
   if (reads.some((read) => read.isError && !isRetrying(read))) return "failed";
   if (reads.some((read) => read.isPending || isRetrying(read))) return "loading";
   return "ready";
@@ -22,8 +25,13 @@ export function readStage(reads: readonly ReadStatus[]): "loading" | "failed" | 
  */
 export function loadingOnly(read: ReadStatus): ReadStatus {
   return {
-    isPending: read.isPending || (read.isError && read.isFetching),
+    isPending: read.isPending || isRetrying(read),
     isError: false,
     isFetching: read.isFetching,
   };
+}
+
+/** "Try again" across several reads: those that came back are not read twice. */
+export function retryFailed(reads: readonly { isError: boolean; refetch: () => unknown }[]) {
+  for (const read of reads) if (read.isError) void read.refetch();
 }

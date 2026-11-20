@@ -6,14 +6,10 @@ import { standingQueryOptions } from "../api/standingQueryOptions.ts";
 
 /** Waits without reading while `player` is null, the session not being known yet. */
 export function useStanding(player: SignedInPlayer | null) {
-  const read = useQuery({
-    ...standingQueryOptions(player?.id ?? ""),
-    enabled: player !== null,
-  });
-  const { data, isPending, error } = read;
+  const read = useQuery(standingQueryOptions(player === null ? null : player.id));
+  const { data, error } = read;
   return {
     standing: data ?? null,
-    isPending,
     read,
     stage: readStage([read]),
     failure: error === null ? null : describeApiError(error),

@@ -12,7 +12,7 @@ import { useStanding } from "../../ranked/hooks/useStanding.ts";
 export function useProfileReads(player: SignedInPlayer | null) {
   const { standing, read, failure, retry } = useStanding(player);
   const hasNickname = player !== null && player.nickname !== null;
-  const ornament = useQuery({ ...ornamentQueryOptions(player?.id ?? ""), enabled: hasNickname });
+  const ornament = useQuery(ornamentQueryOptions(hasNickname ? player.id : null));
 
   return {
     standing,

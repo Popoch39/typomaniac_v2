@@ -13,25 +13,20 @@ export type LeaderboardPlayer = Leaderboard["podium"][number];
 /**
  * The page of the Leaderboard the URL asks for, and the page the URL must be replaced by when the
  * server served another one. The page shown stays until the next one is read, so that turning a page
- * never blanks the Leaderboard. The session is waited on too: it decides whether "Your position" is
- * laid out.
+ * never blanks the Leaderboard. The session is not waited on: only "Your position" depends on it, and
+ * the skeleton drops that Panel only once the reader is known to be a Guest.
  */
 export function useLeaderboard() {
   const { page } = useSearch({ from: "/_shell/leaderboard" });
   const me = useQuery(meQueryOptions());
   const read = useQuery({ ...leaderboardQueryOptions(page), placeholderData: keepPreviousData });
-  const { data, isPlaceholderData } = read;
-  const error = me.error ?? read.error;
+  const { data, isPlaceholderData, error } = read;
   return {
     leaderboard: data ?? null,
-    stage: readStage([me, read]),
-    isSessionKnown: !me.isPending,
-    isSignedIn: me.data != null,
+    stage: readStage([read]),
+    isGuest: me.data === null,
     failure: error === null ? null : describeApiError(error),
-    retry: () => {
-      if (me.isError) void me.refetch();
-      if (read.isError) void read.refetch();
-    },
+    retry: () => void read.refetch(),
     replacingPage:
       data === undefined
         ? null
