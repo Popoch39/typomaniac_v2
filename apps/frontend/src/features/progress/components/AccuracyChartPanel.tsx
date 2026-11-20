@@ -11,15 +11,13 @@ const SERIES = [{ key: "accuracy" }, { key: "consistency" }] as const;
 
 interface AccuracyChartPanelProps {
   rows: readonly ProgressChartRow[];
-  /** What the period and the kind of Duels chosen cover. */
-  tag: string;
   /** Said instead of empty axes while there is no Game. */
   emptyMessage: string;
 }
 
-export function AccuracyChartPanel({ rows, tag, emptyMessage }: AccuracyChartPanelProps) {
+export function AccuracyChartPanel({ rows, emptyMessage }: AccuracyChartPanelProps) {
   return (
-    <Panel title="Accuracy and Consistency" tag={tag}>
+    <Panel title="Accuracy and Consistency">
       <ProgressChart rows={rows} config={CONFIG} series={SERIES} emptyMessage={emptyMessage} />
     </Panel>
   );
