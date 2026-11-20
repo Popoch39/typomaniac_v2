@@ -35,6 +35,7 @@
     "../src/features/ornament/picker",
     "../src/features/progress/chart",
     "../src/features/progress/filter",
+    "../src/features/progress/rank",
     "../src/features/ranked/standing",
     "../src/features/queue/clock",
     "../src/features/queue/message",

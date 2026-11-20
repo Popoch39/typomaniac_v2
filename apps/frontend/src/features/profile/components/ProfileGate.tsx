@@ -3,19 +3,21 @@ import type { ReactNode } from "react";
 import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import type { ProgressGame } from "../../progress/chart/progressChartRows.ts";
+import type { RankPoint } from "../../progress/rank/rankChartRows.ts";
 import type { OwnStanding } from "../../ranked/standing/describeStanding.ts";
 import { useProfileReads } from "../hooks/useProfileReads.ts";
 
 interface ProfileGateProps {
   player: SignedInPlayer;
   /**
-   * `games` is null for a Player without a Nickname, whose Progress is not read;
+   * `games` and `rankPoints` are null for a Player without a Nickname, whose Progress is not read;
    * `isProgressUpdating` while they are those of the previous period or kind.
    */
   children: (
     standing: OwnStanding,
     games: readonly ProgressGame[] | null,
     isProgressUpdating: boolean,
+    rankPoints: readonly RankPoint[] | null,
   ) => ReactNode;
 }
 
@@ -28,5 +30,10 @@ export function ProfileGate({ player, children }: ProfileGateProps) {
   }
   if (failure) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
   if (standing === null) return null;
-  return children(standing, progress?.games ?? null, isProgressUpdating);
+  return children(
+    standing,
+    progress?.games ?? null,
+    isProgressUpdating,
+    progress?.rankPoints ?? null,
+  );
 }

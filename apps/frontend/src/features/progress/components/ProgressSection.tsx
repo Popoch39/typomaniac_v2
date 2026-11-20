@@ -1,8 +1,10 @@
 import { cn } from "../../../shared/lib/utils.ts";
 import type { ProgressGame } from "../chart/progressChartRows.ts";
+import type { RankPoint } from "../rank/rankChartRows.ts";
 import { useProgressSection } from "../hooks/useProgressSection.ts";
 import { AccuracyChartPanel } from "./AccuracyChartPanel.tsx";
 import { ProgressToolbar } from "./ProgressToolbar.tsx";
+import { RankChartPanel } from "./RankChartPanel.tsx";
 import { WpmChartPanel } from "./WpmChartPanel.tsx";
 
 interface ProgressSectionProps {
@@ -11,10 +13,19 @@ interface ProgressSectionProps {
   isUpdating: boolean;
   /** Said instead of empty axes while no Duel was played. */
   emptyMessage: string;
+  rankPoints: readonly RankPoint[];
+  /** The Rank chart waits for the end of the Placement. */
+  isUnranked: boolean;
 }
 
 // Every Panel stays drawn, even without a Game, so that choosing another period or kind moves nothing.
-export function ProgressSection({ games, isUpdating, emptyMessage }: ProgressSectionProps) {
+export function ProgressSection({
+  games,
+  isUpdating,
+  emptyMessage,
+  rankPoints,
+  isUnranked,
+}: ProgressSectionProps) {
   const section = useProgressSection(games, emptyMessage);
 
   return (
@@ -26,6 +37,11 @@ export function ProgressSection({ games, isUpdating, emptyMessage }: ProgressSec
       >
         <WpmChartPanel {...section} />
         <AccuracyChartPanel {...section} />
+        <RankChartPanel
+          points={rankPoints}
+          isUnranked={isUnranked}
+          neverPlayedMessage={emptyMessage}
+        />
       </div>
     </section>
   );
