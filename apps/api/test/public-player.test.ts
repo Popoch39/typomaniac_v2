@@ -178,7 +178,7 @@ test("the MMR is not in a Player's page", async () => {
   });
 });
 
-test("a Player reading pages beyond the progress limit is refused with 429 and told when to retry", async () => {
+test("a Player reading pages beyond their public read limit is refused with 429 and told when to retry", async () => {
   const limitedRedis = await createTestRedis();
   try {
     const limited = createApp(testDb.db, auth, limitedRedis.redis, getLogger("api"), {

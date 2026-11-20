@@ -411,7 +411,7 @@ test("an unknown Nickname answers 404 with its own code", async () => {
   expect(await response.json()).toEqual({ code: "PLAYER_NOT_FOUND" });
 });
 
-test("a Player reading Progress beyond the progress limit is refused with 429 and told when to retry", async () => {
+test("a Player reading Progress beyond their public read limit is refused with 429 and told when to retry", async () => {
   const limitedRedis = await createTestRedis();
   try {
     const limited = createApp(testDb.db, auth, limitedRedis.redis, getLogger("api"), {

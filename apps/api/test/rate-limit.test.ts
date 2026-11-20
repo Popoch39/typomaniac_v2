@@ -138,7 +138,7 @@ test("new Guests from one IP beyond its limit get a 429 instead of a cookie", as
   });
 });
 
-test("public Player pages read without a session beyond the progress limit of one IP are refused with 429", async () => {
+test("public Player pages read without a session beyond the public read limit of one IP are refused with 429", async () => {
   await withRedis(async (redis) => {
     const { origin, stop } = listenWith(redis, {
       limits: { publicReadPerRequester: generous, publicReadPerIp: twoPerMinute },
