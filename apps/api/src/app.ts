@@ -1,6 +1,7 @@
 import type { ApiModule, Logger } from "@repo/logger";
 import { Elysia } from "elysia";
 import type { Db } from "./db/client.ts";
+import { createAdministrationRoutes } from "./modules/administration/index.ts";
 import { createAuthRoutes, createProtection } from "./modules/auth/index.ts";
 import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
@@ -15,6 +16,7 @@ import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
 import { createQueueRoutes, type QueueOptions } from "./modules/queue/index.ts";
 import { createRateLimiter, type RateLimitOptions } from "./modules/rate-limit/index.ts";
+import { createReportRoutes } from "./modules/report/index.ts";
 import { createStandingRoutes } from "./modules/standing/index.ts";
 import type { Redis } from "./redis/client.ts";
 
@@ -67,7 +69,9 @@ export const createApp = (
       .use(createPlayerRoutes(db, protection, rateLimiter))
       .use(createOrnamentRoutes(db, protection))
       .use(createStandingRoutes(db, auth, protection))
-      .use(createFairPlayRoutes(db, protection, rateLimiter, fairPlay))
+      .use(createFairPlayRoutes(db, protection, fairPlay))
+      .use(createReportRoutes(db, protection, rateLimiter))
+      .use(createAdministrationRoutes(db, protection))
       .use(
         createDuelRoutes(
           db,
