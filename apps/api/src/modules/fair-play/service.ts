@@ -2,10 +2,13 @@ import { and, desc, eq, gt, gte, isNull, lte, ne } from "drizzle-orm";
 import { REPAIR_WINDOW_MS } from "@repo/fair-play-engine";
 import { alias } from "drizzle-orm/pg-core";
 import {
+  account,
+  bannedIdentity,
   type Db,
   duel,
   duelParticipant,
   sanction,
+  session,
   user,
   voidedDuel,
   type Transaction,
@@ -138,25 +141,77 @@ export const suspendPlayer = (
       })
       .returning({ id: sanction.id });
     if (!saved) throw new Error(`Could not save the Suspension of Player ${playerId}`);
-    const won = await tx
-      .select({ duelId: duel.id })
-      .from(duelParticipant)
-      .innerJoin(duel, eq(duel.id, duelParticipant.duelId))
-      .leftJoin(voidedDuel, eq(voidedDuel.duelId, duel.id))
-      .where(
-        and(
-          eq(duelParticipant.playerId, playerId),
-          eq(duelParticipant.outcome, "win"),
-          eq(duel.kind, "ranked"),
-          gte(duel.endedAt, new Date(at.getTime() - REPAIR_WINDOW_MS)),
-          lte(duel.endedAt, at),
-          isNull(voidedDuel.duelId),
-        ),
-      )
-      .orderBy(duel.endedAt);
-    for (const { duelId } of won)
-      await withdrawDuel(tx, { duelId, playerId }, () => Promise.resolve(saved.id));
+    await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
     return "suspended";
+  });
+
+// Voids, under the Suspension or Ban `sanctionId`, every ranked Duel the Player won in the repair
+// window before `at` that is not voided yet (ADR 0015).
+const withdrawRecentWins = async (
+  tx: Transaction,
+  { playerId, at, sanctionId }: { playerId: string; at: Date; sanctionId: string },
+) => {
+  const won = await tx
+    .select({ duelId: duel.id })
+    .from(duelParticipant)
+    .innerJoin(duel, eq(duel.id, duelParticipant.duelId))
+    .leftJoin(voidedDuel, eq(voidedDuel.duelId, duel.id))
+    .where(
+      and(
+        eq(duelParticipant.playerId, playerId),
+        eq(duelParticipant.outcome, "win"),
+        eq(duel.kind, "ranked"),
+        gte(duel.endedAt, new Date(at.getTime() - REPAIR_WINDOW_MS)),
+        lte(duel.endedAt, at),
+        isNull(voidedDuel.duelId),
+      ),
+    )
+    .orderBy(duel.endedAt);
+  for (const { duelId } of won)
+    await withdrawDuel(tx, { duelId, playerId }, () => Promise.resolve(sanctionId));
+};
+
+export type BanResult = "banned" | "already-banned";
+
+/**
+ * Bans a Player from `at`, for good, in one transaction: the Ban is saved, the Player is marked as
+ * banned, their GitHub and Discord accounts and their e-mail are refused at sign-in from then on,
+ * every session of theirs is deleted, so that their next request is that of a Guest, and every
+ * ranked Duel they won in the repair window before it is voided under it (ADR 0015). A Player
+ * already banned is left as they are.
+ */
+export const banPlayer = (
+  db: Db,
+  { playerId, cause, at }: { playerId: string; cause: SanctionCause; at: Date },
+): Promise<BanResult> =>
+  db.transaction(async (tx) => {
+    // Locked first, so that two bans of one Player wait on each other and the second sees the first.
+    const [found] = await tx
+      .select({ bannedAt: user.bannedAt, email: user.email })
+      .from(user)
+      .where(eq(user.id, playerId))
+      .for("update");
+    if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
+    if (found.bannedAt) return "already-banned";
+    const [saved] = await tx
+      .insert(sanction)
+      .values({ playerId, kind: "ban", cause, startedAt: at })
+      .returning({ id: sanction.id });
+    if (!saved) throw new Error(`Could not save the Ban of Player ${playerId}`);
+    await tx.update(user).set({ bannedAt: at }).where(eq(user.id, playerId));
+    const accounts = await tx
+      .select({ providerId: account.providerId, accountId: account.accountId })
+      .from(account)
+      .where(eq(account.userId, playerId));
+    await tx
+      .insert(bannedIdentity)
+      .values([
+        ...accounts.map((provided) => ({ sanctionId: saved.id, ...provided })),
+        { sanctionId: saved.id, email: found.email.toLowerCase() },
+      ]);
+    await tx.delete(session).where(eq(session.userId, playerId));
+    await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
+    return "banned";
   });
 
 /**
@@ -184,8 +239,9 @@ export const readCurrentSuspension = async (db: Db, playerId: string, now: Date)
 const opponentSeat = alias(duelParticipant, "opponent_seat");
 
 /**
- * The Voided Duels the Player sat in, newest first: when each was voided, against whom, and the LP
- * it gave them back or took from them. Never the MMR (ADR 0006), nor who was at fault or why.
+ * The Voided Duels the Player sat in, newest first: when each was voided, against whom, whether that
+ * Opponent has since been banned, and the LP it gave them back or took from them. Never the MMR
+ * (ADR 0006), nor who was at fault or why.
  */
 export const readOwnVoidedDuels = async (db: Db, playerId: string) => {
   const rows = await db
@@ -193,6 +249,7 @@ export const readOwnVoidedDuels = async (db: Db, playerId: string) => {
       duelId: voidedDuelCorrection.duelId,
       voidedAt: sanction.startedAt,
       opponentNickname: user.nickname,
+      opponentBannedAt: user.bannedAt,
       lp: voidedDuelCorrection.lp,
     })
     .from(voidedDuelCorrection)
@@ -215,5 +272,9 @@ export const readOwnVoidedDuels = async (db: Db, playerId: string) => {
     .leftJoin(user, eq(user.id, opponentSeat.playerId))
     .where(eq(duelParticipant.playerId, playerId))
     .orderBy(desc(sanction.startedAt));
-  return rows.map(({ voidedAt, ...row }) => ({ ...row, voidedAt: voidedAt.getTime() }));
+  return rows.map(({ voidedAt, opponentBannedAt, ...row }) => ({
+    ...row,
+    voidedAt: voidedAt.getTime(),
+    opponentBanned: opponentBannedAt !== null,
+  }));
 };

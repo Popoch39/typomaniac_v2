@@ -8,6 +8,8 @@ const voidedDuel = t.Object({
   voidedAt: t.Number(),
   // Null when the Opponent has no Nickname, or no account any more.
   opponentNickname: t.Nullable(t.String()),
+  // The Opponent has been banned since: shown marked as such, never with why.
+  opponentBanned: t.Boolean(),
   // The LP the voiding gave back (positive) or took (negative), signed.
   lp: t.Integer(),
 });

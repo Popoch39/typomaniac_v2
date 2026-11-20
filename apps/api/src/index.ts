@@ -28,12 +28,18 @@ const redis = await openRedis(redisUrl);
 const lifecycle = createLifecycle();
 
 // Re-exported so Elysia's AOT can discover the app from the process entry.
-export const app = createApp(db, createAuth(db, authConfig, { redis }), redis, logger, {
-  dev: devOptions,
-  fairPlay: fairPlayConfig,
-  lifecycle,
-  rateLimit: { trustProxy: readTrustProxy() },
-});
+export const app = createApp(
+  db,
+  createAuth(db, { ...authConfig, appealAddress: fairPlayConfig.appealAddress }, { redis }),
+  redis,
+  logger,
+  {
+    dev: devOptions,
+    fairPlay: fairPlayConfig,
+    lifecycle,
+    rateLimit: { trustProxy: readTrustProxy() },
+  },
+);
 
 app.listen(Number(process.env.PORT ?? 3000));
 logger.info("API listening on port {port}", { port: app.server?.port });

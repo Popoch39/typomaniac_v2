@@ -13,7 +13,7 @@ import {
   type Standing,
   wornOrnament,
 } from "@repo/ranked-engine";
-import { and, asc, count, desc, eq, isNotNull, lt, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, isNull, lt, type SQL, sql } from "drizzle-orm";
 import {
   type Db,
   type Transaction,
@@ -181,7 +181,8 @@ export const PODIUM_SIZE = 3;
 /** How many ranked Players a page of the Leaderboard lists, from the first Position after the Podium. */
 export const LEADERBOARD_PAGE_SIZE = 15;
 
-const isRanked = isNotNull(standingTable.ladderIndex);
+// Listed: ranked and not banned. Every query using it joins `user`.
+const isRanked = and(isNotNull(standingTable.ladderIndex), isNull(user.bannedAt));
 
 // Rank first (its ladder index, then its LP), the MMR at equal Rank, and the Player's id last so that
 // equal Standings keep one order. The index `standing_leaderboard_idx` follows it column for column.
@@ -231,7 +232,11 @@ export const leaderboardSlice = (db: Db, offset: number, limit: number) =>
     .limit(limit);
 
 const countRanked = async (db: Db) => {
-  const [row] = await db.select({ total: count() }).from(standingTable).where(isRanked);
+  const [row] = await db
+    .select({ total: count() })
+    .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
+    .where(isRanked);
   return row?.total ?? 0;
 };
 
@@ -264,6 +269,7 @@ const countAhead = async (db: Db, row: LeaderboardRow) => {
   const [counted] = await db
     .select({ ahead: count() })
     .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
     .where(and(isRanked, comparedTo("ahead", row)));
   return counted?.ahead ?? 0;
 };

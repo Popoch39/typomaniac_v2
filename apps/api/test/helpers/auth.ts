@@ -3,6 +3,9 @@ import { makeSignature } from "better-auth/crypto";
 import type { Db } from "../../src/db/client.ts";
 import { type Auth, type AuthRateLimit, createAuth } from "../../src/modules/auth/service.ts";
 
+/** Where a banned Player of a test is told to write. */
+export const TEST_APPEAL_ADDRESS = "appeal@typomaniac.test";
+
 // Each test file builds its own instance on its own database, like the app it is injected into.
 export const createTestAuth = (db: Db, rateLimit?: AuthRateLimit) =>
   createAuth(
@@ -12,6 +15,7 @@ export const createTestAuth = (db: Db, rateLimit?: AuthRateLimit) =>
       secret: "test-secret-of-at-least-32-characters",
       github: { clientId: "test-github-id", clientSecret: "test-github-secret" },
       discord: { clientId: "test-discord-id", clientSecret: "test-discord-secret" },
+      appealAddress: TEST_APPEAL_ADDRESS,
     },
     rateLimit,
   );

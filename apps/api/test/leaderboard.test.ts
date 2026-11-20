@@ -476,7 +476,9 @@ test("a page of the Leaderboard is read from its index, not sorted", async () =>
     select 'p' || n, 1000 + n % 900, 30,
       case when n % 5 = 0 then null else n % 21 end, case when n % 5 = 0 then null else n % 100 end
     from generate_series(1, 5000) n`);
+  // Both tables, as autovacuum would have them: the Leaderboard also leaves banned Players out.
   await db.execute(sql`analyze standing`);
+  await db.execute(sql`analyze "user"`);
 
   for (const [offset, limit] of [
     [0, 3],

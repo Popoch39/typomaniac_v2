@@ -5,7 +5,8 @@ import {
   type ValidateUserInfoSource,
 } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import type { Db } from "../../db/client.ts";
+import { and, eq, isNull, or } from "drizzle-orm";
+import { bannedIdentity, type Db, sanction } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { assignDefaultNickname } from "../player/service.ts";
 import { createRedisRateLimitStorage } from "../rate-limit/service.ts";
@@ -25,6 +26,40 @@ export const refuseUnverifiedEmail = ({
         error: "email_not_verified",
         errorDescription: "Verify your email address with the provider, then sign in again.",
       };
+
+/**
+ * Whether a sign-in presents an identity a Ban refuses: the provider account it comes from, or its
+ * e-mail, whatever its case. A revoked Ban refuses nothing.
+ */
+export const isBannedIdentity = async (
+  db: Db,
+  {
+    providerId,
+    accountId,
+    email,
+  }: { providerId: string; accountId: string | null; email: string | null },
+) => {
+  const matches = [
+    ...(accountId === null
+      ? []
+      : [and(eq(bannedIdentity.providerId, providerId), eq(bannedIdentity.accountId, accountId))]),
+    ...(email === null ? [] : [eq(bannedIdentity.email, email.toLowerCase())]),
+  ];
+  if (matches.length === 0) return false;
+  const [found] = await db
+    .select({ id: bannedIdentity.id })
+    .from(bannedIdentity)
+    .innerJoin(sanction, eq(sanction.id, bannedIdentity.sanctionId))
+    .where(and(isNull(sanction.revokedAt), or(...matches)))
+    .limit(1);
+  return found !== undefined;
+};
+
+// The provider's own id of the account, as Better Auth stores it in `account.account_id`.
+const providerAccountIdOf = (profile: Record<string, unknown> | undefined) => {
+  const id = profile?.id;
+  return typeof id === "string" || typeof id === "number" ? String(id) : null;
+};
 
 // Discord identifiers count milliseconds from this instant in their upper bits.
 const DISCORD_EPOCH_MS = 1_420_070_400_000;
@@ -63,7 +98,12 @@ export type AuthRateLimit = { redis: Redis } & Pick<
 // Built from an injected database, like the app, so each test file gets an instance on its own
 // database. Without a rate limit, Better Auth's is off: its in-memory count would not hold across
 // instances.
-export const createAuth = (db: Db, config: AuthConfig, rateLimit?: AuthRateLimit) => {
+// `appealAddress` is where a banned Player is told to write when their sign-in is refused.
+export const createAuth = (
+  db: Db,
+  config: AuthConfig & { appealAddress: string },
+  rateLimit?: AuthRateLimit,
+) => {
   // Only validateUserInfo sees the raw provider profile, and only the account hooks write the
   // account: the creation date is held from one to the other for the sign-in request that read it.
   const providerCreatedAts = new WeakMap<object, { providerId: string; createdAt: Date }>();
@@ -111,8 +151,19 @@ export const createAuth = (db: Db, config: AuthConfig, rateLimit?: AuthRateLimit
       },
     },
     user: {
-      validateUserInfo: (info, request) => {
+      validateUserInfo: async (info, request) => {
         const { oauth } = info.source;
+        // Refused before anything is created or attached: a banned Player cannot come back as a new
+        // one with the same provider account or e-mail (ADR 0014).
+        if (
+          oauth &&
+          (await isBannedIdentity(db, {
+            providerId: oauth.providerId,
+            accountId: providerAccountIdOf(oauth.profile),
+            email: typeof info.user.email === "string" ? info.user.email : null,
+          }))
+        )
+          return { error: "BANNED", errorDescription: config.appealAddress };
         const createdAt = oauth ? providerCreatedAtOf(oauth.providerId, oauth.profile) : null;
         if (oauth && createdAt !== null) {
           providerCreatedAts.set(request, { providerId: oauth.providerId, createdAt });

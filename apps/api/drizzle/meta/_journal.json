@@ -106,6 +106,13 @@
       "when": 1795188715729,
       "tag": "0014_account_provider_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795190151898,
+      "tag": "0015_ban",
+      "breakpoints": true
     }
   ]
 }
