@@ -127,6 +127,13 @@
       "when": 1795190953601,
       "tag": "0017_leader_lease",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795191658263,
+      "tag": "0018_game_analysis",
+      "breakpoints": true
     }
   ]
 }

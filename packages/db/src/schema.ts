@@ -1,5 +1,6 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
 import type { Outcome, Seat, ViolationKind } from "@repo/duel-engine";
+import type { GameSignals } from "@repo/fair-play-engine";
 import type { OrnamentChoice, RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
@@ -277,6 +278,38 @@ export const violation = pgTable(
   },
   (table) => [index("violation_player_idx").on(table.playerId, table.duelId)],
 );
+
+// What the signals said of one saved ranked Game (ADR 0014), with the version of the signals that
+// read it, so that a new version is run again over the saved journals.
+export const gameAnalysis = pgTable(
+  "game_analysis",
+  {
+    duelId: uuid("duel_id").notNull(),
+    round: smallint("round").notNull(),
+    seat: smallint("seat").$type<Seat>().notNull(),
+    signalsVersion: smallint("signals_version").notNull(),
+    signals: jsonb("signals").$type<GameSignals>().notNull(),
+    // The instant of the fair-play pass that read it.
+    analysedAt: timestamp("analysed_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.duelId, table.round, table.seat] }),
+    foreignKey({
+      columns: [table.duelId, table.round, table.seat],
+      foreignColumns: [duelGame.duelId, duelGame.round, duelGame.seat],
+    }).onDelete("cascade"),
+  ],
+);
+
+// A Player's Suspicion, as the fair-play pass last computed it from their recent ranked Games, and the
+// instant it did. It never sanctions: past a threshold it only calls for a Review.
+export const suspicion = pgTable("suspicion", {
+  playerId: text("player_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  value: doublePrecision("value").notNull(),
+  computedAt: timestamp("computed_at").notNull(),
+});
 
 // A Sanction applied to a Player for cheating, in rising order: a Voided Duel, a Suspension, a Ban.
 // Its cause says whether a Violation or a Review brought it. Kept once revoked, so that a Player's

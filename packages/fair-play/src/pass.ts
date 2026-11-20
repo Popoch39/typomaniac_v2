@@ -1,6 +1,7 @@
 import { type Db, duel, type Transaction, user, violation } from "@repo/db";
 import { nextViolationSanction } from "@repo/fair-play-engine";
 import { and, countDistinct, eq, isNotNull, isNull, lte } from "drizzle-orm";
+import { analyseGames } from "./analysis.ts";
 import { banPlayerIn, suspendPlayerIn, voidDuelIn } from "./sanction.ts";
 
 /**
@@ -10,6 +11,8 @@ import { banPlayerIn, suspendPlayerIn, voidDuelIn } from "./sanction.ts";
  */
 export const runFairPlayPass = async (db: Db, now: number) => {
   await sanctionViolations(db, new Date(now));
+  // Suspicion never sanctions: the analysis only reads Games and saves what their signals say.
+  await analyseGames(db, new Date(now));
 };
 
 // Sanctions, one Player and one Duel at a time and in the order the Duels ended, the Violations whose

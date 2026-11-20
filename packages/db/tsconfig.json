@@ -15,6 +15,7 @@
   "references": [
     { "path": "../typing-engine" },
     { "path": "../duel-engine" },
+    { "path": "../fair-play-engine" },
     { "path": "../ranked-engine" }
   ]
 }

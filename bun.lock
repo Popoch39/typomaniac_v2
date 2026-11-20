@@ -115,6 +115,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/duel-engine": "*",
+        "@repo/fair-play-engine": "*",
         "@repo/ranked-engine": "*",
         "@repo/typing-engine": "*",
         "drizzle-orm": "0.45.4",
