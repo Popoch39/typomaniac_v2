@@ -10,5 +10,9 @@
     "verbatimModuleSyntax": true
   },
   "include": ["."],
-  "references": [{ "path": ".." }]
+  "references": [
+    { "path": ".." },
+    { "path": "../../typing-engine" },
+    { "path": "../../duel-engine" }
+  ]
 }

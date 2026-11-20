@@ -1,3 +1,5 @@
 [test]
 coverage = true
 coverageThreshold = { lines = 1.0, functions = 1.0 }
+# The typing and Duel engines are covered by their own test runs.
+coveragePathIgnorePatterns = ["../typing-engine/**", "../duel-engine/**", "../ranked-engine/**"]

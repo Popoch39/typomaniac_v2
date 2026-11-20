@@ -29,6 +29,30 @@ A Violation is proof, so it is the only cheating sanctioned automatically, one s
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | VIOLATION-1 | A Player's first sanctioned Violation voids its Duel, the second suspends them for 3 days, the third for 14 days, and the fourth and any after it ban them. Several in one Duel count as one. |
 
+## Signals
+
+What one ranked Game says of the typing behind it (ADR 0014). Each signal is a pure function of the Game's journal and Target words, with a name a person can read, and gives a value from 0 (typed like a person) to 1 (not like a person). A signal proves nothing: it only weighs in a Player's Suspicion. Every threshold is a starting value, to be tuned on real Games.
+
+| Id       | Rule                                                                                                                                                                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SIGNAL-1 | `keyPressEvenness`: intervals between KeyPresses as even as a machine's. A coefficient of variation of 0.1 or less reads 1, one of 0.3 or more reads 0. An interval of 1 second or more is a pause and is left out.                        |
+| SIGNAL-2 | `holdEvenness`: keys all held as long as each other. A coefficient of variation of the hold times of 0.05 or less reads 1, one of 0.15 or more reads 0.                                                                                    |
+| SIGNAL-3 | `missingRollover`: at high speed (a median interval of 100 ms or less, about 120 WPM), every key released before the next one goes down. No overlap reads 1; an overlap on 20% of KeyPresses or more reads 0. Below high speed it reads 0. |
+| SIGNAL-4 | `flatWordSpeed`: rare words typed as fast per character as frequent ones. A frequent word is one of the first 100 of the list the Target words are drawn from. The same pace reads 1; rare words 15% slower or more read 0.                |
+| SIGNAL-5 | `superhumanSpeed`: a speed beyond what a person has ever typed. 300 WPM or less reads 0, 400 WPM or more reads 1. A fast honest typist stays at 0.                                                                                         |
+| SIGNAL-6 | A Game with fewer than 20 intervals between KeyPresses, or fewer than 5 words typed without a mistake among the frequent or the rare ones, says nothing on the signals it cannot judge: they read 0.                                       |
+| SIGNAL-7 | The signals carry a version (`SIGNALS_VERSION`), saved with the values they gave and raised whenever a signal is added or changed, so that every saved Game is read again with the new ones.                                               |
+
+## Suspicion
+
+How strongly a Player's ranked Games look like they were not typed by a person. It never sanctions: past a threshold it only calls for a Review (ADR 0014).
+
+| Id          | Rule                                                                                                                                                                                                        |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SUSPICION-1 | A Player's Suspicion is read from their `SUSPICION_GAMES` (20) most recent ranked Games, and no older one.                                                                                                  |
+| SUSPICION-2 | A Game's Suspicion is the sum of its signals, each weighted by a constant share (`SIGNAL_WEIGHTS`), the shares adding up to 1. Speed weighs the least: it must never bring a fast typist to a Review alone. |
+| SUSPICION-3 | A Player's Suspicion is the mean of their Games' over the full window of 20, a missing Game counting as an ordinary one: one unusual Game among ordinary ones, or a few Games alone, leave it low.          |
+
 ## Purity
 
 | Id     | Rule                                                                                                                                              |
