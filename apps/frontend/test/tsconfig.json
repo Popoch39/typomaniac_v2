@@ -20,6 +20,7 @@
     "../src/features/game/words/wavePath.ts",
     "../src/features/game/words/mistakeRuns.ts",
     "../src/features/duel/clock",
+    "../src/features/duel/disconnection",
     "../src/features/duel/caret",
     "../src/features/duel/chart",
     "../src/features/duel/message",
