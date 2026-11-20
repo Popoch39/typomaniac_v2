@@ -42,6 +42,16 @@ export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
   const guestCookies = createGuestCookies(auth.$context.then(({ secret }) => secret));
 
   return new Elysia({ name: "protection" }).macro({
+    // Never refuses: who is asking, the Player or the Guest, when known, for a public route to count
+    // requests against. `requesterId` is null without a session or a Guest cookie, and no cookie is issued.
+    requester: {
+      async derive({ request: { headers } }) {
+        const found = await auth.api.getSession({ headers });
+        if (found) return { requesterId: found.user.id };
+        const guest = await guestCookies.read(headers);
+        return { requesterId: guest?.id ?? null };
+      },
+    },
     signedIn: {
       async derive({ request: { headers } }) {
         const found = await findSession(headers);

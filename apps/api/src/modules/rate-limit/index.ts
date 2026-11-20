@@ -26,6 +26,8 @@ export const RATE_LIMITS = {
   duelSocket: { max: 20, windowSeconds: 60 },
   /** Upgrades to the Queue socket, per Player. */
   queueSocket: { max: 20, windowSeconds: 60 },
+  /** Reads of a Player's public page and Progress, per Player or Guest, else per IP. */
+  progress: { max: 60, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimit>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

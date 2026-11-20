@@ -3,7 +3,7 @@ import { getLogger, type LogRecord, resetLogger, setupLogger } from "@repo/logge
 import { createApp } from "../src/app.ts";
 import type { RateLimitOptions } from "../src/modules/rate-limit/index.ts";
 import type { Redis } from "../src/redis/client.ts";
-import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
+import { createTestAuth, signInPlayer, signInPlayerWithNickname } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 
@@ -134,6 +134,19 @@ test("new Guests from one IP beyond its limit get a 429 instead of a cookie", as
     // A Guest who already holds a cookie is not a new one.
     const cookie = second.headers.get("set-cookie") ?? "";
     expect((await createDuel(origin, { cookie })).status).toBe(201);
+    await stop();
+  });
+});
+
+test("public Player pages read without a session beyond the progress limit of one IP are refused with 429", async () => {
+  await withRedis(async (redis) => {
+    const { origin, stop } = listenWith(redis, { limits: { progress: twoPerMinute } });
+    const { nickname } = await signInPlayerWithNickname(auth, origin);
+    const readPage = () => fetch(`${origin}/api/players/${nickname}`);
+
+    expect((await readPage()).status).toBe(200);
+    expect((await readPage()).status).toBe(200);
+    await expectRateLimited(await readPage());
     await stop();
   });
 });

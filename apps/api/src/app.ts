@@ -11,6 +11,7 @@ import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
 import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
+import { createProgressRoutes } from "./modules/progress/index.ts";
 import { createQueueRoutes, type QueueOptions } from "./modules/queue/index.ts";
 import { createRateLimiter, type RateLimitOptions } from "./modules/rate-limit/index.ts";
 import { createStandingRoutes } from "./modules/standing/index.ts";
@@ -59,6 +60,7 @@ export const createApp = (
       .use(createPlayerRoutes(db, protection, rateLimiter))
       .use(createOrnamentRoutes(db, protection))
       .use(createStandingRoutes(db, auth, protection))
+      .use(createProgressRoutes(db, protection, rateLimiter))
       .use(
         createDuelRoutes(
           db,
