@@ -85,6 +85,13 @@
       "when": 1795117557324,
       "tag": "0011_duel_game_multiplier",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795188296637,
+      "tag": "0012_voided_duel",
+      "breakpoints": true
     }
   ]
 }

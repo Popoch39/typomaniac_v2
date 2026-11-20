@@ -6,8 +6,8 @@ import {
   tierAtLadderIndex,
   wornOrnament,
 } from "@repo/ranked-engine";
-import { eq, inArray, max } from "drizzle-orm";
-import { type Db, duelParticipant, standing, user } from "../../db/client.ts";
+import { and, eq, inArray, max } from "drizzle-orm";
+import { type Db, duelParticipant, standing, user, voidedDuelCorrection } from "../../db/client.ts";
 import { rankFromStored } from "../standing/service.ts";
 
 /** The Ornament each of these Players wears, from their choice and their current Rank, by Player id. */
@@ -35,15 +35,31 @@ export const readWornOrnaments = async (
   );
 };
 
-// Read from the ranked Duels played rather than the Standing, so a demotion never lowers it.
-/** The highest Tier the Player reached after any ranked Duel, `null` before their first Rank. */
+// Read from the ranked Duels played and the corrections of Voided Duels rather than the Standing, so
+// neither a demotion nor a correction ever lowers it (CORRECT-5).
+/** The highest Tier the Player reached after any ranked Duel or correction, `null` before their first Rank. */
 export const readPeakTier = async (db: Db, playerId: string): Promise<Tier | null> => {
-  const [row] = await db
-    .select({ peakIndex: max(duelParticipant.ladderIndexAfter) })
-    .from(duelParticipant)
-    .where(eq(duelParticipant.playerId, playerId));
-  const peakIndex = row?.peakIndex ?? null;
-  return peakIndex === null ? null : tierAtLadderIndex(peakIndex);
+  const [[played], [corrected]] = await Promise.all([
+    db
+      .select({ peakIndex: max(duelParticipant.ladderIndexAfter) })
+      .from(duelParticipant)
+      .where(eq(duelParticipant.playerId, playerId)),
+    db
+      .select({ peakIndex: max(voidedDuelCorrection.ladderIndexAfter) })
+      .from(voidedDuelCorrection)
+      .innerJoin(
+        duelParticipant,
+        and(
+          eq(duelParticipant.duelId, voidedDuelCorrection.duelId),
+          eq(duelParticipant.seat, voidedDuelCorrection.seat),
+        ),
+      )
+      .where(eq(duelParticipant.playerId, playerId)),
+  ]);
+  const reached = [played?.peakIndex, corrected?.peakIndex].filter(
+    (index): index is number => index !== null && index !== undefined,
+  );
+  return reached.length === 0 ? null : tierAtLadderIndex(Math.max(...reached));
 };
 
 /** What the Player chose to wear, the Peak Tier that bounds their choice, and what they wear. */

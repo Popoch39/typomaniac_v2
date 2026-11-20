@@ -6,6 +6,7 @@ import type { Auth } from "./modules/auth/service.ts";
 import { createDevRoutes } from "./modules/dev/index.ts";
 import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
+import { createFairPlayRoutes } from "./modules/fair-play/index.ts";
 import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
@@ -59,6 +60,7 @@ export const createApp = (
       .use(createPlayerRoutes(db, protection, rateLimiter))
       .use(createOrnamentRoutes(db, protection))
       .use(createStandingRoutes(db, auth, protection))
+      .use(createFairPlayRoutes(db, protection))
       .use(
         createDuelRoutes(
           db,
