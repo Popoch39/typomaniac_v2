@@ -56,6 +56,15 @@ What a Player's recent ranked Duels say together, where no single Game says anyt
 | ACROSS-4 | `lossWithoutTyping`: ranked Duels lost without a single Keystroke in any of their Games. One reads 0, three or more read 1. A Duel drawn or won without typing is not counted.                                                                   |
 | ACROSS-5 | The signals across Duels read the Player's `SUSPICION_DUELS` (20) most recent ranked Duels started after their last settled Review, and no older one, as the Games of REVIEW-4.                                                                  |
 
+## Reports
+
+What the Opponents a Player met say of them (ADR 0014). A Report is made by a Participant of a finished ranked Duel against their Opponent, once per Duel; it never sanctions, and the reported Player is told nothing of it.
+
+| Id       | Rule                                                                                                                                                                                                 |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REPORT-1 | `reports`: ranked Duels in which the Opponent reported the Player, among the Duels of ACROSS-5. Each reads 0.2, 5 or more read 1. It is a signal across Duels and weighs like one.                   |
+| REPORT-2 | Reports alone never bring a Player to a Review: even a Player reported in every one of their recent ranked Duels, typing like a person, stays under the threshold. One Report only raises Suspicion. |
+
 ## Suspicion
 
 How strongly a Player's ranked Games look like they were not typed by a person. It never sanctions: past a threshold it only calls for a Review (ADR 0014).
@@ -65,7 +74,7 @@ How strongly a Player's ranked Games look like they were not typed by a person. 
 | SUSPICION-1 | A Player's Suspicion is read from their `SUSPICION_GAMES` (20) most recent ranked Games, and no older one.                                                                                                                                                |
 | SUSPICION-2 | A Game's Suspicion is the sum of its signals, each weighted by a constant share (`SIGNAL_WEIGHTS`), the shares of every signal, of one Game or across Duels, adding up to 1. Speed weighs the least: it must never bring a fast typist to a Review alone. |
 | SUSPICION-3 | A Player's Suspicion is the mean of their Games' over the full window of 20, a missing Game counting as an ordinary one: one unusual Game among ordinary ones, or a few Games alone, leave it low.                                                        |
-| SUSPICION-4 | The signals across Duels (ACROSS-1 to ACROSS-4) add their weighted values to the Suspicion read from the Games: a pair of Players trading wins raises it even when both type like people.                                                                 |
+| SUSPICION-4 | The signals across Duels (ACROSS-1 to ACROSS-4, REPORT-1) add their weighted values to the Suspicion read from the Games: a pair of Players trading wins raises it even when both type like people.                                                       |
 
 ## Reviews
 

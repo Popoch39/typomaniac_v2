@@ -23,10 +23,12 @@ export const duel = (
     opponentId = "opponent",
     outcome = "win",
     incorrect = 0,
-  }: { opponentId?: string | null; outcome?: Outcome; incorrect?: number } = {},
+    reported = false,
+  }: { opponentId?: string | null; outcome?: Outcome; incorrect?: number; reported?: boolean } = {},
 ): RankedDuel => ({
   opponentId,
   outcome,
+  reported,
   games: [game(wpm, incorrect), game(wpm, incorrect)],
 });
 

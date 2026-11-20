@@ -19,8 +19,11 @@ export const SIGNAL_WEIGHTS: GameSignals & DuelSignals = {
   browserHints: 0.1,
   levelJump: 0.05,
   errorlessSeries: 0.05,
-  oneSidedPair: 0.12,
-  lossWithoutTyping: 0.08,
+  oneSidedPair: 0.07,
+  lossWithoutTyping: 0.05,
+  // A Report says what one Opponent thinks, and a sore loser can make one: even a Player reported in
+  // every Duel stays far under the threshold on Reports alone.
+  reports: 0.08,
 };
 
 const gameSuspicion = (signals: GameSignals) =>

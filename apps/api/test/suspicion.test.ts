@@ -205,6 +205,7 @@ test("the pass includes the signals across each Player's recent ranked Duels in 
     errorlessSeries: 0,
     oneSidedPair: 1,
     lossWithoutTyping: 1,
+    reports: 0,
   });
   expect(loser?.value).toBeCloseTo(SIGNAL_WEIGHTS.oneSidedPair + SIGNAL_WEIGHTS.lossWithoutTyping);
 });
@@ -271,6 +272,7 @@ test("the signals across Duels read only the ranked Duels started after the Play
     errorlessSeries: 0,
     oneSidedPair: 0,
     lossWithoutTyping: 0,
+    reports: 0,
   });
   // The winner was never reviewed: all their Duels still count.
   expect((await suspicionOf(winnerId))?.duelSignals.oneSidedPair).toBe(1);

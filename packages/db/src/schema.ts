@@ -316,12 +316,40 @@ export const suspicion = pgTable("suspicion", {
   value: doublePrecision("value").notNull(),
   // What the signals across the Player's recent ranked Duels said. A Suspicion computed before they
   // existed reads none of them, until the raised version of the signals has it computed again.
-  duelSignals: jsonb("duel_signals")
-    .$type<DuelSignals>()
-    .notNull()
-    .default({ levelJump: 0, errorlessSeries: 0, oneSidedPair: 0, lossWithoutTyping: 0 }),
+  duelSignals: jsonb("duel_signals").$type<DuelSignals>().notNull().default({
+    levelJump: 0,
+    errorlessSeries: 0,
+    oneSidedPair: 0,
+    lossWithoutTyping: 0,
+    reports: 0,
+  }),
   computedAt: timestamp("computed_at").notNull(),
 });
+
+// A Player's statement, made at the end of a ranked Duel, that their Opponent cheated in it (ADR 0014).
+// It never sanctions: it only raises the reported Player's Suspicion, and they are told nothing of it.
+// One per Duel and reporting Player.
+export const report = pgTable(
+  "report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    duelId: uuid("duel_id")
+      .notNull()
+      .references(() => duel.id, { onDelete: "cascade" }),
+    reporterId: text("reporter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    reportedId: text("reported_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    reportedAt: timestamp("reported_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("report_duel_reporter_idx").on(table.duelId, table.reporterId),
+    // The Reports against a Player, read by the fair-play pass and by their Review.
+    index("report_reported_idx").on(table.reportedId, table.reportedAt),
+  ],
+);
 
 // A person's examination of a Player (ADR 0014), opened by the fair-play pass for a reason, open until
 // it is settled with a decision. At most one is open per Player, and reaching Master or the Podium

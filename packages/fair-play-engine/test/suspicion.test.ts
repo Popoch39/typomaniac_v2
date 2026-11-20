@@ -28,12 +28,14 @@ const ordinaryDuels: DuelSignals = {
   errorlessSeries: 0,
   oneSidedPair: 0,
   lossWithoutTyping: 0,
+  reports: 0,
 };
 const botDuels: DuelSignals = {
   levelJump: 1,
   errorlessSeries: 1,
   oneSidedPair: 1,
   lossWithoutTyping: 1,
+  reports: 1,
 };
 const games = (count: number, game: GameSignals) => Array.from({ length: count }, () => game);
 
