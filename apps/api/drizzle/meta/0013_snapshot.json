@@ -110,12 +110,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -223,14 +219,8 @@
           "name": "duel_game_duel_id_round_duel_round_duel_id_round_fk",
           "tableFrom": "duel_game",
           "tableTo": "duel_round",
-          "columnsFrom": [
-            "duel_id",
-            "round"
-          ],
-          "columnsTo": [
-            "duel_id",
-            "round"
-          ],
+          "columnsFrom": ["duel_id", "round"],
+          "columnsTo": ["duel_id", "round"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -238,11 +228,7 @@
       "compositePrimaryKeys": {
         "duel_game_duel_id_round_seat_pk": {
           "name": "duel_game_duel_id_round_seat_pk",
-          "columns": [
-            "duel_id",
-            "round",
-            "seat"
-          ]
+          "columns": ["duel_id", "round", "seat"]
         }
       },
       "uniqueConstraints": {},
@@ -367,12 +353,8 @@
           "name": "duel_participant_duel_id_duel_id_fk",
           "tableFrom": "duel_participant",
           "tableTo": "duel",
-          "columnsFrom": [
-            "duel_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["duel_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -380,12 +362,8 @@
           "name": "duel_participant_player_id_user_id_fk",
           "tableFrom": "duel_participant",
           "tableTo": "user",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -393,10 +371,7 @@
       "compositePrimaryKeys": {
         "duel_participant_duel_id_seat_pk": {
           "name": "duel_participant_duel_id_seat_pk",
-          "columns": [
-            "duel_id",
-            "seat"
-          ]
+          "columns": ["duel_id", "seat"]
         }
       },
       "uniqueConstraints": {},
@@ -445,12 +420,8 @@
           "name": "duel_round_duel_id_duel_id_fk",
           "tableFrom": "duel_round",
           "tableTo": "duel",
-          "columnsFrom": [
-            "duel_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["duel_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -458,10 +429,7 @@
       "compositePrimaryKeys": {
         "duel_round_duel_id_round_pk": {
           "name": "duel_round_duel_id_round_pk",
-          "columns": [
-            "duel_id",
-            "round"
-          ]
+          "columns": ["duel_id", "round"]
         }
       },
       "uniqueConstraints": {},
@@ -539,12 +507,8 @@
           "name": "sanction_player_id_user_id_fk",
           "tableFrom": "sanction",
           "tableTo": "user",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -631,12 +595,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -646,9 +606,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -731,12 +689,8 @@
           "name": "standing_player_id_user_id_fk",
           "tableFrom": "standing",
           "tableTo": "user",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -838,9 +792,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -990,12 +942,8 @@
           "name": "violation_player_id_user_id_fk",
           "tableFrom": "violation",
           "tableTo": "user",
-          "columnsFrom": [
-            "player_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["player_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1045,12 +993,8 @@
           "name": "voided_duel_duel_id_duel_id_fk",
           "tableFrom": "voided_duel",
           "tableTo": "duel",
-          "columnsFrom": [
-            "duel_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["duel_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1058,12 +1002,8 @@
           "name": "voided_duel_sanction_id_sanction_id_fk",
           "tableFrom": "voided_duel",
           "tableTo": "sanction",
-          "columnsFrom": [
-            "sanction_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sanction_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1115,12 +1055,8 @@
           "name": "voided_duel_correction_duel_id_voided_duel_duel_id_fk",
           "tableFrom": "voided_duel_correction",
           "tableTo": "voided_duel",
-          "columnsFrom": [
-            "duel_id"
-          ],
-          "columnsTo": [
-            "duel_id"
-          ],
+          "columnsFrom": ["duel_id"],
+          "columnsTo": ["duel_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1128,14 +1064,8 @@
           "name": "voided_duel_correction_duel_id_seat_duel_participant_duel_id_seat_fk",
           "tableFrom": "voided_duel_correction",
           "tableTo": "duel_participant",
-          "columnsFrom": [
-            "duel_id",
-            "seat"
-          ],
-          "columnsTo": [
-            "duel_id",
-            "seat"
-          ],
+          "columnsFrom": ["duel_id", "seat"],
+          "columnsTo": ["duel_id", "seat"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1143,10 +1073,7 @@
       "compositePrimaryKeys": {
         "voided_duel_correction_duel_id_seat_pk": {
           "name": "voided_duel_correction_duel_id_seat_pk",
-          "columns": [
-            "duel_id",
-            "seat"
-          ]
+          "columns": ["duel_id", "seat"]
         }
       },
       "uniqueConstraints": {},
