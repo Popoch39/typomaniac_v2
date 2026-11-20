@@ -1,0 +1,20 @@
+{
+  "name": "@repo/fair-play",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@repo/db": "*",
+    "@repo/fair-play-engine": "*",
+    "@repo/ranked-engine": "*",
+    "drizzle-orm": "0.45.4"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/bun": "^1.4.4",
+    "typescript": "7.0.2"
+  }
+}

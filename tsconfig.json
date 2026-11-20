@@ -16,6 +16,7 @@
     { "path": "apps/frontend/test" },
     { "path": "packages/redis" },
     { "path": "packages/db" },
+    { "path": "packages/fair-play" },
     { "path": "packages/logger" },
     { "path": "packages/queue" },
     { "path": "apps/api" },

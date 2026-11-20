@@ -1,15 +1,11 @@
+import { lockStanding, rankFromStored, standingFromStored, storedStanding } from "@repo/fair-play";
 import {
-  applyCorrection,
   applyDuel,
-  type Correction,
   createStanding,
   DEFAULT_RANKED_CONFIG,
   type DuelUpdate,
-  ladderIndex,
   type OrnamentChoice,
   type Outcome,
-  type Rank,
-  rankAtLadderIndex,
   type Standing,
   wornOrnament,
 } from "@repo/ranked-engine";
@@ -22,27 +18,8 @@ import {
   user,
 } from "../../db/client.ts";
 
-/** A Rank as it is stored: the ladder index of its Division and its LP, both `null` while Unranked. */
-export const storedRank = (rank: Rank | null) => ({
-  ladderIndex: rank === null ? null : ladderIndex(rank),
-  lp: rank === null ? null : rank.lp,
-});
-
-/** The Rank a stored ladder index and LP stand for. */
-export const rankFromStored = (index: number | null, lp: number | null) =>
-  index === null || lp === null ? null : rankAtLadderIndex(index, lp);
-
-const storedStanding = ({ mmr, duelsPlayed, rank }: Standing) => ({
-  mmr,
-  duelsPlayed,
-  ...storedRank(rank),
-});
-
-const standingFromStored = (row: typeof standingTable.$inferSelect): Standing => ({
-  mmr: row.mmr,
-  duelsPlayed: row.duelsPlayed,
-  rank: rankFromStored(row.ladderIndex, row.lp),
-});
+// The Standing rows are read and written the same way by the fair-play steps, which hold these helpers.
+export { rankFromStored, storedRank } from "@repo/fair-play";
 
 /** The Player's Standing, which is the one of a new Player while no ranked Duel has stored one. */
 export const readStanding = async (db: Db, playerId: string): Promise<Standing> => {
@@ -61,21 +38,6 @@ export const saveStanding = async (db: Db, playerId: string, standing: Standing)
 
 /** What a ranked Duel did to a Player's Standing: the one they had, and the ranked engine's update. */
 export type StandingMove = { readonly before: Standing; readonly update: DuelUpdate };
-
-// Gives a new Player their row first, so that there is always one to lock.
-const lockStanding = async (tx: Transaction, playerId: string) => {
-  await tx
-    .insert(standingTable)
-    .values({ playerId, ...storedStanding(createStanding()) })
-    .onConflictDoNothing();
-  const [row] = await tx
-    .select()
-    .from(standingTable)
-    .where(eq(standingTable.playerId, playerId))
-    .for("update");
-  if (!row) throw new Error(`Player ${playerId} has no Standing to lock`);
-  return standingFromStored(row);
-};
 
 /**
  * Moves the Standings of the two Players of a ranked Duel by its Outcomes, inside the transaction
@@ -107,46 +69,6 @@ export const moveStandings = async (
     await move(playerIds[0], playerIds[1], outcomes[0]),
     await move(playerIds[1], playerIds[0], outcomes[1]),
   ];
-};
-
-// A Rank's place along the whole ladder in LP (CORRECT-1), 0 while Unranked.
-const ladderPosition = (rank: Rank | null) =>
-  rank === null ? 0 : ladderIndex(rank) * DEFAULT_RANKED_CONFIG.lpPerDivision + rank.lp;
-
-/** What a correction did to a Player's Standing: the MMR and LP actually applied, and the Rank left. */
-export type AppliedCorrection = { readonly correction: Correction; readonly standing: Standing };
-
-/**
- * Applies a correction to the Standing of each Player, as it is now, inside the caller's
- * transaction. Rows are locked in one order, as `moveStandings` does, so a correction never waits
- * on a Duel being saved that waits on it. Gives what was applied to each, in the order given, which
- * can be less than asked at the floors of the MMR and of the ladder.
- */
-export const correctStandings = async (
-  tx: Transaction,
-  corrections: readonly { readonly playerId: string; readonly correction: Correction }[],
-): Promise<AppliedCorrection[]> => {
-  const before = new Map<string, Standing>();
-  for (const playerId of corrections.map((c) => c.playerId).toSorted())
-    before.set(playerId, await lockStanding(tx, playerId));
-  const applied: AppliedCorrection[] = [];
-  for (const { playerId, correction } of corrections) {
-    const own = before.get(playerId);
-    if (!own) throw new Error(`Player ${playerId} has no Standing to correct`);
-    const standing = applyCorrection(own, correction);
-    await tx
-      .update(standingTable)
-      .set(storedStanding(standing))
-      .where(eq(standingTable.playerId, playerId));
-    applied.push({
-      correction: {
-        mmr: standing.mmr - own.mmr,
-        lp: ladderPosition(standing.rank) - ladderPosition(own.rank),
-      },
-      standing,
-    });
-  }
-  return applied;
 };
 
 /** What a Player may see of their Standing: their Rank and their Placement progress, never the MMR. */

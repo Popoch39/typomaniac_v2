@@ -1,0 +1,20 @@
+{
+  "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    // No DOM lib: this package only runs on Bun, against the database the API and the fair-play worker share.
+    "lib": ["es2023"],
+    "types": ["bun"],
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../db" },
+    { "path": "../ranked-engine" },
+    { "path": "../fair-play-engine" }
+  ]
+}
