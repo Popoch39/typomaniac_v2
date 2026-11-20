@@ -3,7 +3,7 @@ import { nextViolationSanction } from "@repo/fair-play-engine";
 import { and, countDistinct, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { analyseGames } from "./analysis.ts";
 import { openReviews } from "./review.ts";
-import { banPlayerIn, suspendPlayerIn, voidDuelIn } from "./sanction.ts";
+import { banPlayerIn, suspendPlayerIn, voidDuelForViolation } from "./sanction.ts";
 
 /**
  * One pass of the fair-play worker at the instant `now`, which it reads no clock for. Every step is
@@ -56,8 +56,8 @@ const sanctionDuelViolations = async (
     .where(and(eq(violation.playerId, playerId), isNotNull(violation.sanctionedAt)));
   const due = nextViolationSanction(sanctioned?.duels ?? 0);
   const cause = "violation";
-  // A Duel the Player lost is left as it was, but its Violation counts towards the next Sanction all the same.
-  if (due.kind === "voided_duel") await voidDuelIn(tx, { duelId, playerId, cause, at: endedAt });
+  // A Duel the Player lost is left as it was, but the step is saved as a Sanction all the same.
+  if (due.kind === "voided_duel") await voidDuelForViolation(tx, { duelId, playerId, at: endedAt });
   else if (due.kind === "suspension")
     await suspendPlayerIn(tx, { playerId, cause, at: endedAt, lengthMs: due.lengthMs });
   else await banPlayerIn(tx, { playerId, cause, at: endedAt });

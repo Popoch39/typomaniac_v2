@@ -5,7 +5,7 @@ import type { Standing } from "@repo/ranked-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { sanction, voidedDuel } from "../src/db/client.ts";
 import { recordViolation, saveDuel } from "../src/modules/duel/service.ts";
-import { runFairPlayPass } from "../src/modules/fair-play/service.ts";
+import { revokeSanction, runFairPlayPass } from "../src/modules/fair-play/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -58,8 +58,8 @@ const saveRankedDuel = async (
   });
 };
 
-// A ranked Duel the cheater won against a new Opponent, with a Violation of theirs recorded in it.
-const winWithViolation = async (cheaterId: string) => {
+// A ranked Duel against a new Opponent, with a Violation of the cheater's recorded in it.
+const duelWithViolation = async (cheaterId: string, outcomes: readonly [Outcome, Outcome]) => {
   const duelId = crypto.randomUUID();
   await recordViolation(testDb.db, {
     playerId: cheaterId,
@@ -67,13 +67,16 @@ const winWithViolation = async (cheaterId: string) => {
     round: 1,
     kind: "multipleCharacters",
   });
-  await saveRankedDuel(duelId, [cheaterId, await signInRanked()], ["win", "loss"]);
+  await saveRankedDuel(duelId, [cheaterId, await signInRanked()], outcomes);
   return duelId;
 };
+
+const winWithViolation = (cheaterId: string) => duelWithViolation(cheaterId, ["win", "loss"]);
 
 const sanctionsOf = (playerId: string) =>
   testDb.db
     .select({
+      id: sanction.id,
       kind: sanction.kind,
       cause: sanction.cause,
       startedAt: sanction.startedAt,
@@ -173,4 +176,33 @@ test("a Duel saved after the instant of the pass is left for a later pass", asyn
   await runFairPlayPass(testDb.db, before);
 
   expect(await voidedUnder(duelId)).toEqual([]);
+});
+
+test("a first Violation in a Duel the Player lost is saved as a Voided Duel with cause Violation that withdraws nothing, and counts towards the next Sanction", async () => {
+  const cheaterId = await signInRanked();
+  const duelId = await duelWithViolation(cheaterId, ["loss", "win"]);
+
+  await runFairPlayPass(testDb.db, Date.now());
+
+  const [voided] = await sanctionsOf(cheaterId);
+  expect(voided).toEqual(
+    expect.objectContaining({ kind: "voided_duel", cause: "violation", endsAt: null }),
+  );
+  // A Duel the Player at fault lost stays: −16 MMR and −17 LP, as the Duel left them.
+  expect(await voidedUnder(duelId)).toEqual([]);
+  expect(await readStanding(testDb.db, cheaterId)).toEqual({
+    mmr: 1368,
+    duelsPlayed: 41,
+    rank: { tier: "gold", division: 3, lp: 33 },
+  });
+
+  await winWithViolation(cheaterId);
+  await runFairPlayPass(testDb.db, Date.now());
+  expect((await sanctionsOf(cheaterId)).map(({ kind }) => kind)).toEqual([
+    "voided_duel",
+    "suspension",
+  ]);
+  expect(await revokeSanction(testDb.db, { sanctionId: voided?.id ?? "", at: new Date() })).toBe(
+    "revoked",
+  );
 });

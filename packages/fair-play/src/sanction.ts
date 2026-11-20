@@ -57,6 +57,25 @@ export const voidDuelIn = (
     return saved.id;
   });
 
+/**
+ * Voids a Duel for one step of the Violation ladder, inside the caller's transaction: a Sanction of
+ * kind Voided Duel with cause Violation is saved and the Duel voided under it. Unlike `voidDuelIn`, the
+ * Sanction is saved even when the Duel is left alone, lost or drawn by the Player at fault or voided
+ * already, so that their history has every step of the ladder and each can be revoked. The caller
+ * keeps it from being saved twice.
+ */
+export const voidDuelForViolation = async (
+  tx: Transaction,
+  { duelId, playerId, at }: { duelId: string; playerId: string; at: Date },
+) => {
+  const [saved] = await tx
+    .insert(sanction)
+    .values({ playerId, kind: "voided_duel", cause: "violation", startedAt: at })
+    .returning({ id: sanction.id });
+  if (!saved) throw new Error(`Could not save the Sanction voiding Duel ${duelId}`);
+  await withdrawDuel(tx, { duelId, playerId }, () => Promise.resolve(saved.id));
+};
+
 // The voiding itself, under the Sanction that `sanctionOf` saves only once the Duel is known to be
 // voided: its own Voided Duel, or the Suspension or Ban that voids it.
 const withdrawDuel = async (
