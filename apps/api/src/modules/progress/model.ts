@@ -49,10 +49,31 @@ const publicPlayer = t.Object({
   peakTier: t.Nullable(tier),
 });
 
+// One point of the Progress: a Game the Player played, judged by the server.
+const progressGame = t.Object({
+  // The end of the Game's Duel, in milliseconds since the epoch.
+  endedAt: t.Number(),
+  kind: t.Union([t.Literal("ranked"), t.Literal("custom")]),
+  wpm: t.Number(),
+  rawWpm: t.Number(),
+  accuracy: t.Number(),
+  consistency: t.Number(),
+});
+
 export const NicknameGet = {
   Params: t.Object({ nickname: t.String() }),
   Response: {
     200: publicPlayer,
+    404: t.Object({ code: t.Literal("PLAYER_NOT_FOUND") }),
+    429: RateLimited,
+  },
+};
+
+export const NicknameProgressGet = {
+  Params: t.Object({ nickname: t.String() }),
+  Response: {
+    // Oldest first.
+    200: t.Object({ games: t.Array(progressGame) }),
     404: t.Object({ code: t.Literal("PLAYER_NOT_FOUND") }),
     429: RateLimited,
   },
