@@ -1,11 +1,9 @@
 import { useDuelRefusalMessage } from "../hooks/useDuelRefusalMessage.ts";
+import { DuelRefusalPanel } from "./DuelRefusalPanel.tsx";
 
 export function DuelRefusal() {
   const message = useDuelRefusalMessage();
+  if (message === null) return null;
 
-  return (
-    <p role="alert" className="text-danger">
-      {message}
-    </p>
-  );
+  return <DuelRefusalPanel message={message} />;
 }

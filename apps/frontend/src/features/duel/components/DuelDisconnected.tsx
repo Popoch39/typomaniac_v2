@@ -1,8 +1,15 @@
-// Reopening the link is how a Participant gets their seat back, with their Game where they left it.
+import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
+import { Keycap } from "../../../shared/components/Keycap.tsx";
+import { useDuelRejoin } from "../hooks/useDuelRejoin.ts";
+
 export function DuelDisconnected() {
+  const rejoin = useDuelRejoin();
+
   return (
-    <p role="alert" className="text-danger">
-      The connection to the Duel was lost. Reopen the link to get back in.
-    </p>
+    <ErrorPanel title="Duel" message="The connection to the Duel was lost.">
+      <Keycap size="sm" onClick={rejoin}>
+        Rejoin
+      </Keycap>
+    </ErrorPanel>
   );
 }
