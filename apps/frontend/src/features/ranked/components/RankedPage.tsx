@@ -16,13 +16,21 @@ export function RankedPage() {
         title="Ranked"
         lead="1v1 Duels, best of three Rounds. Win to earn LP and climb from Bronze to Master."
       />
-      {/* Both gates show the same skeleton, so that the session check and the Standing read look like
-          one wait. */}
+      {/* While the session is checked, the Standing gate already stands in the place it takes once the
+          Player is known, waiting without a Player: React keeps the same skeleton mounted through both
+          stages, so the two waits look like one and the loading pixels never restart. */}
       <SignedInPlayerGate
         pending={
-          <LoadingState message="Checking your session…">
-            <RankedSkeleton />
-          </LoadingState>
+          <StandingGate
+            player={null}
+            pending={
+              <LoadingState message="Checking your session…">
+                <RankedSkeleton />
+              </LoadingState>
+            }
+          >
+            {() => null}
+          </StandingGate>
         }
         guest={
           <SignInPrompt explanation="Ranked play is for signed-in Players. Sign in to get access." />

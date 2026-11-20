@@ -6,7 +6,8 @@ import { useStanding } from "../hooks/useStanding.ts";
 import type { OwnStanding } from "../standing/describeStanding.ts";
 
 interface StandingGateProps {
-  player: SignedInPlayer;
+  /** Null while the session is checked: the gate then only shows its pending view. */
+  player: SignedInPlayer | null;
   /** Shown while the Standing is read, and again while a failed read is tried again. */
   pending: ReactNode;
   children: (standing: OwnStanding) => ReactNode;

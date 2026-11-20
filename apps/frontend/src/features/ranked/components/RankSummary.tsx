@@ -22,12 +22,16 @@ export function RankSummary({ rank }: RankSummaryProps) {
           </p>
         </div>
       </div>
-      {next !== null && (
-        <div className="flex flex-col gap-3">
-          <LpBar lp={rank.lp} next={next} />
-          <p className="m-0 text-sm text-ink-subtle">100 LP promote you to the next Division.</p>
-        </div>
-      )}
+      {/* As tall as the Placement pips and their hint, and kept at Master, so that the Rank card has one
+          box whatever the Standing, the box its skeleton reserves. */}
+      <div className="flex min-h-24 flex-col gap-3">
+        {next !== null && (
+          <>
+            <LpBar lp={rank.lp} next={next} />
+            <p className="m-0 text-sm text-ink-subtle">100 LP promote you to the next Division.</p>
+          </>
+        )}
+      </div>
     </>
   );
 }
