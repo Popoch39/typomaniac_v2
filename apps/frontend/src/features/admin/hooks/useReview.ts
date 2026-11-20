@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { reviewQueryOptions } from "../api/reviewQueryOptions.ts";
-import { ADMINISTRATION_WORDING } from "./useOpenReviews.ts";
+import { ADMINISTRATION_WORDING } from "../review/administrationWording.ts";
 
 export type Review = NonNullable<ReturnType<typeof useReview>["review"]>;
 

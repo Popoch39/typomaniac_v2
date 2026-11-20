@@ -4,7 +4,7 @@ import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { playerSanctionsQueryOptions } from "../api/playerSanctionsQueryOptions.ts";
 import { sanctionLine } from "../review/sanctionLine.ts";
-import { ADMINISTRATION_WORDING } from "./useOpenReviews.ts";
+import { ADMINISTRATION_WORDING } from "../review/administrationWording.ts";
 import type { Review } from "./useReview.ts";
 
 const FAILURES = {

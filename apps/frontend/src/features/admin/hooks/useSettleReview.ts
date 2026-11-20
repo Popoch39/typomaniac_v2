@@ -8,7 +8,7 @@ import { settledLine } from "../review/settledLine.ts";
 import { settlementOf } from "../review/settlementOf.ts";
 import { voidableDuels } from "../review/voidableDuels.ts";
 import type { Review } from "./useReview.ts";
-import { ADMINISTRATION_WORDING } from "./useOpenReviews.ts";
+import { ADMINISTRATION_WORDING } from "../review/administrationWording.ts";
 
 const FAILURES = {
   ...ADMINISTRATION_WORDING,
