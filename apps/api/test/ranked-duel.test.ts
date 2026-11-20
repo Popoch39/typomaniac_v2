@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import type { ServerMessage } from "@repo/duel-engine";
+import { type ClientMessage, type ServerMessage, VIOLATION_CLOSE_REASON } from "@repo/duel-engine";
 import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import type { Standing } from "@repo/ranked-engine";
 import { eq } from "drizzle-orm";
@@ -8,7 +8,7 @@ import { createApp } from "../src/app.ts";
 import type { DuelOptions } from "../src/modules/duel/index.ts";
 import { createRelay } from "../src/modules/duel/relay.ts";
 import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
-import { duel, duelGame, duelParticipant, duelRound } from "../src/db/client.ts";
+import { duel, duelGame, duelParticipant, duelRound, violation } from "../src/db/client.ts";
 import { tickMatchmaker } from "../src/modules/queue/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";
@@ -78,12 +78,35 @@ const seat = async (
 type Seated = Awaited<ReturnType<typeof seat>>;
 
 /**
+ * Types `word` and its Separator from `at` on, as the game's client does on a physical keyboard:
+ * each character is one key going down, its insert, and the key going up (ADR 0016).
+ */
+const typeWord = (
+  socket: { send: (message: ClientMessage) => void },
+  round: number,
+  word: string,
+  at: number,
+) => {
+  for (const [offset, char] of `${word} `.split("").entries()) {
+    const code = char === " " ? "Space" : `Key${char.toUpperCase()}`;
+    const keyAt = at + offset * 100;
+    socket.send({ type: "event", round, event: { type: "keyDown", at: keyAt, code } });
+    socket.send({ type: "event", round, event: { type: "insert", at: keyAt + 10, text: char } });
+    socket.send({ type: "event", round, event: { type: "keyUp", at: keyAt + 60, code } });
+  }
+};
+
+/**
  * Plays a Duel to its end. Each Round goes to the Player named, who types its first Target word
  * while the other types nothing, or is drawn. Every Game ends on a Tick stamped 30 seconds ahead.
  */
-const play = async (players: Seated, rounds: readonly ("first" | "second" | "draw")[]) => {
+const play = async (
+  players: Seated,
+  rounds: readonly ("first" | "second" | "draw")[],
+  firstRound = 1,
+) => {
   for (const [index, winner] of rounds.entries()) {
-    const round = index + 1;
+    const round = index + firstRound;
     const countdowns = [];
     for (const player of players) countdowns.push(await nextOfType(player, "countdown"));
     const [countdown] = countdowns;
@@ -93,12 +116,7 @@ const play = async (players: Seated, rounds: readonly ("first" | "second" | "dra
     for (const [position, { socket }] of players.entries()) {
       const types = winner === (position === 0 ? "first" : "second");
       socket.send({ type: "event", round, event: { type: "start", at: 10 } });
-      if (types)
-        socket.send({
-          type: "event",
-          round,
-          event: { type: "insert", at: 1010, text: `${countdown.words[0]} ` },
-        });
+      if (types) typeWord(socket, round, countdown.words[0] ?? "", 1010);
       socket.send({ type: "event", round, event: { type: "tick", at: 30_010 } });
     }
     for (const player of players) await nextOfType(player, "roundEnd");
@@ -562,11 +580,7 @@ test("a ranked Duel with one Player connected starts without the other once the 
   expect(countdown.startAt).toBeGreaterThanOrEqual(createdAt.before + connectMs);
   await Bun.sleep(Math.max(0, countdown.startAt - Date.now()));
   socket.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
-  socket.send({
-    type: "event",
-    round: 1,
-    event: { type: "insert", at: 1010, text: `${countdown.words[0]} ` },
-  });
+  typeWord(socket, 1, countdown.words[0] ?? "", 1010);
   socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
   // The Games left open are closed at their deadlines, those of the present Player too from the
   // second Round on: the sweeps stand for the instants they fall due.
@@ -606,6 +620,126 @@ test("a ranked Duel with one Player connected starts without the other once the 
     rank: null,
   });
   socket.close();
+});
+
+// Both Players start the first Round of their ranked Duel once its Start has come.
+const startFirstRound = async (players: Seated) => {
+  const [countdown] = [
+    await nextOfType(players[0], "countdown"),
+    await nextOfType(players[1], "countdown"),
+  ];
+  await Bun.sleep(Math.max(0, countdown.startAt - Date.now()));
+  for (const { socket } of players)
+    socket.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
+  return countdown;
+};
+
+const savedViolations = (duelId: string) =>
+  testDb.db.select().from(violation).where(eq(violation.duelId, duelId));
+
+const isRelayedInsert = (message: ServerMessage) =>
+  message.type === "opponentEvent" && message.event.type === "insert";
+
+test("in a ranked Duel, an insert of several characters is a Violation: never applied, journaled nor relayed, its socket closed for it and the Violation recorded; the Player comes back to their Game and both finish the Duel", async () => {
+  const { duelId, origin, players } = await openRankedDuel();
+  const [cheater, opponent] = players;
+  const countdown = await startFirstRound(players);
+  const before = Date.now();
+
+  cheater.socket.send({
+    type: "event",
+    round: 1,
+    event: { type: "insert", at: 1010, text: `${countdown.words[0]} ` },
+  });
+
+  expect(await cheater.socket.closedWith).toEqual({ code: 1008, reason: VIOLATION_CLOSE_REASON });
+  // Told the Player at fault is away, as at any disconnection, and nothing of the insert.
+  const away = await nextOfType(opponent, "presence");
+  expect(away.participant).toMatchObject({ seat: cheater.seat, connected: false });
+  expect(opponent.received.some(isRelayedInsert)).toBe(false);
+  const saved = await savedViolations(duelId);
+  expect(saved).toEqual([
+    {
+      id: expect.any(String),
+      playerId: cheater.id,
+      duelId,
+      round: 1,
+      kind: "multipleCharacters",
+      committedAt: expect.any(Date),
+    },
+  ]);
+  expect(saved[0]?.committedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
+  expect(saved[0]?.committedAt.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+
+  const socket = await openSocket(
+    `${origin.replace(/^http/, "ws")}/api/duels/${duelId}/socket`,
+    cheater.cookie,
+  );
+  const back = { ...cheater, socket, received: [] as ServerMessage[] };
+  const state = await nextOfType(back, "state");
+  expect(state.journals[cheater.seat]).toEqual([{ type: "start", at: 10 }]);
+  typeWord(socket, 1, countdown.words[0] ?? "", 1010);
+  socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
+  opponent.socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
+  for (const player of [back, opponent]) await nextOfType(player, "roundEnd");
+  const ends = await play([back, opponent], ["first"], 2);
+
+  expect(ends[1].outcomes[opponent.seat]).toBe("loss");
+  expect(ends[0].outcomes[cheater.seat]).toBe("win");
+  expect(await savedParticipants(duelId)).toHaveLength(2);
+  socket.close();
+  opponent.socket.close();
+});
+
+test("in a ranked Duel, a one-character insert that no keyDown accounts for is a Violation, refused the same way", async () => {
+  const { duelId, players } = await openRankedDuel();
+  const [cheater, opponent] = players;
+  const countdown = await startFirstRound(players);
+
+  cheater.socket.send({
+    type: "event",
+    round: 1,
+    event: { type: "insert", at: 1010, text: countdown.words[0]?.[0] ?? "" },
+  });
+
+  expect(await cheater.socket.closedWith).toEqual({ code: 1008, reason: VIOLATION_CLOSE_REASON });
+  await nextOfType(opponent, "presence");
+  expect(opponent.received.some(isRelayedInsert)).toBe(false);
+  expect((await savedViolations(duelId)).map(({ playerId, kind }) => ({ playerId, kind }))).toEqual(
+    [{ playerId: cheater.id, kind: "noKeyPress" }],
+  );
+  opponent.socket.close();
+});
+
+test("a ranked Game typed one key at a time, with key rollover and a held key, records no Violation", async () => {
+  const { duelId, players } = await openRankedDuel();
+  const [typist, opponent] = players;
+  const countdown = await startFirstRound(players);
+  const [first, second] = (countdown.words[0] ?? "").split("");
+  const send = (event: ClientMessage & { type: "event" }) => typist.socket.send(event);
+  const event = (gameEvent: Extract<ClientMessage, { type: "event" }>["event"]) =>
+    send({ type: "event", round: 1, event: gameEvent });
+
+  // The second key goes down before the first is released, then is held and repeats.
+  event({ type: "keyDown", at: 1000, code: "KeyA" });
+  event({ type: "insert", at: 1001, text: first ?? "" });
+  event({ type: "keyDown", at: 1050, code: "KeyB" });
+  event({ type: "insert", at: 1051, text: second ?? "" });
+  event({ type: "keyUp", at: 1080, code: "KeyA" });
+  event({ type: "insert", at: 1600, text: second ?? "" });
+  event({ type: "insert", at: 1650, text: second ?? "" });
+  event({ type: "keyUp", at: 1700, code: "KeyB" });
+  event({ type: "delete", at: 1800, unit: "word" });
+  typeWord(typist.socket, 1, countdown.words[0] ?? "", 2000);
+
+  for (let relayed = 0; relayed < 4;)
+    if (isRelayedInsert(await nextOfType(opponent, "opponentEvent"))) relayed++;
+  expect(await savedViolations(duelId)).toEqual([]);
+  expect(await Promise.race([typist.socket.closed, Bun.sleep(100).then(() => "open")])).toBe(
+    "open",
+  );
+  typist.socket.close();
+  opponent.socket.close();
 });
 
 test("each Player of a ranked Duel is shown both Avatars, none for a Player without a picture", async () => {

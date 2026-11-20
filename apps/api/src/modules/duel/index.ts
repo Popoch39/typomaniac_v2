@@ -2,9 +2,14 @@ import {
   anchorStart,
   boundEvent,
   COUNTDOWN_MS,
+  findViolation,
+  type KeyPairing,
+  NO_KEYS_PAIRED,
+  pairKeys,
   type Participant,
   ROUND_PAUSE_MS,
   type ServerMessage,
+  VIOLATION_CLOSE_REASON,
 } from "@repo/duel-engine";
 import type { Logger } from "@repo/logger";
 import { applyEvent, type Game } from "@repo/typing-engine";
@@ -34,6 +39,7 @@ import {
   readDuel,
   readJournals,
   readRounds,
+  recordViolation,
   releaseSeat,
   replayGame,
   startLateGame,
@@ -83,16 +89,20 @@ export const createDuelRoutes = (
     anchorAt: number | null;
     /** This instance's copy of the Participant's Game, rebuilt from its journal on opening. */
     game: Game;
+    /** Whether the Duel is ranked, the only kind in which a Violation is refused (ADR 0016). */
+    ranked: boolean;
+    /** What pairs each insert of the Game with a KeyPress, rebuilt from its journal like the Game. */
+    keys: KeyPairing;
   };
   // What each open socket is seated as, set on open and read on messages and on close.
   const seated = new Map<string, Seating>();
   // The message counter of each open socket, with whom to blame in the warning, and the sockets
-  // closed for flooding, whose messages still in flight are dropped as well.
+  // closed for flooding or for a Violation, whose messages still in flight are dropped as well.
   const messageWindows = new Map<
     string,
     { readonly overCap: (now: number) => boolean; readonly key: string; readonly duelId: string }
   >();
-  const flooded = new Set<string>();
+  const closing = new Set<string>();
 
   // Every instance sweeps the Duels that have something due, its own or not: a Duel moves forward
   // whoever is connected to it, and on whichever instance. One sweep at a time: a slow one is not
@@ -174,8 +184,8 @@ export const createDuelRoutes = (
         // Runs on every message before its body is validated, so that malformed ones count too.
         parse(ws) {
           const counted = messageWindows.get(ws.id);
-          if (!counted || flooded.has(ws.id) || !counted.overCap(Date.now())) return;
-          flooded.add(ws.id);
+          if (!counted || closing.has(ws.id) || !counted.overCap(Date.now())) return;
+          closing.add(ws.id);
           logger.warn("Duel socket of {key} in seat {seat} of Duel {duelId} closed for flooding", {
             limit: "socketMessages",
             key: counted.key,
@@ -220,6 +230,7 @@ export const createDuelRoutes = (
               if (message.round !== entry.round) {
                 entry.round = message.round;
                 entry.game = replayGame(message.words, []);
+                entry.keys = NO_KEYS_PAIRED;
                 entry.anchorAt = null;
               }
               entry.startAt = message.startAt;
@@ -246,6 +257,8 @@ export const createDuelRoutes = (
             startAt: null,
             anchorAt,
             game,
+            ranked: duel.kind === "ranked",
+            keys: journals[self.seat].reduce(pairKeys, NO_KEYS_PAIRED),
           };
           seated.set(ws.id, entry);
           await holdSeat(redis, ws.params.id, self.seat, connection);
@@ -288,7 +301,7 @@ export const createDuelRoutes = (
           const now = Date.now();
           // The message over the cap is dropped, never journaled nor relayed. Closing leaves the
           // Participant away, as any disconnection does: no other sanction.
-          if (flooded.has(ws.id)) return;
+          if (closing.has(ws.id)) return;
           if (message.type === "ping") {
             ws.send({ type: "pong", clientAt: message.clientAt, serverAt: now });
             return;
@@ -299,6 +312,32 @@ export const createDuelRoutes = (
           const { status, startedAt } = seating.game;
           const { startAt } = seating;
           if (!isEventAccepted(event, { status, startAt, now })) return;
+          const { playerId } = ws.identity;
+          if (seating.ranked && playerId !== null) {
+            const kind = findViolation(seating.keys, event);
+            seating.keys = pairKeys(seating.keys, event);
+            // Refused like a flood: never applied, journaled nor relayed, and the Participant is
+            // away until they reconnect. Its Sanction is left to the fair-play pass (ADR 0014).
+            if (kind !== null) {
+              closing.add(ws.id);
+              const { round } = seating;
+              const { seat } = seating.participant;
+              const duelId = ws.params.id;
+              logger.warn(
+                "Duel socket of {playerId} in seat {seat} of Duel {duelId} closed for a Violation",
+                { playerId, duelId, seat, round, kind },
+              );
+              await recordViolation(db, { playerId, duelId, round, kind }).catch((error: unknown) =>
+                logger.error("Could not record the Violation of {playerId} in Duel {duelId}", {
+                  playerId,
+                  duelId,
+                  error,
+                }),
+              );
+              ws.close(CloseCode.policyViolation, VIOLATION_CLOSE_REASON);
+              return;
+            }
+          }
           // Only a start is accepted in a Game that has not started.
           if (startedAt === null && startAt !== null) seating.anchorAt = anchorStart(now, startAt);
           const { anchorAt } = seating;
@@ -334,7 +373,7 @@ export const createDuelRoutes = (
         async close(ws, code) {
           lifecycle.release(ws.id);
           messageWindows.delete(ws.id);
-          flooded.delete(ws.id);
+          closing.delete(ws.id);
           const seating = seated.get(ws.id);
           logger.info("Socket on Duel {duelId} closed ({code})", {
             duelId: ws.params.id,

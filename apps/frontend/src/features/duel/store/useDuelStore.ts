@@ -43,6 +43,8 @@ type DuelState = {
   readonly opponentGame: Game | null;
   /** Why the Participant could not take a seat, in words for the user. */
   readonly refusal: string | null;
+  /** The reason the server gave as it closed the socket for good, once the phase is `disconnected`. */
+  readonly closeReason: string | null;
   /**
    * Whether the socket dropped and is being reopened. The phase it dropped in stays shown until
    * the server says where the Duel is.
@@ -105,6 +107,7 @@ const initialState = {
   words: [],
   opponentGame: null,
   refusal: null,
+  closeReason: null,
   isReconnecting: false,
   end: null,
   duelId: null,
@@ -251,10 +254,10 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     return true;
   };
 
-  const disconnect = () => {
+  const disconnect = (closeReason: string) => {
     if (get().phase === "finished") return;
     stopFollowingSocket();
-    set({ phase: "disconnected", isReconnecting: false });
+    set({ phase: "disconnected", closeReason, isReconnecting: false });
   };
 
   const leave = () => {

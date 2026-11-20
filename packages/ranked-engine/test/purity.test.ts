@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { applyDuel, createStanding, type Standing } from "../src/index.ts";
+import { applyCorrection, applyDuel, createStanding, type Standing } from "../src/index.ts";
 
 test("PURE-1: applying a Duel never modifies the standing it receives", () => {
   const standing: Standing = { mmr: 1300, duelsPlayed: 2, rank: null };
@@ -32,4 +32,19 @@ test("PURE-1: the standing and the update pass through JSON unchanged", () => {
     lpDelta: 0,
     rankChange: "none",
   });
+});
+
+test("PURE-1: a correction never modifies the standing it receives, and gives the same standing for the same input", () => {
+  const standing: Standing = {
+    mmr: 1300,
+    duelsPlayed: 30,
+    rank: { tier: "gold", division: 3, lp: 10 },
+  };
+  const untouched = structuredClone(standing);
+
+  const corrected = applyCorrection(standing, { mmr: -16, lp: -30 });
+
+  expect(standing).toEqual(untouched);
+  expect(applyCorrection(structuredClone(standing), { mmr: -16, lp: -30 })).toEqual(corrected);
+  expect(JSON.parse(JSON.stringify(corrected))).toEqual(corrected);
 });

@@ -15,6 +15,7 @@ import {
   type Seat,
   type ServerMessage,
   START_WINDOW_MS,
+  type ViolationKind,
 } from "@repo/duel-engine";
 import type { Logger } from "@repo/logger";
 import type { Ornament, Rank } from "@repo/ranked-engine";
@@ -34,6 +35,7 @@ import {
   duelGame,
   duelParticipant,
   duelRound,
+  violation,
 } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import {
@@ -667,6 +669,19 @@ const readRankedEnds = async (tx: Transaction, duelId: string) => {
   const [first, second] = ends;
   if (!first || !second) throw new Error(`Duel ${duelId} was saved without both participants`);
   return [first, second] as const;
+};
+
+/** Records a Violation refused in a ranked Duel, at the instant it is recorded. */
+export const recordViolation = async (
+  db: Db,
+  committed: {
+    readonly playerId: string;
+    readonly duelId: string;
+    readonly round: number;
+    readonly kind: ViolationKind;
+  },
+) => {
+  await db.insert(violation).values(committed);
 };
 
 /**

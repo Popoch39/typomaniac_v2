@@ -1,5 +1,7 @@
 export { DEFAULT_RANKED_CONFIG } from "./config.ts";
 export type { RankedConfig } from "./config.ts";
+export { applyCorrection } from "./correction.ts";
+export type { Correction } from "./correction.ts";
 export { applyDuel } from "./duel.ts";
 export type { DuelUpdate } from "./duel.ts";
 export { ladderIndex, rankAtLadderIndex } from "./ladder.ts";

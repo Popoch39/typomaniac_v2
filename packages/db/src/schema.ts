@@ -1,5 +1,5 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
-import type { Outcome, Seat } from "@repo/duel-engine";
+import type { Outcome, Seat, ViolationKind } from "@repo/duel-engine";
 import type { OrnamentChoice, RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
@@ -250,5 +250,82 @@ export const duelParticipant = pgTable(
     primaryKey({ columns: [table.duelId, table.seat] }),
     // A Player's ranked Duels in the order they played them, for the Outcomes of their Placement.
     index("duel_participant_player_idx").on(table.playerId, table.duelsPlayedBefore),
+  ],
+);
+
+// One row per Violation refused live in a ranked Duel (ADR 0014, ADR 0016), counted per Player to
+// pick their automatic Sanction. Written as it is refused, before the Duel is saved: no key to `duel`.
+export const violation = pgTable(
+  "violation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    duelId: uuid("duel_id").notNull(),
+    round: smallint("round").notNull(),
+    kind: text("kind", { enum: ["multipleCharacters", "noKeyPress"] })
+      .$type<ViolationKind>()
+      .notNull(),
+    committedAt: timestamp("committed_at").defaultNow().notNull(),
+  },
+  (table) => [index("violation_player_idx").on(table.playerId, table.duelId)],
+);
+
+// A Sanction applied to a Player for cheating, in rising order: a Voided Duel, a Suspension, a Ban.
+// Its cause says whether a Violation or a Review brought it. Kept once revoked, so that a Player's
+// history stays whole.
+export const sanction = pgTable(
+  "sanction",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["voided_duel", "suspension", "ban"] }).notNull(),
+    cause: text("cause", { enum: ["violation", "review"] }).notNull(),
+    startedAt: timestamp("started_at").notNull(),
+    // The end of a Suspension; null for the other kinds.
+    endsAt: timestamp("ends_at"),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (table) => [index("sanction_player_idx").on(table.playerId)],
+);
+
+// A ranked Duel withdrawn where the cheating paid (ADR 0015), and the Sanction it comes from. Keyed on
+// the Duel, so that a Duel is never voided, nor its Players repaired, twice.
+export const voidedDuel = pgTable(
+  "voided_duel",
+  {
+    duelId: uuid("duel_id")
+      .primaryKey()
+      .references(() => duel.id, { onDelete: "cascade" }),
+    sanctionId: uuid("sanction_id")
+      .notNull()
+      .references(() => sanction.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("voided_duel_sanction_idx").on(table.sanctionId)],
+);
+
+// One row per seat of a Voided Duel whose Player was corrected: the MMR and LP actually applied to
+// their Standing, signed, and the ladder index it was left at, which counts towards the Peak Tier.
+export const voidedDuelCorrection = pgTable(
+  "voided_duel_correction",
+  {
+    duelId: uuid("duel_id")
+      .notNull()
+      .references(() => voidedDuel.duelId, { onDelete: "cascade" }),
+    seat: smallint("seat").$type<Seat>().notNull(),
+    mmr: integer("mmr").notNull(),
+    lp: integer("lp").notNull(),
+    // Null when the Player was Unranked.
+    ladderIndexAfter: smallint("ladder_index_after"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.duelId, table.seat] }),
+    foreignKey({
+      columns: [table.duelId, table.seat],
+      foreignColumns: [duelParticipant.duelId, duelParticipant.seat],
+    }).onDelete("cascade"),
   ],
 );

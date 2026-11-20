@@ -2,6 +2,12 @@ import type { Ornament, Rank, RankChange } from "@repo/ranked-engine";
 import type { GameEvent, Result } from "@repo/typing-engine";
 import type { RoundOutcomes } from "./rounds.ts";
 
+/**
+ * The reason the server gives as it closes, with a policy-violation code, the socket of a ranked
+ * Duel that sent a Violation, so that the client can tell it from any other closing.
+ */
+export const VIOLATION_CLOSE_REASON = "input not accepted in ranked play";
+
 /** A Participant's place in a Duel; it indexes the pairs of journals, Results and Outcomes. */
 export type Seat = 0 | 1;
 

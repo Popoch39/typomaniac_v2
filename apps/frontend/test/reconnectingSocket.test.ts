@@ -3,7 +3,11 @@ import { createReconnectingSocket } from "../src/shared/lib/reconnectingSocket.t
 
 // What the server does with each connection it accepts, in order: greet it and close it with a
 // code, close it at once without a word, or greet it and keep it open.
-type Script = { readonly greet: string | null; readonly closeWith: number | null };
+type Script = {
+  readonly greet: string | null;
+  readonly closeWith: number | null;
+  readonly reason?: string;
+};
 const scripts: Script[] = [];
 let connections = 0;
 
@@ -14,9 +18,9 @@ const server = Bun.serve({
   websocket: {
     open(ws) {
       connections += 1;
-      const { greet, closeWith } = scripts.shift() ?? { greet: "hello", closeWith: null };
+      const { greet, closeWith, reason } = scripts.shift() ?? { greet: "hello", closeWith: null };
       if (greet !== null) ws.send(greet);
-      if (closeWith !== null) ws.close(closeWith);
+      if (closeWith !== null) ws.close(closeWith, reason);
     },
     message() {},
   },
@@ -44,8 +48,8 @@ const handlersOf = ({ reconnects }: { reconnects: boolean }) => {
         seen.push("reconnect");
         return reconnects;
       },
-      disconnect: () => {
-        seen.push("disconnect");
+      disconnect: (reason: string) => {
+        seen.push(reason === "" ? "disconnect" : `disconnect ${reason}`);
         settle();
       },
     },
@@ -88,6 +92,17 @@ test("a socket the server closed on purpose is not reopened", async () => {
   await settled;
 
   expect(seen).toEqual(["receive only", "disconnect"]);
+});
+
+test("an owner told the socket is closed on purpose is given the reason the server closed it with", async () => {
+  scripts.push({ greet: "only", closeWith: 1008, reason: "input not accepted" });
+  const socket = createReconnectingSocket();
+  const { seen, settled, handlers } = handlersOf({ reconnects: true });
+
+  socket.open(url, handlers);
+  await settled;
+
+  expect(seen).toEqual(["receive only", "disconnect input not accepted"]);
 });
 
 test("an owner that no longer needs the socket is told it is disconnected instead", async () => {
