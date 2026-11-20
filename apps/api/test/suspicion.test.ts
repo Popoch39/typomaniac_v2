@@ -246,15 +246,13 @@ test("the signals across Duels read only the ranked Duels started after the Play
     );
   await runFairPlayPass(testDb.db, start + 10 * 60_000);
   const settledAt = new Date(start + 11 * 60_000);
-  await testDb.db
-    .insert(review)
-    .values({
-      playerId: loserId,
-      reason: "suspicion",
-      openedAt: settledAt,
-      settledAt,
-      decision: "cleared",
-    });
+  await testDb.db.insert(review).values({
+    playerId: loserId,
+    reason: "suspicion",
+    openedAt: settledAt,
+    settledAt,
+    decision: "cleared",
+  });
   await saveOneRoundDuel(
     "ranked",
     [loserId, await signInRanked()],
