@@ -7,5 +7,6 @@ export type { ReviewCandidate, ReviewReason } from "./review.ts";
 export { readGameSignals, SIGNAL_NAMES, SIGNALS_VERSION } from "./signals.ts";
 export type { GameSignals, PlayedGame, SignalName } from "./signals.ts";
 export { playerSuspicion, SIGNAL_WEIGHTS, SUSPICION_GAMES } from "./suspicion.ts";
+export { suspensionLength } from "./suspension.ts";
 export { nextViolationSanction } from "./violation.ts";
 export type { ViolationSanction } from "./violation.ts";

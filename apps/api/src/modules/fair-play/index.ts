@@ -8,6 +8,7 @@ import {
   readOpenReviews,
   readOwnVoidedDuels,
   readReview,
+  settleReview,
 } from "./service.ts";
 
 export const createFairPlayRoutes = (
@@ -42,4 +43,24 @@ export const createFairPlayRoutes = (
       },
       async ({ params, status }) =>
         (await readReview(db, params.id)) ?? status(404, { code: "REVIEW_NOT_FOUND" }),
+    )
+    .post(
+      "/admin/reviews/:id/settlement",
+      {
+        administrator: true,
+        params: FairPlayModel.AdminReviewsIdSettlementPost.Params,
+        body: FairPlayModel.AdminReviewsIdSettlementPost.Body,
+        response: FairPlayModel.AdminReviewsIdSettlementPost.Response,
+      },
+      async ({ params, body, status }) => {
+        const settled = await settleReview(db, {
+          reviewId: params.id,
+          settlement: body,
+          at: new Date(),
+        });
+        if (settled === "not-found") return status(404, { code: "REVIEW_NOT_FOUND" });
+        if (settled === "duel-not-found") return status(404, { code: "DUEL_NOT_FOUND" });
+        if (settled === "already-settled") return status(409, { code: "REVIEW_ALREADY_SETTLED" });
+        return status(204, undefined);
+      },
     );

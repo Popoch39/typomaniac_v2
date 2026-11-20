@@ -19,8 +19,15 @@ import { readStanding } from "../standing/service.ts";
 
 // The steps that apply a Sanction live in @repo/fair-play, shared with the fair-play worker: this is
 // their one import path in the API.
-export { banPlayer, runFairPlayPass, suspendPlayer, voidDuel } from "@repo/fair-play";
-export type { BanResult, SanctionCause, SuspendResult, VoidDuelResult } from "@repo/fair-play";
+export { banPlayer, runFairPlayPass, settleReview, suspendPlayer, voidDuel } from "@repo/fair-play";
+export type {
+  BanResult,
+  ReviewSettlement,
+  SanctionCause,
+  SettleReviewResult,
+  SuspendResult,
+  VoidDuelResult,
+} from "@repo/fair-play";
 
 /**
  * The end of the Player's current Suspension, as epoch milliseconds, or null when none holds at

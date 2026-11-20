@@ -129,6 +129,29 @@ export const AdminReviewsIdGet = {
   },
 };
 
+const reviewNotFound = t.Object({ code: t.Literal("REVIEW_NOT_FOUND") });
+
+export const AdminReviewsIdSettlementPost = {
+  Params: t.Object({ id: t.String({ format: "uuid" }) }),
+  // The four endings of a Review: clearing the Player, or a Sanction with cause Review.
+  Body: t.Union([
+    t.Object({ decision: t.Literal("cleared") }),
+    t.Object({
+      decision: t.Literal("voided_duels"),
+      // Ranked Duels of the reviewed Player; those they lost or drew are left alone (ADR 0015).
+      duelIds: t.Array(t.String({ format: "uuid" }), { minItems: 1 }),
+    }),
+    t.Object({ decision: t.Literal("suspension") }),
+    t.Object({ decision: t.Literal("ban") }),
+  ]),
+  Response: {
+    204: t.Void(),
+    403: forbidden,
+    404: t.Union([reviewNotFound, t.Object({ code: t.Literal("DUEL_NOT_FOUND") })]),
+    409: t.Object({ code: t.Literal("REVIEW_ALREADY_SETTLED") }),
+  },
+};
+
 export const MeFairPlayGet = {
   Response: t.Object({
     // Newest first.
