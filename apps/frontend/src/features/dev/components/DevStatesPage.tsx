@@ -1,4 +1,5 @@
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
+import { DevDuelStates } from "./DevDuelStates.tsx";
 import { DevLeaderboardStates } from "./DevLeaderboardStates.tsx";
 
 /** A dev-only page that shows each skeleton beside its loaded page, and each error state forced on. */
@@ -10,6 +11,7 @@ export function DevStatesPage() {
         lead="Every loading and error state, beside what it stands in for."
       />
       <DevLeaderboardStates />
+      <DevDuelStates />
     </main>
   );
 }
