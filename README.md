@@ -12,6 +12,7 @@ Turborepo monorepo on Bun.
 
 - `@repo/ui`: React component library
 - `@repo/redis`: opening Redis, shared by `api` and `matchmaker`
+- `@repo/db`: the database schema and its opening, shared by `api` and the fair-play worker
 - `@repo/typescript-config`: shared `tsconfig`s
 
 ## Quality

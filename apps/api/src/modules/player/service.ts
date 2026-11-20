@@ -1,7 +1,6 @@
 import { SQL } from "bun";
 import { DrizzleQueryError, eq, inArray } from "drizzle-orm";
-import type { Db } from "../../db/client.ts";
-import { nicknameUniqueIndex, user } from "../../db/schema.ts";
+import { type Db, nicknameUniqueIndex, user } from "../../db/client.ts";
 import { nicknameFormat } from "./model.ts";
 
 const reservedNicknames = new Set([

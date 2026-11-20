@@ -15,8 +15,7 @@ src/
   index.ts          Démarrage : lit la config, ouvre et migre la base, appelle .listen()
   app.ts            Composition : monte Better Auth et .use() chaque module, exporte App
   db/
-    client.ts       Ouverture et migration de la base
-    schema.ts       Toutes les tables Drizzle
+    client.ts       Ré-exporte le schéma, l'ouverture et la migration de la base du package `@repo/db`, partagé avec le worker de fair-play
   redis/
     client.ts       Ré-exporte l'ouverture de Redis du package `@repo/redis`, partagé avec `apps/matchmaker`
   modules/
@@ -35,10 +34,10 @@ test/
 - `model.ts` décrit le contrat d'API, pas les tables. Un groupe par route, nommé `[Chemin][Méthode]` relatif au préfixe (`PUT /nickname` donne `NicknamePut`), avec ses schémas sous `Body`, `Params`, `Query`, `Response`. Il s'importe en `import * as PlayerModel from "./model.ts"`. Un type n'est dérivé (`UnwrapModels`) que lorsqu'un service en a besoin.
 - `service.ts` ne connaît ni `status()` ni le contexte : il rend un résultat (`"saved" | "taken"`) que la route traduit en réponse HTTP.
 - Un module n'importe d'un autre que son `index.ts` ou son `service.ts`, jamais l'inverse en cycle. `player` dépend de `auth`, pas le contraire, à une exception : `auth/service.ts` importe `player/service.ts` pour le Nickname par défaut (pas de cycle, `player/service.ts` n'importe que la base).
-- Les tables restent toutes dans `src/db/schema.ts` : l'adaptateur Better Auth et drizzle-kit lisent ce seul fichier.
+- Les tables restent toutes dans `packages/db/src/schema.ts` (`@repo/db`) : l'adaptateur Better Auth et drizzle-kit lisent ce seul fichier. Dans l'API, tables, `Db`, `Transaction` et ouverture s'importent de `src/db/client.ts`, jamais de `@repo/db` directement.
 - `src/app.ts` compose l'app et exporte `App` (type partagé avec le client Eden) sans écouter de port. Il ne déclare aucune route métier : une nouvelle route va dans son module.
 - `src/index.ts` est le seul endroit qui appelle `.listen()`.
-- `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse. Les packages que l'API importe (`@repo/typing-engine`, `@repo/duel-engine`, `@repo/ranked-engine`, `@repo/matchmaking-engine`, `@repo/redis`, `@repo/logger`, `@repo/queue`) sont compilés depuis leurs sources : leur dossier entier doit aussi être copié avant `bun build`, sinon l'import ne se résout pas. `apps/matchmaker/Dockerfile` suit la même règle.
+- `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse. Les packages que l'API importe (`@repo/typing-engine`, `@repo/duel-engine`, `@repo/ranked-engine`, `@repo/matchmaking-engine`, `@repo/redis`, `@repo/db`, `@repo/logger`, `@repo/queue`) sont compilés depuis leurs sources : leur dossier entier doit aussi être copié avant `bun build`, sinon l'import ne se résout pas. `apps/matchmaker/Dockerfile` suit la même règle.
 - Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet. Exception : une route WebSocket ne s'upgrade pas par `app.handle()`, ses tests font `.listen(0)` et passent par de vrais clients HTTP et WebSocket (`test/helpers/socket.ts`).
 
 ## Base de données
@@ -46,7 +45,7 @@ test/
 PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / drizzle-kit `0.31`, voir `docs/adr/0002-postgres-drizzle-migrations-at-startup.md`.
 
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
-- Le schéma vit dans `src/db/schema.ts` (`drizzle-orm/pg-core`). Après chaque changement : `bun run db:generate`, puis commit du dossier `drizzle/` généré.
+- Le schéma vit dans `packages/db/src/schema.ts` (`@repo/db`, `drizzle-orm/pg-core`), partagé avec le worker de fair-play, qui lit les Duels enregistrés sans importer l'API ; `openDatabase`, `migrateDatabase` et `requireDatabaseUrl` vivent dans `packages/db/src/client.ts`. Les migrations restent à l'API, seule à migrer (ADR 0002) : après chaque changement du schéma, `bun run db:generate` depuis `apps/api/` (son `drizzle.config.ts` pointe sur le schéma du package), puis commit du dossier `apps/api/drizzle/` généré.
 - Schémas d'API : TypeBox 1.x (`t` d'Elysia) écrits à la main. `drizzle-orm/typebox`, cité par `.agents/skills/elysiajs/references/drizzle.md`, n'existe qu'en Drizzle 1.0 ; ne pas installer `drizzle-typebox` (TypeBox 0.x, incompatible avec Elysia 2).
 - `src/app.ts` exporte `createApp(db, auth, redis, logger, options?)`, les options facultatives réunies dans un seul objet `AppOptions` (`{ duel, queue, dev, lifecycle, rateLimit }`). La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
 - Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis, getLogger("api"))`.
@@ -102,7 +101,7 @@ Better Auth `1.7.25`, branché sur Postgres par son adaptateur Drizzle (`better-
 - `src/modules/auth/service.ts` exporte `createAuth(db, config)`, une fabrique : il n'y a pas d'instance globale à importer. `src/index.ts` lit la config avec `requireAuthConfig()` (`src/modules/auth/config.ts`, qui refuse de démarrer sans `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `DISCORD_CLIENT_ID` ou `DISCORD_CLIENT_SECRET`), fabrique l'instance et l'injecte dans `createApp(db, auth)`.
 - Rate limit de Better Auth : `createAuth(db, config, { redis })` le branche, ses compteurs dans Redis sous le namespace de l'API (clés `auth-rate-limit:*`, fenêtre fixe, un `EVAL` atomique), pour qu'il tienne entre instances. Il passe par `rateLimit.customStorage`, pas par `secondaryStorage` de Better Auth, qui sortirait aussi les sessions et l'état OAuth de Postgres. Actif en production seulement (défaut de Better Auth, `enabled` le force) ; limites par défaut de Better Auth (3 / 10 s sur `/sign-in/*`, 100 / 10 s ailleurs, par IP), surchargées par `customRules`. Au-delà, Better Auth répond 429 `{ message }` avec `X-Retry-After` : `createAuthRoutes` le remplace par la réponse de toutes les limites (`rateLimiter.refuse("auth", ip, ...)` : 429 `{ code: "RATE_LIMITED" }`, `Retry-After`, warning `api.rate-limit` avec la limite et la clé). Sans troisième argument, le rate limit est coupé.
 - Dans les tests : `createTestAuth(testDb.db)` (`test/helpers/auth.ts`) fabrique une instance sur la base du fichier de test, sans rate limit ; `createTestAuth(testDb.db, { redis, enabled: true, customRules })` l'active avec des limites abaissées (`test/auth-rate-limit.test.ts`).
-- L'adaptateur retrouve ses tables dans le schéma passé à Drizzle par `openDatabase`, sous les noms d'export `user`, `session`, `account`, `verification` de `src/db/schema.ts`. Ne pas les renommer.
+- L'adaptateur retrouve ses tables dans le schéma passé à Drizzle par `openDatabase`, sous les noms d'export `user`, `session`, `account`, `verification` de `packages/db/src/schema.ts`. Ne pas les renommer.
 - L'intégration à Elysia suit `.agents/skills/elysiajs/references/better-auth.md` (macro pour les routes protégées), pas la doc de Better Auth, écrite pour Elysia 1. Ses routes passent par `createAuthRoutes` (`src/modules/auth/index.ts`, `parse: "none"` comme un `.mount`) plutôt que `.mount(auth.handler)` : un mount ne voit pas le socket, et Better Auth doit recevoir l'IP client résolue par l'API dans l'en-tête `CLIENT_IP_HEADER` (toujours réécrit), seul en-tête qu'il lit (`advanced.ipAddress.ipAddressHeaders`).
 - Deux niveaux de protection, en option de route (`createProtection(auth)`, `src/modules/auth/index.ts`), qui donnent `player` et `session` au handler. En mettre une seule par route.
   - `signedIn: true`, « connecté » : 401 `{ code: "UNAUTHORIZED" }` sans session valide. `player.nickname` peut être `null`.
@@ -136,4 +135,4 @@ cd apps/api
 bunx auth@1.7.25 generate --config ./auth.cli.tmp.ts --output ./auth-schema.tmp.ts -y
 ```
 
-Relire le fichier généré, reporter les tables dans `src/db/schema.ts`, supprimer les deux fichiers temporaires, puis `bun run db:generate --name <nom>` et commit du dossier `drizzle/`.
+Relire le fichier généré, reporter les tables dans `packages/db/src/schema.ts`, supprimer les deux fichiers temporaires, puis `bun run db:generate --name <nom>` et commit du dossier `drizzle/`.

@@ -7,8 +7,7 @@ import {
   wornOrnament,
 } from "@repo/ranked-engine";
 import { eq, inArray, max } from "drizzle-orm";
-import type { Db } from "../../db/client.ts";
-import { duelParticipant, standing, user } from "../../db/schema.ts";
+import { type Db, duelParticipant, standing, user } from "../../db/client.ts";
 import { rankFromStored } from "../standing/service.ts";
 
 /** The Ornament each of these Players wears, from their choice and their current Rank, by Player id. */

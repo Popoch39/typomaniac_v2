@@ -8,7 +8,7 @@ import { createApp } from "../src/app.ts";
 import type { DuelOptions } from "../src/modules/duel/index.ts";
 import { createRelay } from "../src/modules/duel/relay.ts";
 import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
-import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
+import { duel, duelGame, duelParticipant, duelRound } from "../src/db/client.ts";
 import { tickMatchmaker } from "../src/modules/queue/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayerWithNickname } from "./helpers/auth.ts";

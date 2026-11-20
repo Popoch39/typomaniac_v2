@@ -27,8 +27,14 @@ import {
   getResult,
 } from "@repo/typing-engine";
 import { eq } from "drizzle-orm";
-import type { Db, Transaction } from "../../db/client.ts";
-import { duel, duelGame, duelParticipant, duelRound } from "../../db/schema.ts";
+import {
+  type Db,
+  type Transaction,
+  duel,
+  duelGame,
+  duelParticipant,
+  duelRound,
+} from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import {
   moveStandings,

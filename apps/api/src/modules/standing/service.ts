@@ -12,8 +12,13 @@ import {
   wornOrnament,
 } from "@repo/ranked-engine";
 import { and, asc, count, desc, eq, isNotNull, lt, type SQL, sql } from "drizzle-orm";
-import type { Db, Transaction } from "../../db/client.ts";
-import { duelParticipant, standing as standingTable, user } from "../../db/schema.ts";
+import {
+  type Db,
+  type Transaction,
+  duelParticipant,
+  standing as standingTable,
+  user,
+} from "../../db/client.ts";
 
 /** A Rank as it is stored: the ladder index of its Division and its LP, both `null` while Unranked. */
 export const storedRank = (rank: Rank | null) => ({

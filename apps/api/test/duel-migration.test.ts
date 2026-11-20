@@ -5,8 +5,7 @@ import { join } from "node:path";
 import { DUEL_GAME_CONFIG, getAverageMultiplier, getOutcome } from "@repo/duel-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { eq, sql } from "drizzle-orm";
-import { migrateDatabase } from "../src/db/client.ts";
-import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
+import { migrateDatabase, duel, duelGame, duelParticipant, duelRound } from "../src/db/client.ts";
 import { createTestDb } from "./helpers/db.ts";
 
 const migrationsFolder = join(import.meta.dir, "../drizzle");

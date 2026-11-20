@@ -14,6 +14,7 @@ COPY packages/duel-engine/package.json ./packages/duel-engine/
 COPY packages/ranked-engine/package.json ./packages/ranked-engine/
 COPY packages/matchmaking-engine/package.json ./packages/matchmaking-engine/
 COPY packages/redis/package.json ./packages/redis/
+COPY packages/db/package.json ./packages/db/
 COPY packages/logger/package.json ./packages/logger/
 COPY packages/queue/package.json ./packages/queue/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
@@ -25,6 +26,7 @@ COPY packages/duel-engine ./packages/duel-engine
 COPY packages/ranked-engine ./packages/ranked-engine
 COPY packages/matchmaking-engine ./packages/matchmaking-engine
 COPY packages/redis ./packages/redis
+COPY packages/db ./packages/db
 COPY packages/logger ./packages/logger
 COPY packages/queue ./packages/queue
 COPY apps/api ./apps/api

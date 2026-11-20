@@ -10,7 +10,7 @@ import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-
 import { and, count, eq } from "drizzle-orm";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
-import { duel, duelGame, duelParticipant, duelRound, user } from "../src/db/schema.ts";
+import { duel, duelGame, duelParticipant, duelRound, user } from "../src/db/client.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";

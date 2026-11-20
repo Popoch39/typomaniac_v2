@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import type { OrnamentChoice, Standing } from "@repo/ranked-engine";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
-import { user } from "../src/db/schema.ts";
+import { user } from "../src/db/client.ts";
 import { eq, sql } from "drizzle-orm";
 import { leaderboardSlice, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";

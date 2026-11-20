@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { DUEL_GAME_CONFIG, type Outcome } from "@repo/duel-engine";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
-import { duel, duelParticipant } from "../src/db/schema.ts";
+import { duel, duelParticipant } from "../src/db/client.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
