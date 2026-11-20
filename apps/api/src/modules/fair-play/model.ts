@@ -124,6 +124,16 @@ export const AdminReviewsIdGet = {
           revokedAt: t.Nullable(t.Number()),
         }),
       ),
+      // The Reports made against the Player, newest first: weighed with the signals, never shown to them.
+      reports: t.Array(
+        t.Object({
+          duelId: t.String(),
+          // Null when the reporting Player has no Nickname.
+          reporterNickname: t.Nullable(t.String()),
+          // Epoch milliseconds.
+          reportedAt: t.Number(),
+        }),
+      ),
     }),
     403: forbidden,
     404: t.Object({ code: t.Literal("REVIEW_NOT_FOUND") }),

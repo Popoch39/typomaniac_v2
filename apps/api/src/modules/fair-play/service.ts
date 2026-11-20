@@ -172,7 +172,7 @@ export const readReview = async (db: Db, reviewId: string) => {
     .where(eq(review.id, reviewId));
   if (!found) return null;
   const { playerId } = found;
-  const [standing, duels, violations, sanctions] = await Promise.all([
+  const [standing, duels, violations, sanctions, reports] = await Promise.all([
     readStanding(db, playerId),
     readReviewedDuels(db, playerId),
     db
@@ -197,6 +197,7 @@ export const readReview = async (db: Db, reviewId: string) => {
       .from(sanction)
       .where(eq(sanction.playerId, playerId))
       .orderBy(desc(sanction.startedAt)),
+    readReviewedReports(db, playerId),
   ]);
   return {
     id: found.id,
@@ -216,7 +217,23 @@ export const readReview = async (db: Db, reviewId: string) => {
       endsAt: endsAt?.getTime() ?? null,
       revokedAt: revokedAt?.getTime() ?? null,
     })),
+    reports,
   };
+};
+
+// The Reports made against the Player, newest first, with the Duel each concerns and who made it.
+const readReviewedReports = async (db: Db, playerId: string) => {
+  const rows = await db
+    .select({
+      duelId: report.duelId,
+      reporterNickname: user.nickname,
+      reportedAt: report.reportedAt,
+    })
+    .from(report)
+    .innerJoin(user, eq(user.id, report.reporterId))
+    .where(eq(report.reportedId, playerId))
+    .orderBy(desc(report.reportedAt), asc(report.id));
+  return rows.map(({ reportedAt, ...row }) => ({ ...row, reportedAt: reportedAt.getTime() }));
 };
 
 // The Player's recent ranked Duels, newest first, each with its Games in Round order.

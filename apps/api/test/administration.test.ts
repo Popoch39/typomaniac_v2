@@ -250,6 +250,7 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
         revokedAt: null,
       },
     ],
+    reports: [],
   });
 });
 

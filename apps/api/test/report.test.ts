@@ -3,7 +3,7 @@ import { getLogger } from "@repo/logger";
 import { eq } from "drizzle-orm";
 import { SIGNAL_WEIGHTS } from "@repo/fair-play-engine";
 import { createApp } from "../src/app.ts";
-import { review, suspicion } from "../src/db/client.ts";
+import { review, suspicion, user } from "../src/db/client.ts";
 import { saveDuel } from "../src/modules/duel/service.ts";
 import { runFairPlayPass } from "../src/modules/fair-play/service.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
@@ -201,4 +201,42 @@ test("a pass after the one that read a Report changes nothing more", async () =>
   expect(
     await testDb.db.select().from(suspicion).where(eq(suspicion.playerId, reported.player.id)),
   ).toEqual(first);
+});
+
+test("the Reports against a Player are listed in their Review, newest first, with the Duel they concern and who made them", async () => {
+  const administrator = await signInPlayer(auth);
+  await testDb.db
+    .update(user)
+    .set({ isAdministrator: true })
+    .where(eq(user.id, administrator.player.id));
+  const [reported, first, second] = [
+    await signInRanked(),
+    await signInRanked(),
+    await signInRanked(),
+  ];
+  await testDb.db.update(user).set({ nickname: "first" }).where(eq(user.id, first.player.id));
+  const older = await saveFinishedDuel("ranked", [reported.player.id, first.player.id]);
+  const newer = await saveFinishedDuel("ranked", [reported.player.id, second.player.id]);
+  await report(older, first.cookie);
+  await report(newer, second.cookie);
+  const [opened] = await testDb.db
+    .insert(review)
+    .values({ playerId: reported.player.id, reason: "suspicion", openedAt: new Date() })
+    .returning({ id: review.id });
+
+  const response = await app.handle(
+    new Request(`http://localhost/api/admin/reviews/${opened?.id}`, {
+      headers: { cookie: administrator.cookie },
+    }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual(
+    expect.objectContaining({
+      reports: [
+        { duelId: newer, reporterNickname: null, reportedAt: expect.any(Number) },
+        { duelId: older, reporterNickname: "first", reportedAt: expect.any(Number) },
+      ],
+    }),
+  );
 });

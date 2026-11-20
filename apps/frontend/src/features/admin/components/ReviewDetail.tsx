@@ -4,6 +4,7 @@ import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
 import { useReview } from "../hooks/useReview.ts";
 import { ReviewDuels } from "./ReviewDuels.tsx";
 import { ReviewRecords } from "./ReviewRecords.tsx";
+import { ReviewReports } from "./ReviewReports.tsx";
 import { ReviewSummary } from "./ReviewSummary.tsx";
 
 interface ReviewDetailProps {
@@ -22,6 +23,7 @@ export function ReviewDetail({ reviewId }: ReviewDetailProps) {
       <ReviewSummary review={review} />
       <ReviewDuels duels={review.duels} />
       <ReviewRecords review={review} />
+      <ReviewReports review={review} />
     </Panel>
   );
 }
