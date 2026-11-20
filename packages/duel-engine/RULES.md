@@ -99,6 +99,22 @@ The server compares elapsed times, never absolute clocks: the time elapsed on th
 | ------ | ------------------------------------------------------------------------------------ |
 | SEAT-1 | The Opponent of a Participant sits on the other seat: seat 0 faces seat 1, and back. |
 
+## Violation
+
+What the server refuses on receipt in a ranked Duel, where play requires a physical keyboard (ADR 0014, ADR 0016). The Target words are plain lowercase words, so a keyboard writes each of their characters with one key going down. The game's client sends no auto-repeated `keyDown`: a held key reaches the server as one `keyDown` followed by several `insert`s.
+
+| Id          | Rule                                                                                                                                                             |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| VIOLATION-1 | An `insert` of more than one character is a Violation, whatever came before it.                                                                                  |
+| VIOLATION-2 | A one-character `insert` is accounted for by a `keyDown` received since the previous `insert`; without one, it is a Violation.                                   |
+| VIOLATION-3 | A `keyDown` accounts for one `insert` only, and several `keyDown`s received since the previous `insert` account for one `insert` as well.                        |
+| VIOLATION-4 | With key rollover, a key that goes down before the previous one is released accounts for its own `insert`.                                                       |
+| VIOLATION-5 | While the key that accounted for an `insert` is held, an `insert` of the same character is its repeat and needs no `keyDown`; once released, it repeats nothing. |
+| VIOLATION-6 | An Event other than an `insert` is never a Violation; a deletion leaves the pairing as it was.                                                                   |
+| VIOLATION-7 | The pairing is plain JSON, never mutated, and rebuilt by folding over the journal.                                                                               |
+
+The rule is applied to ranked Duels only: a Custom Duel accepts any input.
+
 ## Messages
 
 | Id        | Rule                                                                                                              |
