@@ -40,6 +40,7 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?GITHUB_CLIENT_SECRET is required}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:?DISCORD_CLIENT_ID is required}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:?DISCORD_CLIENT_SECRET is required}
+      FAIR_PLAY_APPEAL_ADDRESS: ${FAIR_PLAY_APPEAL_ADDRESS:?FAIR_PLAY_APPEAL_ADDRESS is required}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
@@ -59,6 +60,21 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+  # One is enough: a second one started by a deployment overlap waits for the leader lock. It never
+  # migrates the database: until the API has, its passes fail and are tried again.
+  fair-play-worker:
+    build:
+      context: .
+      dockerfile: apps/fair-play-worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-typomaniac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-typomaniac}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
 
 volumes:
   postgres-data:

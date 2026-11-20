@@ -6,4 +6,5 @@ export const signedInPlayerFixture: SignedInPlayer = {
   nickname: "dev_alice",
   avatarUrl: null,
   ornament: null,
+  isAdministrator: false,
 };

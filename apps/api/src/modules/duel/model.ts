@@ -134,6 +134,11 @@ export const IdSocket = {
   Body: t.Union([
     t.Object({ type: t.Literal("ping"), clientAt: t.Number() }),
     t.Object({ type: t.Literal("event"), round, event: gameEvent }),
+    t.Object({
+      type: t.Literal("hints"),
+      round,
+      hints: t.Object({ scriptedKeys: t.Integer({ minimum: 0 }), automated: t.Boolean() }),
+    }),
   ]),
   Response: {
     // What the socket sends once open; the other statuses refuse the upgrade.

@@ -15,6 +15,9 @@ export const createPlayerRoutes = (db: Db, protection: Protection, rateLimiter: 
       // The picture Better Auth stored from the provider at creation, loaded straight from its CDN.
       avatarUrl: player.image ?? null,
       ornament: (await readWornOrnaments(db, [player.id])).get(player.id) ?? null,
+      // Only says whether to link the administration page: every administration route checks the mark
+      // again on the server.
+      isAdministrator: player.isAdministrator === true,
     }))
     .put(
       "/me/nickname",

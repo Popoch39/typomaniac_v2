@@ -8,12 +8,16 @@ COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/matchmaker/package.json ./apps/matchmaker/
+COPY apps/fair-play-worker/package.json ./apps/fair-play-worker/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/typing-engine/package.json ./packages/typing-engine/
 COPY packages/duel-engine/package.json ./packages/duel-engine/
 COPY packages/ranked-engine/package.json ./packages/ranked-engine/
+COPY packages/fair-play/package.json ./packages/fair-play/
+COPY packages/fair-play-engine/package.json ./packages/fair-play-engine/
 COPY packages/matchmaking-engine/package.json ./packages/matchmaking-engine/
 COPY packages/redis/package.json ./packages/redis/
+COPY packages/db/package.json ./packages/db/
 COPY packages/logger/package.json ./packages/logger/
 COPY packages/queue/package.json ./packages/queue/
 COPY packages/typescript-config/package.json ./packages/typescript-config/

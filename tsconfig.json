@@ -10,12 +10,17 @@
     { "path": "packages/ranked-engine/test" },
     { "path": "packages/matchmaking-engine" },
     { "path": "packages/matchmaking-engine/test" },
+    { "path": "packages/fair-play-engine" },
+    { "path": "packages/fair-play-engine/test" },
     { "path": "apps/frontend" },
     { "path": "apps/frontend/test" },
     { "path": "packages/redis" },
+    { "path": "packages/db" },
+    { "path": "packages/fair-play" },
     { "path": "packages/logger" },
     { "path": "packages/queue" },
     { "path": "apps/api" },
-    { "path": "apps/matchmaker" }
+    { "path": "apps/matchmaker" },
+    { "path": "apps/fair-play-worker" }
   ]
 }

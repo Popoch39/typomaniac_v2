@@ -48,6 +48,15 @@ test("signing in again as the same Dev Player finds them rather than creating an
   expect(await second.json()).toEqual(await first.json());
 });
 
+test("a Dev Player may queue at once, as no provider made their account", async () => {
+  const cookie = sessionCookieOf(await signIn(enabledApp, "dev_alice")) ?? "";
+
+  const queue = await enabledApp.handle(
+    new Request("http://localhost/api/queue", { headers: { cookie } }),
+  );
+  expect(queue.status).toBe(200);
+});
+
 test("only the known Dev Players can be signed in as", async () => {
   expect((await signIn(enabledApp, "someone_else")).status).toBe(422);
 });

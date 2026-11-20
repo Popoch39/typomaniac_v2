@@ -1,0 +1,1 @@
+ALTER TABLE "violation" ADD COLUMN "sanctioned_at" timestamp;

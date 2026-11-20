@@ -8,6 +8,7 @@ import type { Redis } from "../../redis/client.ts";
 import { type Protection } from "../auth/index.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { DUEL_EXPIRY_MS, readUnfinishedRankedDuel } from "../duel/service.ts";
+import { readCurrentSuspension } from "../fair-play/service.ts";
 import { mayReconnect } from "../lifecycle/closeCode.ts";
 import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
@@ -23,6 +24,7 @@ import {
   leaveQueue,
   QUEUE_ENTRY_EXPIRY_MS,
   readQueueEntry,
+  readRankedOpensAt,
   refreshQueueEntry,
 } from "./service.ts";
 
@@ -70,6 +72,21 @@ export const createQueueRoutes = (
     const duelId = await readUnfinishedRankedDuel(redis, playerId);
     if (duelId !== null) return status(409, { code: "RANKED_DUEL_UNFINISHED", duelId });
   };
+  // A suspended Player is told until when; the Queue opens again by itself at that instant.
+  const refuseWhileSuspended = async (playerId: string) => {
+    const suspension = await readCurrentSuspension(db, playerId, new Date());
+    if (suspension) return status(403, { code: "RANKED_SUSPENDED", endsAt: suspension.endsAt });
+  };
+  // A throwaway account must cost time before it plays ranked (ADR 0014).
+  const refuseBeforeRankedOpens = async (playerId: string) => {
+    const opensAt = await readRankedOpensAt(db, playerId);
+    if (opensAt === null) return status(403, { code: "ACCOUNT_AGE_UNKNOWN" });
+    if (opensAt > Date.now()) return status(403, { code: "ACCOUNT_TOO_YOUNG", opensAt });
+  };
+  const refuseQueue = async (playerId: string) =>
+    (await refuseWhileInRankedDuel(playerId)) ??
+    (await refuseWhileSuspended(playerId)) ??
+    (await refuseBeforeRankedOpens(playerId));
 
   return (
     new Elysia({ prefix: "/api/queue" })
@@ -82,7 +99,7 @@ export const createQueueRoutes = (
         "/",
         { nicknameChosen: true, response: QueueModel.RootGet.Response },
         async ({ player }) => {
-          const refused = await refuseWhileInRankedDuel(player.id);
+          const refused = await refuseQueue(player.id);
           if (refused) return refused;
           return { queuedAt: (await readQueueEntry(redis, player.id))?.queuedAt ?? null };
         },
@@ -93,11 +110,11 @@ export const createQueueRoutes = (
         response: QueueModel.Socket.Response,
         async beforeHandle({ body, player, set }) {
           // Also runs before each message, which carries a body: the upgrade alone is counted and
-          // checked against the Duel.
+          // checked against the Duel, the Suspension and the account's age.
           if (body !== undefined) return;
           const refused = await rateLimiter.check("queueSocket", player.id, set);
           if (refused) return refused;
-          return refuseWhileInRankedDuel(player.id);
+          return refuseQueue(player.id);
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;

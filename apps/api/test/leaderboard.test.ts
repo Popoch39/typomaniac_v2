@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import type { OrnamentChoice, Standing } from "@repo/ranked-engine";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
-import { user } from "../src/db/schema.ts";
+import { user } from "../src/db/client.ts";
 import { eq, sql } from "drizzle-orm";
 import { leaderboardSlice, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
@@ -476,7 +476,9 @@ test("a page of the Leaderboard is read from its index, not sorted", async () =>
     select 'p' || n, 1000 + n % 900, 30,
       case when n % 5 = 0 then null else n % 21 end, case when n % 5 = 0 then null else n % 100 end
     from generate_series(1, 5000) n`);
+  // Both tables, as autovacuum would have them: the Leaderboard also leaves banned Players out.
   await db.execute(sql`analyze standing`);
+  await db.execute(sql`analyze "user"`);
 
   for (const [offset, limit] of [
     [0, 3],

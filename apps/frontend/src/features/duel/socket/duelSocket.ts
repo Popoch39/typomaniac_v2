@@ -14,8 +14,11 @@ type DuelSocketHandlers = {
    * Participant no longer needs it.
    */
   readonly reconnect: () => boolean;
-  /** The socket closed after the Participant was seated, and is not reopened. */
-  readonly disconnect: () => void;
+  /**
+   * The socket closed after the Participant was seated, and is not reopened, with the reason the
+   * server closed it with.
+   */
+  readonly disconnect: (reason: string) => void;
 };
 
 const REFUSALS = { NICKNAME_REQUIRED: "Choose a Nickname to join this Duel." };

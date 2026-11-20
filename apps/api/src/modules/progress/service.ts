@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type { UnwrapSchema } from "elysia";
-import type { Db } from "../../db/client.ts";
-import { duel, duelGame, duelParticipant } from "../../db/schema.ts";
+import { type Db, duel, duelGame, duelParticipant } from "../../db/client.ts";
 import { readPlayerIdByNickname } from "../player/service.ts";
 import type * as ProgressModel from "./model.ts";
 

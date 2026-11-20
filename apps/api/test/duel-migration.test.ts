@@ -5,8 +5,7 @@ import { join } from "node:path";
 import { DUEL_GAME_CONFIG, getAverageMultiplier, getOutcome } from "@repo/duel-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { eq, sql } from "drizzle-orm";
-import { migrateDatabase } from "../src/db/client.ts";
-import { duel, duelGame, duelParticipant, duelRound } from "../src/db/schema.ts";
+import { migrateDatabase, duel, duelGame, duelParticipant, duelRound } from "../src/db/client.ts";
 import { createTestDb } from "./helpers/db.ts";
 
 const migrationsFolder = join(import.meta.dir, "../drizzle");
@@ -116,6 +115,7 @@ test("a Duel saved before the migration reads as a single-Round Custom Duel, and
       journal: journals[0],
       outcome: "win",
       multiplier: 1,
+      hints: null,
     },
     {
       duelId,
@@ -125,6 +125,7 @@ test("a Duel saved before the migration reads as a single-Round Custom Duel, and
       journal: journals[1],
       outcome: "loss",
       multiplier: 1,
+      hints: null,
     },
   ]);
   expect(

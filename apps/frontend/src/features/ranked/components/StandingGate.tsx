@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { ReadGate } from "../../../shared/components/ReadGate.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
-import { useStanding } from "../hooks/useStanding.ts";
+import type { Suspension } from "../../fair-play/notice/describeSuspension.ts";
+import type { VoidedDuel } from "../../fair-play/notice/describeVoidedDuel.ts";
+import { useRankedReads } from "../hooks/useRankedReads.ts";
 import type { OwnStanding } from "../standing/describeStanding.ts";
 
 interface StandingGateProps {
@@ -9,16 +11,25 @@ interface StandingGateProps {
   player: SignedInPlayer | null;
   /** Shown while the Standing is read, and again while a failed read is tried again. */
   pending: ReactNode;
-  children: (standing: OwnStanding, player: SignedInPlayer) => ReactNode;
+  children: (
+    standing: OwnStanding,
+    player: SignedInPlayer,
+    voidedDuels: readonly VoidedDuel[],
+    suspension: Suspension | null,
+  ) => ReactNode;
 }
 
-// Shows its content once the Player's Standing is read, and a way to read it again when that fails.
+// Shows its content once the Player's Standing and their fair-play state are both read, and a way to
+// read them again when that fails.
 export function StandingGate({ player, pending, children }: StandingGateProps) {
-  const { standing, stage, failure, retry } = useStanding(player);
+  const { standing, voidedDuels, suspension, stage, failure, retry } = useRankedReads(player);
 
   return (
     <ReadGate stage={stage} pending={pending} title="Standing" failure={failure} retry={retry}>
-      {standing !== null && player !== null && children(standing, player)}
+      {standing !== null &&
+        voidedDuels !== null &&
+        player !== null &&
+        children(standing, player, voidedDuels, suspension)}
     </ReadGate>
   );
 }

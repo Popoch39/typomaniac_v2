@@ -6,4 +6,5 @@ export const playerFixture: SignedInPlayer = {
   nickname: "Lumen",
   avatarUrl: null,
   ornament: { tier: "gold", division: 2 },
+  isAdministrator: false,
 };

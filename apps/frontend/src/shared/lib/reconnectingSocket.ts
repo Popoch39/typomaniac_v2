@@ -12,8 +12,8 @@ export type ReconnectingSocketHandlers = {
    * no longer needs it.
    */
   readonly reconnect: () => boolean;
-  /** The socket closed after its first message, and is not reopened. */
-  readonly disconnect: () => void;
+  /** The socket closed after its first message, and is not reopened, with the reason it closed with. */
+  readonly disconnect: (reason: string) => void;
 };
 
 /**
@@ -34,13 +34,13 @@ export function createReconnectingSocket() {
       received = true;
       receive(String(event.data));
     });
-    opened.addEventListener("close", async ({ code }) => {
+    opened.addEventListener("close", async ({ code, reason }) => {
       if (socket !== opened) return;
       if (received || attempt > 0) {
         // A reopening is a fresh opening: the server sends its first message again.
         const nextAttempt = received ? 1 : attempt + 1;
         const delay = reconnectDelay(code, nextAttempt);
-        if (delay === null || !reconnect()) return disconnect();
+        if (delay === null || !reconnect()) return disconnect(reason);
         retryTimer = setTimeout(() => {
           retryTimer = null;
           connect(url, handlers, nextAttempt);

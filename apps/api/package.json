@@ -12,7 +12,10 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@repo/db": "*",
     "@repo/duel-engine": "*",
+    "@repo/fair-play": "*",
+    "@repo/fair-play-engine": "*",
     "@repo/logger": "*",
     "@repo/matchmaking-engine": "*",
     "@repo/queue": "*",

@@ -1,0 +1,2 @@
+ALTER TABLE "violation" ADD COLUMN "sanction_id" uuid;--> statement-breakpoint
+ALTER TABLE "violation" ADD CONSTRAINT "violation_sanction_id_sanction_id_fk" FOREIGN KEY ("sanction_id") REFERENCES "public"."sanction"("id") ON DELETE set null ON UPDATE no action;

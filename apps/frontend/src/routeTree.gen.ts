@@ -11,11 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ShellAdminRouteImport } from './routes/_shell/admin'
 import { Route as ShellCustomRouteImport } from './routes/_shell/custom'
 import { Route as ShellLeaderboardRouteImport } from './routes/_shell/leaderboard'
 import { Route as ShellPracticeRouteImport } from './routes/_shell/practice'
 import { Route as ShellProfileRouteImport } from './routes/_shell/profile'
 import { Route as ShellRankedRouteImport } from './routes/_shell/ranked'
+import { Route as ShellSignInRouteImport } from './routes/_shell/sign-in'
 import { Route as DevRankupRouteImport } from './routes/dev.rankup'
 import { Route as DevStatesRouteImport } from './routes/dev.states'
 import { Route as DuelDuelIdRouteImport } from './routes/duel.$duelId'
@@ -29,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ShellAdminRoute = ShellAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => ShellRoute,
 } as any)
 const ShellCustomRoute = ShellCustomRouteImport.update({
   id: '/custom',
@@ -55,6 +62,11 @@ const ShellRankedRoute = ShellRankedRouteImport.update({
   path: '/ranked',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellSignInRoute = ShellSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => ShellRoute,
+} as any)
 const DevRankupRoute = DevRankupRouteImport.update({
   id: '/dev/rankup',
   path: '/dev/rankup',
@@ -78,11 +90,13 @@ const ShellPlayersNicknameRoute = ShellPlayersNicknameRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof ShellAdminRoute
   '/custom': typeof ShellCustomRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
   '/profile': typeof ShellProfileRoute
   '/ranked': typeof ShellRankedRoute
+  '/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
   '/dev/states': typeof DevStatesRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
@@ -90,11 +104,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof ShellAdminRoute
   '/custom': typeof ShellCustomRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
   '/profile': typeof ShellProfileRoute
   '/ranked': typeof ShellRankedRoute
+  '/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
   '/dev/states': typeof DevStatesRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
@@ -104,11 +120,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_shell': typeof ShellRouteWithChildren
+  '/_shell/admin': typeof ShellAdminRoute
   '/_shell/custom': typeof ShellCustomRoute
   '/_shell/leaderboard': typeof ShellLeaderboardRoute
   '/_shell/practice': typeof ShellPracticeRoute
   '/_shell/profile': typeof ShellProfileRoute
   '/_shell/ranked': typeof ShellRankedRoute
+  '/_shell/sign-in': typeof ShellSignInRoute
   '/dev/rankup': typeof DevRankupRoute
   '/dev/states': typeof DevStatesRoute
   '/duel/$duelId': typeof DuelDuelIdRoute
@@ -118,11 +136,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/custom'
     | '/leaderboard'
     | '/practice'
     | '/profile'
     | '/ranked'
+    | '/sign-in'
     | '/dev/rankup'
     | '/dev/states'
     | '/duel/$duelId'
@@ -130,11 +150,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/custom'
     | '/leaderboard'
     | '/practice'
     | '/profile'
     | '/ranked'
+    | '/sign-in'
     | '/dev/rankup'
     | '/dev/states'
     | '/duel/$duelId'
@@ -143,11 +165,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_shell'
+    | '/_shell/admin'
     | '/_shell/custom'
     | '/_shell/leaderboard'
     | '/_shell/practice'
     | '/_shell/profile'
     | '/_shell/ranked'
+    | '/_shell/sign-in'
     | '/dev/rankup'
     | '/dev/states'
     | '/duel/$duelId'
@@ -177,6 +201,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_shell/admin': {
+      id: '/_shell/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof ShellAdminRouteImport
+      parentRoute: typeof ShellRoute
     }
     '/_shell/custom': {
       id: '/_shell/custom'
@@ -213,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellRankedRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/sign-in': {
+      id: '/_shell/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof ShellSignInRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/dev/rankup': {
       id: '/dev/rankup'
       path: '/dev/rankup'
@@ -245,20 +283,24 @@ declare module '@tanstack/react-router' {
 }
 
 interface ShellRouteChildren {
+  ShellAdminRoute: typeof ShellAdminRoute
   ShellCustomRoute: typeof ShellCustomRoute
   ShellLeaderboardRoute: typeof ShellLeaderboardRoute
   ShellPracticeRoute: typeof ShellPracticeRoute
   ShellProfileRoute: typeof ShellProfileRoute
   ShellRankedRoute: typeof ShellRankedRoute
+  ShellSignInRoute: typeof ShellSignInRoute
   ShellPlayersNicknameRoute: typeof ShellPlayersNicknameRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
+  ShellAdminRoute: ShellAdminRoute,
   ShellCustomRoute: ShellCustomRoute,
   ShellLeaderboardRoute: ShellLeaderboardRoute,
   ShellPracticeRoute: ShellPracticeRoute,
   ShellProfileRoute: ShellProfileRoute,
   ShellRankedRoute: ShellRankedRoute,
+  ShellSignInRoute: ShellSignInRoute,
   ShellPlayersNicknameRoute: ShellPlayersNicknameRoute,
 }
 

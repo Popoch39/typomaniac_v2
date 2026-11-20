@@ -1,6 +1,6 @@
 # Typomaniac
 
-Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured, then of ranked play: how a Duel moves a Player's level and Rank, and how two Players are brought together for one.
+Typomaniac is a ranked 1v1 typing duel game. You can play without signing in; signing in lets you keep your results. This glossary fixes the vocabulary of identity, then of typing: what a player types, how it is judged and what is measured, then of ranked play: how a Duel moves a Player's level and Rank, and how two Players are brought together for one, then of fair play: how cheating is found and what it costs.
 
 ## Language
 
@@ -238,3 +238,41 @@ _Avoid_: lobby, pool, waiting room, search
 **Pairing**:
 Two queued Players proposed to each other; it becomes a ranked Duel once both accept. The verb is _pair_: the Queue pairs two Players.
 _Avoid_: match, matchup, proposal, invitation
+
+### Fair play
+
+**Violation**:
+An Event that the game itself cannot produce, received from a Participant in a ranked Duel; it is refused, and it is proof that their Game was not played with the game as it is.
+_Avoid_: exploit, hack, illegal event, invalid input
+
+**Suspicion**:
+How strongly a Player's ranked Games look like they were not typed by a person; it proves nothing by itself and only calls for a Review.
+_Avoid_: cheat score, risk, flag, trust
+
+**Review**:
+A person's examination of a Player under Suspicion, which ends by clearing them or by a Sanction.
+_Avoid_: audit, moderation, investigation
+
+**Administrator**:
+The Player who settles Reviews: a mark set by hand in the database, checked by the server on every administration route.
+_Avoid_: admin, moderator, staff
+
+**Report**:
+A Player's statement, made at the end of a ranked Duel, that their Opponent cheated in it; it raises that Opponent's Suspicion and never sanctions by itself.
+_Avoid_: complaint, flag, ticket
+
+**Sanction**:
+What is applied to a Player for cheating: a **Voided Duel**, a **Suspension** or a **Ban**, in rising order.
+_Avoid_: penalty, punishment, strike
+
+**Voided Duel**:
+A ranked Duel whose effect on both Standings is withdrawn where the cheating paid: the Player at fault loses what they won in it, and their Opponent gets back what they lost. A Duel the Player at fault lost stays as it was.
+_Avoid_: cancelled duel, annulled duel, reverted duel, refund
+
+**Suspension**:
+A Sanction that keeps a Player out of the Queue for a set time; they can still sign in and play Practice and Custom Duels.
+_Avoid_: timeout, temporary ban, cooldown
+
+**Ban**:
+A permanent Sanction: the Player can no longer sign in, and the GitHub and Discord accounts and the e-mail they signed in with can never be used to sign in again.
+_Avoid_: permanent suspension, block, exclusion

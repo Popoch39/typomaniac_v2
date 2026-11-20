@@ -17,9 +17,12 @@ export const openSocketOf = async <Received, Sent>(url: string, cookie: string) 
   });
   // Settles once the socket is closed, from either side, with its close code: how a test sees the
   // server close it.
-  const closed = new Promise<number>((resolve) =>
-    socket.addEventListener("close", (event) => resolve(event.code), { once: true }),
+  const closedWith = new Promise<{ code: number; reason: string }>((resolve) =>
+    socket.addEventListener("close", ({ code, reason }) => resolve({ code, reason }), {
+      once: true,
+    }),
   );
+  const closed = closedWith.then(({ code }) => code);
 
   const next = () => {
     const message = received.shift();
@@ -37,6 +40,8 @@ export const openSocketOf = async <Received, Sent>(url: string, cookie: string) 
     send,
     staysSilent,
     closed,
+    // The same, with the reason the server gave for closing.
+    closedWith,
     close: () => socket.close(),
     // Cuts the connection without a close frame, as a lost network does: the server sees 1006.
     drop: () => socket.terminate(),

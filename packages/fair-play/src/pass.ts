@@ -1,0 +1,82 @@
+import { type Db, duel, sanction, type Transaction, user, violation } from "@repo/db";
+import { nextViolationSanction } from "@repo/fair-play-engine";
+import { and, countDistinct, eq, isNull, lte } from "drizzle-orm";
+import { analyseGames } from "./analysis.ts";
+import { openReviews } from "./review.ts";
+import {
+  banForViolation,
+  repairWindowBefore,
+  saveSuspension,
+  voidDuelForViolation,
+} from "./sanction.ts";
+
+/**
+ * One pass of the fair-play worker at the instant `now`, which it reads no clock for. Every step is
+ * its own transaction and idempotent, so a pass that fails half way, or one run twice, leaves the
+ * same database as one that ran once.
+ */
+export const runFairPlayPass = async (db: Db, now: number) => {
+  await sanctionViolations(db, new Date(now));
+  // Suspicion never sanctions: the analysis only reads Games and saves what their signals say.
+  await analyseGames(db, new Date(now));
+  await openReviews(db, new Date(now));
+};
+
+// Sanctions, one Player and one Duel at a time and in the order the Duels ended, the Violations whose
+// Duel was saved by `at`. A Violation whose Duel is not saved yet is left for a later pass.
+const sanctionViolations = async (db: Db, at: Date) => {
+  const pending = await db
+    .selectDistinct({
+      playerId: violation.playerId,
+      duelId: violation.duelId,
+      endedAt: duel.endedAt,
+    })
+    .from(violation)
+    .innerJoin(duel, eq(duel.id, violation.duelId))
+    .where(and(isNull(violation.sanctionedAt), lte(duel.endedAt, at)))
+    .orderBy(duel.endedAt, violation.playerId);
+  for (const committed of pending)
+    await db.transaction((tx) => sanctionDuelViolations(tx, { ...committed, at }));
+};
+
+// VIOLATION-1: the Player's Violations in one Duel count as one, sanctioned one step up from those
+// sanctioned before under a Sanction not revoked since. The Sanction starts at the pass, so that a
+// late pass never applies a Suspension already partly over; the Violation's mark, not that instant,
+// keeps a second pass from applying it again. Its repair window runs back from when the Duel ended, so
+// that it covers that Duel however late the pass.
+const sanctionDuelViolations = async (
+  tx: Transaction,
+  { playerId, duelId, endedAt, at }: { playerId: string; duelId: string; endedAt: Date; at: Date },
+) => {
+  // Locked first, so that two passes sanctioning one Player wait on each other and the second sees the first.
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, playerId)).for("update");
+  const ofDuel = and(eq(violation.playerId, playerId), eq(violation.duelId, duelId));
+  const [still] = await tx
+    .select({ id: violation.id })
+    .from(violation)
+    .where(and(ofDuel, isNull(violation.sanctionedAt)))
+    .limit(1);
+  if (!still) return;
+  const [sanctioned] = await tx
+    .select({ duels: countDistinct(violation.duelId) })
+    .from(violation)
+    .innerJoin(sanction, eq(sanction.id, violation.sanctionId))
+    .where(and(eq(violation.playerId, playerId), isNull(sanction.revokedAt)));
+  const due = nextViolationSanction(sanctioned?.duels ?? 0);
+  const withdrawSince = repairWindowBefore(endedAt);
+  // A Duel the Player lost is left as it was, but the step is saved as a Sanction all the same.
+  const sanctionId =
+    due.kind === "voided_duel"
+      ? await voidDuelForViolation(tx, { duelId, playerId, at })
+      : due.kind === "suspension"
+        ? await saveSuspension(
+            tx,
+            { playerId, cause: "violation", at, lengthMs: due.lengthMs },
+            withdrawSince,
+          )
+        : await banForViolation(tx, { playerId, at }, withdrawSince);
+  await tx
+    .update(violation)
+    .set({ sanctionedAt: at, sanctionId })
+    .where(and(ofDuel, isNull(violation.sanctionedAt)));
+};

@@ -75,6 +75,15 @@ export const createProtection = (auth: Auth, rateLimiter: RateLimiter) => {
         return { player: { ...found.user, nickname }, session: found.session };
       },
     },
+    // The administrator only. A Guest gets the same FORBIDDEN as any other Player: an administration
+    // route says nothing of itself to anyone else, not even that signing in would change the answer.
+    administrator: {
+      async derive({ request: { headers } }) {
+        const found = await auth.api.getSession({ headers });
+        if (!found?.user.isAdministrator) return status(403, { code: "FORBIDDEN" });
+        return { player: found.user, session: found.session };
+      },
+    },
     // A Player with a Nickname or a Guest. Anyone without a session becomes a Guest, given a signed
     // cookie on first contact, which an upgrade must pass on with `upgrade: ({ set }) => set.headers`.
     participant: {

@@ -3,6 +3,9 @@ import { makeSignature } from "better-auth/crypto";
 import type { Db } from "../../src/db/client.ts";
 import { type Auth, type AuthRateLimit, createAuth } from "../../src/modules/auth/service.ts";
 
+/** Where a banned Player of a test is told to write. */
+export const TEST_APPEAL_ADDRESS = "appeal@typomaniac.test";
+
 // Each test file builds its own instance on its own database, like the app it is injected into.
 export const createTestAuth = (db: Db, rateLimit?: AuthRateLimit) =>
   createAuth(
@@ -12,22 +15,36 @@ export const createTestAuth = (db: Db, rateLimit?: AuthRateLimit) =>
       secret: "test-secret-of-at-least-32-characters",
       github: { clientId: "test-github-id", clientSecret: "test-github-secret" },
       discord: { clientId: "test-discord-id", clientSecret: "test-discord-secret" },
+      appealAddress: TEST_APPEAL_ADDRESS,
     },
     rateLimit,
   );
+
+// A GitHub account old enough for ranked play, so the Queue opens to the Players of other tests.
+const OLD_ENOUGH_FOR_RANKED = new Date("2020-01-01T00:00:00Z");
 
 // Goes through Better Auth's internal adapter rather than its test-utils plugin: 1.7.25 only exports that plugin
 // from the global "better-auth/plugins" entry, and it would have to sit in the production configuration.
 export const signInPlayer = async (
   auth: Auth,
-  { email, image }: { email?: string; image?: string } = {},
+  {
+    email,
+    image,
+    providerCreatedAt = OLD_ENOUGH_FOR_RANKED,
+  }: { email?: string; image?: string; providerCreatedAt?: Date | null } = {},
 ) => {
   const { internalAdapter, authCookies, secret } = await auth.$context;
   // createUser runs the address check, which Better Auth only allows inside a request.
+  // createOAuthUser's type leaves out the additional fields of the account, which it writes all the same.
+  const providerAccount = {
+    providerId: "github",
+    accountId: crypto.randomUUID(),
+    providerCreatedAt,
+  };
   const { user: player } = await internalAdapter.createOAuthUser(
     // An empty provider username yields no default Nickname, so the Player starts without one.
     { name: "", email: email ?? `${crypto.randomUUID()}@example.com`, emailVerified: true, image },
-    { providerId: "github", accountId: crypto.randomUUID() },
+    providerAccount,
   );
   const { token } = await internalAdapter.createSession(player.id);
   // Better Auth only accepts a session cookie signed with its secret.

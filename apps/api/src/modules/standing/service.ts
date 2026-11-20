@@ -1,41 +1,25 @@
+import { lockStanding, rankFromStored, standingFromStored, storedStanding } from "@repo/fair-play";
 import {
   applyDuel,
   createStanding,
   DEFAULT_RANKED_CONFIG,
   type DuelUpdate,
-  ladderIndex,
   type OrnamentChoice,
   type Outcome,
-  type Rank,
-  rankAtLadderIndex,
   type Standing,
   wornOrnament,
 } from "@repo/ranked-engine";
-import { and, asc, count, desc, eq, isNotNull, lt, type SQL, sql } from "drizzle-orm";
-import type { Db, Transaction } from "../../db/client.ts";
-import { duelParticipant, standing as standingTable, user } from "../../db/schema.ts";
+import { and, asc, count, desc, eq, isNotNull, isNull, lt, type SQL, sql } from "drizzle-orm";
+import {
+  type Db,
+  type Transaction,
+  duelParticipant,
+  standing as standingTable,
+  user,
+} from "../../db/client.ts";
 
-/** A Rank as it is stored: the ladder index of its Division and its LP, both `null` while Unranked. */
-export const storedRank = (rank: Rank | null) => ({
-  ladderIndex: rank === null ? null : ladderIndex(rank),
-  lp: rank === null ? null : rank.lp,
-});
-
-/** The Rank a stored ladder index and LP stand for. */
-export const rankFromStored = (index: number | null, lp: number | null) =>
-  index === null || lp === null ? null : rankAtLadderIndex(index, lp);
-
-const storedStanding = ({ mmr, duelsPlayed, rank }: Standing) => ({
-  mmr,
-  duelsPlayed,
-  ...storedRank(rank),
-});
-
-const standingFromStored = (row: typeof standingTable.$inferSelect): Standing => ({
-  mmr: row.mmr,
-  duelsPlayed: row.duelsPlayed,
-  rank: rankFromStored(row.ladderIndex, row.lp),
-});
+// The Standing rows are read and written the same way by the fair-play steps, which hold these helpers.
+export { rankFromStored, storedRank } from "@repo/fair-play";
 
 /** The Player's Standing, which is the one of a new Player while no ranked Duel has stored one. */
 export const readStanding = async (db: Db, playerId: string): Promise<Standing> => {
@@ -54,21 +38,6 @@ export const saveStanding = async (db: Db, playerId: string, standing: Standing)
 
 /** What a ranked Duel did to a Player's Standing: the one they had, and the ranked engine's update. */
 export type StandingMove = { readonly before: Standing; readonly update: DuelUpdate };
-
-// Gives a new Player their row first, so that there is always one to lock.
-const lockStanding = async (tx: Transaction, playerId: string) => {
-  await tx
-    .insert(standingTable)
-    .values({ playerId, ...storedStanding(createStanding()) })
-    .onConflictDoNothing();
-  const [row] = await tx
-    .select()
-    .from(standingTable)
-    .where(eq(standingTable.playerId, playerId))
-    .for("update");
-  if (!row) throw new Error(`Player ${playerId} has no Standing to lock`);
-  return standingFromStored(row);
-};
 
 /**
  * Moves the Standings of the two Players of a ranked Duel by its Outcomes, inside the transaction
@@ -134,7 +103,8 @@ export const PODIUM_SIZE = 3;
 /** How many ranked Players a page of the Leaderboard lists, from the first Position after the Podium. */
 export const LEADERBOARD_PAGE_SIZE = 15;
 
-const isRanked = isNotNull(standingTable.ladderIndex);
+// Listed: ranked and not banned. Every query using it joins `user`.
+const isRanked = and(isNotNull(standingTable.ladderIndex), isNull(user.bannedAt));
 
 // Rank first (its ladder index, then its LP), the MMR at equal Rank, and the Player's id last so that
 // equal Standings keep one order. The index `standing_leaderboard_idx` follows it column for column.
@@ -184,7 +154,11 @@ export const leaderboardSlice = (db: Db, offset: number, limit: number) =>
     .limit(limit);
 
 const countRanked = async (db: Db) => {
-  const [row] = await db.select({ total: count() }).from(standingTable).where(isRanked);
+  const [row] = await db
+    .select({ total: count() })
+    .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
+    .where(isRanked);
   return row?.total ?? 0;
 };
 
@@ -217,6 +191,7 @@ const countAhead = async (db: Db, row: LeaderboardRow) => {
   const [counted] = await db
     .select({ ahead: count() })
     .from(standingTable)
+    .innerJoin(user, eq(user.id, standingTable.playerId))
     .where(and(isRanked, comparedTo("ahead", row)));
   return counted?.ahead ?? 0;
 };

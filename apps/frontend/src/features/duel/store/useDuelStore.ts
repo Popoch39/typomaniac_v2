@@ -14,6 +14,7 @@ import { create } from "zustand";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretStore.ts";
 import { eventTime, shiftEventTime } from "../../game/clock/eventTime.ts";
+import { useBrowserHintsStore } from "../../game/store/useBrowserHintsStore.ts";
 import { useGameStore } from "../../game/store/useGameStore.ts";
 import { standingQueryKey } from "../../ranked/api/standingQueryOptions.ts";
 import { opponentCaretPosition } from "../caret/opponentCaretPosition.ts";
@@ -43,6 +44,8 @@ type DuelState = {
   readonly opponentGame: Game | null;
   /** Why the Participant could not take a seat, in words for the user. */
   readonly refusal: string | null;
+  /** The reason the server gave as it closed the socket for good, once the phase is `disconnected`. */
+  readonly closeReason: string | null;
   /**
    * Whether the socket dropped and is being reopened. The phase it dropped in stays shown until
    * the server says where the Duel is.
@@ -72,10 +75,17 @@ const withParticipant = (participants: readonly Participant[], participant: Part
 let stopForwarding: (() => void) | null = null;
 
 // The server applies the Participant's Events to its own copy of the Game of `round`, from the Start on.
-function forwardEvents(round: number) {
+// In a ranked Duel, the browser's hints on the Game go once, just ahead of the Event that ends it, so
+// that the server holds them before the Round, and maybe the Duel, is saved.
+function forwardEvents(round: number, ranked: boolean) {
   stopForwarding?.();
-  stopForwarding = useGameStore.subscribe(({ lastEvent }, previous) => {
+  stopForwarding = useGameStore.subscribe(({ lastEvent, game }, previous) => {
     if (lastEvent !== null && lastEvent !== previous.lastEvent) {
+      const hints =
+        ranked && game.status === "finished"
+          ? useBrowserHintsStore.getState().take(navigator.webdriver)
+          : null;
+      if (hints !== null) sendToDuel({ type: "hints", round, hints });
       sendToDuel({ type: "event", round, event: lastEvent });
     }
   });
@@ -105,6 +115,7 @@ const initialState = {
   words: [],
   opponentGame: null,
   refusal: null,
+  closeReason: null,
   isReconnecting: false,
   end: null,
   duelId: null,
@@ -112,14 +123,15 @@ const initialState = {
 
 export const useDuelStore = create<DuelState>()((set, get) => {
   const start = () => {
-    const { round, words } = get();
+    const { round, words, ranks } = get();
     if (round === null) return;
     // A Game the Participant starts runs on their own clock.
     shiftEventTime(0);
     const at = eventTime();
     const gameStore = useGameStore.getState();
     gameStore.loadGame(DUEL_GAME_CONFIG, words);
-    forwardEvents(round);
+    useBrowserHintsStore.getState().reset();
+    forwardEvents(round, ranks !== null);
     gameStore.applyEvent({ type: "start", at });
     set({ phase: "running" });
   };
@@ -128,14 +140,15 @@ export const useDuelStore = create<DuelState>()((set, get) => {
   const resume = (startAt: number) => {
     const journal = resumedJournal;
     const [started] = journal;
-    const { round, words } = get();
+    const { round, words, ranks } = get();
     if (started?.type !== "start" || round === null) return;
     const load = (clockOffset: number | null) => {
       const shift = eventClockShift({ gameStartedAt: started.at, startAt, clockOffset });
       if (shift === null) return;
       stopResumingGame();
       shiftEventTime(shift);
-      forwardEvents(round);
+      // The keys counted before the socket dropped still count: the Game goes on.
+      forwardEvents(round, ranks !== null);
       useGameStore.getState().loadGame(DUEL_GAME_CONFIG, words, journal);
       set({ phase: "running" });
     };
@@ -251,10 +264,10 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     return true;
   };
 
-  const disconnect = () => {
+  const disconnect = (closeReason: string) => {
     if (get().phase === "finished") return;
     stopFollowingSocket();
-    set({ phase: "disconnected", isReconnecting: false });
+    set({ phase: "disconnected", closeReason, isReconnecting: false });
   };
 
   const leave = () => {

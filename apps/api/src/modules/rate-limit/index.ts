@@ -26,6 +26,8 @@ export const RATE_LIMITS = {
   duelSocket: { max: 20, windowSeconds: 60 },
   /** Upgrades to the Queue socket, per Player. */
   queueSocket: { max: 20, windowSeconds: 60 },
+  /** Reports made, per Player: one per Duel already, this stops a Player spamming them across Duels. */
+  report: { max: 10, windowSeconds: 60 },
   /** Reads of a Player's public page and Progress, per Player or Guest. */
   publicReadPerRequester: { max: 60, windowSeconds: 60 },
   /** Reads of a Player's public page and Progress, per IP. */

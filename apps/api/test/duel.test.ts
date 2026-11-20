@@ -10,7 +10,7 @@ import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-
 import { and, count, eq } from "drizzle-orm";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
-import { duel, duelGame, duelParticipant, duelRound, user } from "../src/db/schema.ts";
+import { duel, duelGame, duelParticipant, duelRound, user, violation } from "../src/db/client.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
@@ -758,6 +758,52 @@ test("the Events a Participant sends are kept in their Game's journal, handed ba
   }
 });
 
+test("a Custom Duel accepts an insert of several characters and one no keyDown accounts for, which a ranked Duel refuses as Violations", async () => {
+  const { creator, opponent, duelId, stop } = await startDuel(0);
+  try {
+    creator.send({ type: "event", round: 1, event: { type: "start", at: 10 } });
+    creator.send({ type: "event", round: 1, event: { type: "insert", at: 20, text: "word " } });
+    creator.send({ type: "event", round: 1, event: { type: "insert", at: 30, text: "a" } });
+    const relayed = [await opponent.next(), await opponent.next(), await opponent.next()];
+
+    expect(relayed).toEqual([
+      { type: "opponentEvent", event: { type: "start", at: 10 } },
+      { type: "opponentEvent", event: { type: "insert", at: 20, text: "word " } },
+      { type: "opponentEvent", event: { type: "insert", at: 30, text: "a" } },
+    ]);
+    expect(await Promise.race([creator.closed, Bun.sleep(100).then(() => "open")])).toBe("open");
+    expect(await testDb.db.select().from(violation).where(eq(violation.duelId, duelId))).toEqual(
+      [],
+    );
+  } finally {
+    await stop();
+  }
+});
+
+test("a Custom Duel ignores the browser's hints: nothing of them is relayed nor saved", async () => {
+  const { creator, opponent, words, duelId, stop } = await startDuel(0);
+  try {
+    const sockets = [creator, opponent] as const;
+    creator.send({ type: "hints", round: 1, hints: { scriptedKeys: 7, automated: true } });
+    playGame(creator, 1, `${words[0]} `);
+    playGame(opponent, 1);
+    const second = await awaitStart(sockets, 2);
+    playGame(creator, 2, `${second.words[0]} `);
+    playGame(opponent, 2);
+    const received = await messagesUntilEnd(opponent);
+
+    expect(JSON.stringify(received)).not.toContain("scriptedKeys");
+    expect(
+      await testDb.db
+        .select({ hints: duelGame.hints })
+        .from(duelGame)
+        .where(eq(duelGame.duelId, duelId)),
+    ).toEqual([{ hints: null }, { hints: null }, { hints: null }, { hints: null }]);
+  } finally {
+    await stop();
+  }
+});
+
 test("an Event naming another Round than the current one is ignored", async () => {
   const { creator, opponent, reopenCreator, stop } = await startDuel(0);
   try {
@@ -1365,6 +1411,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: creatorJournal,
         outcome: "win",
         multiplier: 1,
+        hints: null,
       },
       {
         duelId,
@@ -1374,6 +1421,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: guestJournal,
         outcome: "loss",
         multiplier: 1,
+        hints: null,
       },
       {
         duelId,
@@ -1383,6 +1431,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: secondJournals[0],
         outcome: "win",
         multiplier: 1,
+        hints: null,
       },
       {
         duelId,
@@ -1392,6 +1441,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: secondJournals[1],
         outcome: "loss",
         multiplier: 1,
+        hints: null,
       },
     ]);
     // A Custom Duel keeps no Standing: the ranked columns stay empty.

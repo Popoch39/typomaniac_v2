@@ -3,6 +3,7 @@ import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
 import { queueQueryOptions } from "../api/queueQueryOptions.ts";
+import { accountAgeRefusalOf } from "../refusal/accountAgeRefusalOf.ts";
 import { parseQueueMessage } from "../message/parseQueueMessage.ts";
 
 type QueueSocketHandlers = {
@@ -22,6 +23,7 @@ const REFUSALS = {
   UNAUTHORIZED: "Sign in to enter the Queue.",
   NICKNAME_REQUIRED: "Choose a Nickname to enter the Queue.",
   RANKED_DUEL_UNFINISHED: "Finish your ranked Duel before entering the Queue again.",
+  RANKED_SUSPENDED: "You are suspended from ranked play: the Queue opens again when it ends.",
 };
 const UNREACHABLE = "The Queue could not be reached. Try again in a moment.";
 
@@ -36,7 +38,7 @@ async function findRefusal() {
     await queryClient.fetchQuery(queueQueryOptions());
     return UNREACHABLE;
   } catch (error) {
-    return describeApiError(error, REFUSALS);
+    return accountAgeRefusalOf(error) ?? describeApiError(error, REFUSALS);
   }
 }
 
