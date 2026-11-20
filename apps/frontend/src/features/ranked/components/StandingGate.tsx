@@ -1,23 +1,30 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { StatusMessage } from "../../../shared/components/StatusMessage.tsx";
+import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
+import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { useStanding } from "../hooks/useStanding.ts";
 import type { OwnStanding } from "../standing/describeStanding.ts";
 
 interface StandingGateProps {
-  player: SignedInPlayer;
+  /** Null while the session is checked: the gate then only shows its pending view. */
+  player: SignedInPlayer | null;
+  /** Shown while the Standing is read, and again while a failed read is tried again. */
+  pending: ReactNode;
   children: (standing: OwnStanding) => ReactNode;
 }
 
-// Shows its content once the Player's Standing is read, and says so while it is not.
-export function StandingGate({ player, children }: StandingGateProps) {
-  const { standing, isPending, failure } = useStanding(player);
+// Shows its content once the Player's Standing is read, and a way to read it again when that fails.
+export function StandingGate({ player, pending, children }: StandingGateProps) {
+  const { standing, stage, failure, retry } = useStanding(player);
 
-  if (isPending) {
-    return <StatusMessage role="status" icon={LoaderCircle} message="Reading your Standing…" />;
+  if (stage === "loading") return pending;
+  if (stage === "failed" && failure !== null) {
+    return (
+      <ErrorPanel title="Standing" message={failure}>
+        <TryAgainKey onRetry={retry} />
+      </ErrorPanel>
+    );
   }
-  if (failure) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
   if (standing === null) return null;
   return children(standing);
 }

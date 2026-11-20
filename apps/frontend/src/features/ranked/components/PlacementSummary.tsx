@@ -23,7 +23,7 @@ export function PlacementSummary({ placement }: PlacementSummaryProps) {
           </p>
         </div>
       </div>
-      <div className="flex flex-col gap-3.5">
+      <div className="flex min-h-24 flex-col gap-3.5">
         <PlacementPips outcomes={placement.outcomes} total={placement.total} />
         <p className="m-0 text-sm text-ink-subtle">{hint}</p>
       </div>

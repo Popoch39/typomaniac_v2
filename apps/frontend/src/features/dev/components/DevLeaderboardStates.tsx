@@ -4,11 +4,11 @@ import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import { LeaderboardSections } from "../../leaderboard/components/LeaderboardSections.tsx";
 import { LeaderboardSkeleton } from "../../leaderboard/components/LeaderboardSkeleton.tsx";
 import { leaderboardFixture } from "../fixtures/leaderboardFixture.ts";
-import { useDevLeaderboardStates } from "../hooks/useDevLeaderboardStates.ts";
+import { useDevFailedRead } from "../hooks/useDevFailedRead.ts";
 import { DevStateColumn } from "./DevStateColumn.tsx";
 
 export function DevLeaderboardStates() {
-  const { failure, isRetrying, retry } = useDevLeaderboardStates();
+  const { failure, isRetrying, retry } = useDevFailedRead();
 
   return (
     <section aria-label="Leaderboard" className="flex flex-col gap-8">
