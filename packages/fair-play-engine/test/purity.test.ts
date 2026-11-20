@@ -4,9 +4,11 @@ import {
   nextViolationSanction,
   playerSuspicion,
   rankedOpensAt,
+  readDuelSignals,
   readGameSignals,
   reviewToOpen,
 } from "../src/index.ts";
+import { duel } from "./helpers/duels.ts";
 import { person, targetWords, typeJournal } from "./helpers/journal.ts";
 
 test("PURE-1: reading when ranked opens never modifies the creation dates it receives", () => {
@@ -58,11 +60,14 @@ test("PURE-1: the same journal always gives the same signals, and they pass thro
 
 test("PURE-1: Suspicion never modifies the signals it is read from and is the same for the same signals", () => {
   const recentGames = [readGameSignals(played), readGameSignals(played)];
-  const untouched = structuredClone(recentGames);
-  const suspicion = playerSuspicion(recentGames);
+  const duelSignals = readDuelSignals([duel(70), duel(72)]);
+  const untouched = structuredClone({ recentGames, duelSignals });
+  const suspicion = playerSuspicion(recentGames, duelSignals);
 
-  expect(recentGames).toEqual(untouched);
-  expect(playerSuspicion(structuredClone(recentGames))).toBe(suspicion);
+  expect({ recentGames, duelSignals }).toEqual(untouched);
+  expect(playerSuspicion(structuredClone(recentGames), structuredClone(duelSignals))).toBe(
+    suspicion,
+  );
   expect(JSON.parse(JSON.stringify(suspicion))).toBe(suspicion);
 });
 
@@ -80,4 +85,25 @@ test("PURE-1: deciding a Review never modifies what it is given, is the same for
   expect(candidate).toEqual(untouched);
   expect(reviewToOpen(structuredClone(candidate))).toBe(reason);
   expect(JSON.parse(JSON.stringify(reason))).toBe(reason);
+});
+
+const recentDuels = [
+  duel(70, { opponentId: "rival", outcome: "loss", incorrect: 1 }),
+  duel(140, { opponentId: "rival" }),
+  duel(65, { opponentId: null, outcome: "draw" }),
+];
+
+test("PURE-1: reading the signals across Duels never modifies the Duels it receives", () => {
+  const untouched = structuredClone(recentDuels);
+
+  readDuelSignals(recentDuels);
+
+  expect(recentDuels).toEqual(untouched);
+});
+
+test("PURE-1: the same Duels always give the same signals across Duels, and they pass through JSON unchanged", () => {
+  const signals = readDuelSignals(recentDuels);
+
+  expect(readDuelSignals(structuredClone(recentDuels))).toEqual(signals);
+  expect(JSON.parse(JSON.stringify(signals))).toEqual(signals);
 });

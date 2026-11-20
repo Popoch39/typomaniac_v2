@@ -11,11 +11,15 @@ import {
 } from "@repo/db";
 import {
   playerSuspicion,
+  type RankedDuel,
+  readDuelSignals,
   readGameSignals,
   SIGNALS_VERSION,
+  SUSPICION_DUELS,
   SUSPICION_GAMES,
 } from "@repo/fair-play-engine";
-import { and, desc, eq, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 // A ranked Game of a Player, saved by `at`, that no analysis of the current signals has read yet:
 // never analysed, or analysed by an older version of the signals.
@@ -115,9 +119,60 @@ const updateSuspicion = async (tx: Transaction, playerId: string, at: Date) => {
     )
     .orderBy(desc(duel.endedAt), desc(gameAnalysis.round))
     .limit(SUSPICION_GAMES);
-  const computed = { value: playerSuspicion(recent.map(({ signals }) => signals)), computedAt: at };
+  const duelSignals = readDuelSignals(await recentDuels(tx, playerId, at));
+  const computed = {
+    value: playerSuspicion(
+      recent.map(({ signals }) => signals),
+      duelSignals,
+    ),
+    duelSignals,
+    computedAt: at,
+  };
   await tx
     .insert(suspicion)
     .values({ playerId, ...computed })
     .onConflictDoUpdate({ target: suspicion.playerId, set: computed });
+};
+
+const opponent = alias(duelParticipant, "opponent");
+
+// ACROSS-5: the Player's most recent ranked Duels saved by `at`, newest first, each with its Opponent
+// and the Player's own Games in Round order.
+const recentDuels = async (tx: Transaction, playerId: string, at: Date): Promise<RankedDuel[]> => {
+  const duels = await tx
+    .select({
+      duelId: duelParticipant.duelId,
+      seat: duelParticipant.seat,
+      outcome: duelParticipant.outcome,
+      opponentId: opponent.playerId,
+    })
+    .from(duelParticipant)
+    .innerJoin(duel, eq(duel.id, duelParticipant.duelId))
+    .innerJoin(
+      opponent,
+      and(eq(opponent.duelId, duelParticipant.duelId), ne(opponent.seat, duelParticipant.seat)),
+    )
+    .where(
+      and(eq(duelParticipant.playerId, playerId), eq(duel.kind, "ranked"), lte(duel.endedAt, at)),
+    )
+    .orderBy(desc(duel.endedAt))
+    .limit(SUSPICION_DUELS);
+  if (duels.length === 0) return [];
+  const games = await tx
+    .select({ duelId: duelGame.duelId, seat: duelGame.seat, result: duelGame.result })
+    .from(duelGame)
+    .where(
+      inArray(
+        duelGame.duelId,
+        duels.map(({ duelId }) => duelId),
+      ),
+    )
+    .orderBy(asc(duelGame.round));
+  return duels.map(({ duelId, seat, outcome, opponentId }) => ({
+    opponentId,
+    outcome,
+    games: games
+      .filter((game) => game.duelId === duelId && game.seat === seat)
+      .map(({ result }) => result),
+  }));
 };

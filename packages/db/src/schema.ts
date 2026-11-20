@@ -1,6 +1,6 @@
 // Tables are added here by the features that need them; drizzle-kit reads this file.
 import type { Outcome, Seat, ViolationKind } from "@repo/duel-engine";
-import type { GameSignals, ReviewReason } from "@repo/fair-play-engine";
+import type { DuelSignals, GameSignals, ReviewReason } from "@repo/fair-play-engine";
 import type { OrnamentChoice, RankChange } from "@repo/ranked-engine";
 import type { GameConfig, GameEvent, Result } from "@repo/typing-engine";
 import { relations, sql } from "drizzle-orm";
@@ -308,6 +308,12 @@ export const suspicion = pgTable("suspicion", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   value: doublePrecision("value").notNull(),
+  // What the signals across the Player's recent ranked Duels said. A Suspicion computed before they
+  // existed reads none of them, until the raised version of the signals has it computed again.
+  duelSignals: jsonb("duel_signals")
+    .$type<DuelSignals>()
+    .notNull()
+    .default({ levelJump: 0, errorlessSeries: 0, oneSidedPair: 0, lossWithoutTyping: 0 }),
   computedAt: timestamp("computed_at").notNull(),
 });
 

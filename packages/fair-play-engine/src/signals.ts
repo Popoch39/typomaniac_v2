@@ -34,7 +34,7 @@ export type GameSignals = { readonly [name in SignalName]: number };
  * SIGNAL-7: the version of the signals, saved with the values they gave. Raised whenever a signal
  * is added or changed, so that the fair-play pass reads every saved Game again with the new ones.
  */
-export const SIGNALS_VERSION = 1;
+export const SIGNALS_VERSION = 2;
 
 // A longer gap is a pause between bursts, not part of the rhythm being judged.
 const PAUSE_MS = 1000;
