@@ -49,6 +49,9 @@ export const user = pgTable(
     // Hand-written, not generated: when the Player was banned, null otherwise. The row is kept, so
     // that their Nickname stays taken and their past Opponents still see them, marked as banned.
     bannedAt: timestamp("banned_at"),
+    // Hand-written, not generated: the administrator's mark (ADR 0014), set by hand in the database,
+    // never by a route. Checked by the server on every administration route.
+    isAdministrator: boolean("is_administrator").default(false).notNull(),
   },
   (table) => [
     // Hand-written too. On the lowercase form so two Nicknames differing only by case collide, while the column keeps the chosen case.

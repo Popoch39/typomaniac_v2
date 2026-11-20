@@ -173,6 +173,9 @@ export const createAuth = (
       additionalFields: {
         // input: false keeps Better Auth's own routes from setting it: only PUT /api/me/nickname applies the Nickname rules.
         nickname: { type: "string", required: false, input: false },
+        // Set by hand in the database only (ADR 0014); read from the session by the administrator
+        // protection.
+        isAdministrator: { type: "boolean", required: false, defaultValue: false, input: false },
       },
     },
     account: {
