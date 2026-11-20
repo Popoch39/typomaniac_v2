@@ -1,7 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
+import { user } from "../src/db/client.ts";
 import { createProtection } from "../src/modules/auth/index.ts";
 import { createRateLimiter } from "../src/modules/rate-limit/index.ts";
 import { saveStanding } from "../src/modules/standing/service.ts";
@@ -67,6 +69,7 @@ test("a Player with no Nickname reads their own profile, without their email", a
     nickname: null,
     avatarUrl: null,
     ornament: { tier: "unranked", division: null },
+    isAdministrator: false,
   });
   expect(await response.text()).not.toContain("ada@example.com");
 });
@@ -108,4 +111,16 @@ test("a ranked Player wears the Ornament of their Tier, with their Division", as
 
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ ornament: { tier: "gold", division: 2 } });
+});
+
+test("the administrator reads their mark, so the administration page is linked for them alone", async () => {
+  const { player, cookie } = await signInPlayer(auth);
+  await testDb.db.update(user).set({ isAdministrator: true }).where(eq(user.id, player.id));
+
+  const response = await app.handle(
+    new Request("http://localhost/api/me", { headers: { cookie } }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ id: player.id, isAdministrator: true });
 });
