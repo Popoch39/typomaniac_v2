@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  type DuelSignals,
   type GameSignals,
   PODIUM_POSITIONS,
   type ReviewCandidate,
@@ -22,6 +23,18 @@ const ordinaryGame: GameSignals = {
   flatWordSpeed: 0,
   superhumanSpeed: 0,
 };
+const ordinaryDuels: DuelSignals = {
+  levelJump: 0,
+  errorlessSeries: 0,
+  oneSidedPair: 0,
+  lossWithoutTyping: 0,
+};
+const botDuels: DuelSignals = {
+  levelJump: 1,
+  errorlessSeries: 1,
+  oneSidedPair: 1,
+  lossWithoutTyping: 1,
+};
 const games = (count: number, game: GameSignals) => Array.from({ length: count }, () => game);
 
 // A Gold Player off the Podium, never reviewed, whose recent ranked Games are ordinary.
@@ -31,6 +44,7 @@ const ordinary: ReviewCandidate = {
   master: false,
   position: 40,
   gamesSinceLastReview: games(SUSPICION_GAMES, ordinaryGame),
+  duelSignalsSinceLastReview: ordinaryDuels,
 };
 
 test("REVIEW-1: the Suspicion threshold is a starting value, high, held as a constant", () => {
@@ -44,7 +58,7 @@ test("REVIEW-1: a Player whose Suspicion passes the threshold gets a Review with
 
 test("REVIEW-1: a Player whose Suspicion stays under the threshold gets no Review", () => {
   expect(reviewToOpen(ordinary)).toBeNull();
-  // Half of the window typed by a machine reads 0.5, under the threshold.
+  // Half of the window typed by a machine reads 0.35, under the threshold.
   expect(
     reviewToOpen({
       ...ordinary,
@@ -99,5 +113,11 @@ test("REVIEW-3: a Review by Suspicion may open again after the last one was sett
 test("REVIEW-4: only the Games played after the last settled Review count, the missing ones counting as ordinary", () => {
   // A cleared Player with a few bot-like Games since stays under the threshold.
   expect(reviewToOpen({ ...ordinary, gamesSinceLastReview: games(5, botGame) })).toBeNull();
-  expect(reviewToOpen({ ...ordinary, gamesSinceLastReview: games(15, botGame) })).toBe("suspicion");
+  expect(reviewToOpen({ ...ordinary, gamesSinceLastReview: games(18, botGame) })).toBe("suspicion");
+});
+
+test("REVIEW-4: the signals across the Duels started after the last settled Review count towards the Suspicion that opens a Review", () => {
+  const someBotGames = { ...ordinary, gamesSinceLastReview: games(15, botGame) };
+  expect(reviewToOpen(someBotGames)).toBeNull();
+  expect(reviewToOpen({ ...someBotGames, duelSignalsSinceLastReview: botDuels })).toBe("suspicion");
 });

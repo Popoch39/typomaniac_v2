@@ -1,5 +1,5 @@
 {
-  "id": "ca3b1f0e-c684-49ba-bfa7-15fb0ac9f91e",
+  "id": "95ef0969-392e-4e38-8e91-4368aed5db09",
   "prevId": "e74f068b-7f40-4b2f-b65b-3337077d1eee",
   "version": "7",
   "dialect": "postgresql",
@@ -1038,6 +1038,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "duel_signals": {
+          "name": "duel_signals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"levelJump\":0,\"errorlessSeries\":0,\"oneSidedPair\":0,\"lossWithoutTyping\":0}'::jsonb"
+        },
         "computed_at": {
           "name": "computed_at",
           "type": "timestamp",
@@ -1130,13 +1137,6 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_administrator": {
-          "name": "is_administrator",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {

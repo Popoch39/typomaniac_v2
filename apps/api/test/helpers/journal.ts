@@ -44,12 +44,18 @@ const typeJournal = (gap: (word: string) => number, hold: () => number): GameEve
   );
 };
 
-/** A script typing every character 60 ms after the last, each key held 30 ms. */
-export const machineJournal = () =>
+/** A script typing every character `gapMs` after the last, each key held half as long. */
+export const machineJournal = (gapMs = 60) =>
   typeJournal(
-    () => 60,
-    () => 30,
+    () => gapMs,
+    () => gapMs / 2,
   );
+
+/** A Game in which the Player typed nothing. */
+export const idleJournal = (): GameEvent[] => [
+  { type: "start", at: 0 },
+  { type: "tick", at: ROUND_MS },
+];
 
 /**
  * A person typing around 90 ms per character: uneven intervals and hold times, keys often still down
