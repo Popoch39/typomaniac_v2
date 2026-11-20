@@ -7,6 +7,8 @@ export type Review = NonNullable<ReturnType<typeof useReview>["review"]>;
 
 export type ReviewedDuel = Review["duels"][number];
 
+export type ReviewedGame = ReviewedDuel["games"][number];
+
 export function useReview(reviewId: string) {
   const { data, isPending, error } = useQuery(reviewQueryOptions(reviewId));
   return {

@@ -30,6 +30,7 @@
     "../src/features/duel/round",
     "../src/features/duel/scene",
     "../src/features/duel/store/useTierPromotionStore.ts",
+    "../src/features/admin/replay",
     "../src/features/admin/review",
     "../src/features/auth/refusal",
     "../src/features/fair-play/notice",
