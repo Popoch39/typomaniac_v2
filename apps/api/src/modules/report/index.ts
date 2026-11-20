@@ -21,8 +21,8 @@ export const createReportRoutes = (db: Db, protection: Protection, rateLimiter: 
         playerId: player.id,
         at: new Date(),
       });
-      if (made === "not_found") return status(404, { code: "DUEL_NOT_FOUND" });
-      if (made === "already_made") return status(409, { code: "REPORT_ALREADY_MADE" });
+      if (made === "not-found") return status(404, { code: "DUEL_NOT_FOUND" });
+      if (made === "already-made") return status(409, { code: "REPORT_ALREADY_MADE" });
       return status(204, undefined);
     },
   );
