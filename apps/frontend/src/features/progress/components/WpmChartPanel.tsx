@@ -12,12 +12,16 @@ const SERIES = [{ key: "rawWpm" }, { key: "wpm" }, { key: "averageWpm", isTrend:
 
 interface WpmChartPanelProps {
   rows: readonly ProgressChartRow[];
+  /** What the period and the kind of Duels chosen cover. */
+  tag: string;
+  /** Said instead of empty axes while there is no Game. */
+  emptyMessage: string;
 }
 
-export function WpmChartPanel({ rows }: WpmChartPanelProps) {
+export function WpmChartPanel({ rows, tag, emptyMessage }: WpmChartPanelProps) {
   return (
-    <Panel title="WPM" tag="Last 20 Duels">
-      <ProgressChart rows={rows} config={CONFIG} series={SERIES} />
+    <Panel title="WPM" tag={tag}>
+      <ProgressChart rows={rows} config={CONFIG} series={SERIES} emptyMessage={emptyMessage} />
     </Panel>
   );
 }

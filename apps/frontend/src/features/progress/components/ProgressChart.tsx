@@ -17,12 +17,22 @@ interface ProgressChartProps {
   /** Each series' label and theme colour, by its key. */
   config: ChartConfig;
   series: readonly { key: ProgressSeries; isTrend?: boolean }[];
+  /** Said in the chart's place while there is no Game. */
+  emptyMessage: string;
 }
 
 /** One point per Game, oldest on the left. */
-export function ProgressChart({ rows, config, series }: ProgressChartProps) {
+export function ProgressChart({ rows, config, series, emptyMessage }: ProgressChartProps) {
   const tooltipLabel = useProgressTooltipLabel();
 
+  if (rows.length === 0) {
+    return (
+      // The chart's own height, so that the Panel keeps its box with or without Games.
+      <p className="m-0 flex h-72 items-center justify-center text-center text-ink-muted">
+        {emptyMessage}
+      </p>
+    );
+  }
   return (
     // A fixed height, whatever the width, so that the page below never moves.
     <ChartContainer config={config} className="aspect-auto h-72 w-full">

@@ -14,7 +14,7 @@ interface PlayerProfileProps {
 export function PlayerProfile({ player }: PlayerProfileProps) {
   return (
     <ProfileGate player={player}>
-      {(standing, games) => (
+      {(standing, games, isProgressUpdating) => (
         <div className="flex flex-col gap-7 pb-2.5">
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7">
             <Panel title="Player">
@@ -42,7 +42,11 @@ export function PlayerProfile({ player }: PlayerProfileProps) {
               <p className="m-0 text-ink-muted">Choose a Nickname to see your Progress.</p>
             </Panel>
           ) : (
-            <ProgressSection games={games} emptyMessage="Your Progress fills as you play Duels." />
+            <ProgressSection
+              games={games}
+              isUpdating={isProgressUpdating}
+              emptyMessage="Your Progress fills as you play Duels."
+            />
           )}
         </div>
       )}

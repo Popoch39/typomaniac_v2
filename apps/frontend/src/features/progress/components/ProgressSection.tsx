@@ -1,29 +1,32 @@
-import { Panel } from "../../../shared/components/Panel.tsx";
+import { cn } from "../../../shared/lib/utils.ts";
 import type { ProgressGame } from "../chart/progressChartRows.ts";
-import { useProgressChartRows } from "../hooks/useProgressChartRows.ts";
+import { useProgressSection } from "../hooks/useProgressSection.ts";
 import { AccuracyChartPanel } from "./AccuracyChartPanel.tsx";
+import { ProgressToolbar } from "./ProgressToolbar.tsx";
 import { WpmChartPanel } from "./WpmChartPanel.tsx";
 
 interface ProgressSectionProps {
   games: readonly ProgressGame[];
+  /** The Games shown are the previous period's or kind's, while the chosen one is read. */
+  isUpdating: boolean;
   /** Said instead of empty axes while no Duel was played. */
   emptyMessage: string;
 }
 
-export function ProgressSection({ games, emptyMessage }: ProgressSectionProps) {
-  const rows = useProgressChartRows(games);
+// Every Panel stays drawn, even without a Game, so that choosing another period or kind moves nothing.
+export function ProgressSection({ games, isUpdating, emptyMessage }: ProgressSectionProps) {
+  const section = useProgressSection(games, emptyMessage);
 
-  if (rows.length === 0) {
-    return (
-      <Panel title="Progress">
-        <p className="m-0 text-ink-muted">{emptyMessage}</p>
-      </Panel>
-    );
-  }
   return (
     <section aria-label="Progress" className="flex flex-col gap-7">
-      <WpmChartPanel rows={rows} />
-      <AccuracyChartPanel rows={rows} />
+      <ProgressToolbar />
+      <div
+        aria-busy={isUpdating}
+        className={cn("flex flex-col gap-7 transition-opacity", isUpdating && "opacity-60")}
+      >
+        <WpmChartPanel {...section} />
+        <AccuracyChartPanel {...section} />
+      </div>
     </section>
   );
 }

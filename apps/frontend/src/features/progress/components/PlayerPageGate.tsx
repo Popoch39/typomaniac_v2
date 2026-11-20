@@ -6,17 +6,22 @@ import { type PublicPlayer, usePlayerPageReads } from "../hooks/usePlayerPageRea
 
 interface PlayerPageGateProps {
   nickname: string;
-  children: (player: PublicPlayer, games: readonly ProgressGame[]) => ReactNode;
+  /** `isProgressUpdating` while the Games shown are those of the previous period or kind. */
+  children: (
+    player: PublicPlayer,
+    games: readonly ProgressGame[],
+    isProgressUpdating: boolean,
+  ) => ReactNode;
 }
 
 // Holds the page back until every panel can be drawn whole, so that none is pushed in or grows later.
 export function PlayerPageGate({ nickname, children }: PlayerPageGateProps) {
-  const { player, progress, isPending, failure } = usePlayerPageReads(nickname);
+  const { player, progress, isProgressUpdating, isPending, failure } = usePlayerPageReads(nickname);
 
   if (isPending) {
     return <StatusMessage role="status" icon={LoaderCircle} message="Reading this Player…" />;
   }
   if (failure) return <StatusMessage role="alert" icon={CircleAlert} message={failure} />;
   if (player === null || progress === null) return null;
-  return children(player, progress.games);
+  return children(player, progress.games, isProgressUpdating);
 }
