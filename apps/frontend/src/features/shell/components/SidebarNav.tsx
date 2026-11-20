@@ -1,4 +1,5 @@
 import { SidebarGroup, SidebarMenu } from "../../../shared/components/ui/sidebar.tsx";
+import { AdminNavLink } from "./AdminNavLink.tsx";
 import { CustomIcon } from "./CustomIcon.tsx";
 import { LeaderboardIcon } from "./LeaderboardIcon.tsx";
 import { PracticeIcon } from "./PracticeIcon.tsx";
@@ -16,6 +17,7 @@ export function SidebarNav() {
           <SidebarNavLink to="/custom" icon={<CustomIcon />} label="Custom" />
           <SidebarNavLink to="/practice" icon={<PracticeIcon />} label="Practice" />
           <SidebarNavLink to="/profile" icon={<ProfileIcon />} label="Profile" />
+          <AdminNavLink />
         </SidebarMenu>
       </nav>
     </SidebarGroup>

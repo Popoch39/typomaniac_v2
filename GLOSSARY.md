@@ -253,6 +253,10 @@ _Avoid_: cheat score, risk, flag, trust
 A person's examination of a Player under Suspicion, which ends by clearing them or by a Sanction.
 _Avoid_: audit, moderation, investigation
 
+**Administrator**:
+The Player who settles Reviews: a mark set by hand in the database, checked by the server on every administration route.
+_Avoid_: admin, moderator, staff
+
 **Report**:
 A Player's statement, made at the end of a ranked Duel, that their Opponent cheated in it; it raises that Opponent's Suspicion and never sanctions by itself.
 _Avoid_: complaint, flag, ticket

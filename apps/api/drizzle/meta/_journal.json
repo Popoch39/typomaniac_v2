@@ -155,6 +155,13 @@
       "when": 1795193140099,
       "tag": "0021_duel_game_hints",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795193528607,
+      "tag": "0022_administrator",
+      "breakpoints": true
     }
   ]
 }
