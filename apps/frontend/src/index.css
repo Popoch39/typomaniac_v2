@@ -278,11 +278,16 @@
 }
 
 /*
- * The Rank up scene of a Tier promotion: a 1040×680 stage, scaled down to fit the viewport and never
- * up. tan(atan2()) turns the ratio of two lengths into the number `scale` needs.
+ * The Rank up scene of a Tier promotion: a 1040×680 stage, scaled to cover the viewport, but never so
+ * far that it cuts into the 880×580 box at its centre that holds the Ornament with its crown, the
+ * Master keys and the title. tan(atan2()) turns the ratio of two lengths into the number `scale` needs.
  */
 @utility rank-up-fit {
-  scale: min(1, tan(atan2(100cqw, 1040px)), tan(atan2(100cqh, 680px)));
+  scale: min(
+    max(tan(atan2(100cqw, 1040px)), tan(atan2(100cqh, 680px))),
+    tan(atan2(100cqw, 880px)),
+    tan(atan2(100cqh, 580px))
+  );
 }
 
 /* Silver: the old Ornament dips, then is cut away at the end of the wipe that draws the new one. */

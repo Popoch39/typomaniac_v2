@@ -11,7 +11,8 @@ import { TierPromotionTitle } from "./TierPromotionTitle.tsx";
 /**
  * The Rank up scene of a Tier promotion, over the Duel end screen: mounted only while open, so that
  * every animation starts from its first frame, and contained so that it never lays out the screen
- * underneath. The 1040 × 680 stage is centred and scaled down to fit the viewport.
+ * underneath. The 1040 × 680 stage is centred and scaled to cover the viewport; the eyebrow and
+ * Continue sit in the corners of the viewport, as the edges of the stage can be cut off.
  */
 export function TierPromotionScene() {
   const scene = useTierPromotionScene();
@@ -30,7 +31,7 @@ export function TierPromotionScene() {
     >
       <div
         className={cn(
-          "absolute top-1/2 left-1/2 h-[680px] w-[1040px] -translate-1/2 overflow-hidden rank-up-fit",
+          "absolute top-1/2 left-1/2 h-[680px] w-[1040px] -translate-1/2 rank-up-fit",
           scene.colourClassName,
         )}
       >
@@ -49,14 +50,14 @@ export function TierPromotionScene() {
           {isBurstOverHero && <TierPromotionBursts tier={promotion.tier} />}
           <TierPromotionTitle promotion={promotion} timings={timings} />
         </div>
-        <p className="absolute top-7 left-10 m-0 text-ink-subtle type-eyebrow">Rank up</p>
-        <TierPromotionContinue
-          isReady={scene.isContinueReady}
-          at={timings.continueAt}
-          onShown={scene.onContinueShown}
-          onContinue={scene.onContinue}
-        />
       </div>
+      <p className="absolute top-7 left-10 m-0 text-ink-subtle type-eyebrow">Rank up</p>
+      <TierPromotionContinue
+        isReady={scene.isContinueReady}
+        at={timings.continueAt}
+        onShown={scene.onContinueShown}
+        onContinue={scene.onContinue}
+      />
     </div>
   );
 }
