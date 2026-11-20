@@ -1,4 +1,4 @@
-import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
+import { PlayerPageLink } from "../../progress/components/PlayerPageLink.tsx";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { LpAmount } from "./LpAmount.tsx";
@@ -16,7 +16,7 @@ export function PodiumPlayer({ player, isOwn }: PodiumPlayerProps) {
       <OrnamentedAvatar player={player} ornament={player.ornament} size="md" isOwn={isOwn} />
       <span className="flex max-w-full items-center gap-2.5">
         <span className="min-w-0 truncate text-2xl font-extrabold text-ink">
-          <PlayerNickname player={player} />
+          <PlayerPageLink player={player} />
         </span>
         {isOwn && <YouTag />}
       </span>
