@@ -7,12 +7,7 @@ interface ReviewRecordsProps {
 }
 
 export function ReviewRecords({ review }: ReviewRecordsProps) {
-  const { violations, sanctions } = useReviewRecords(review);
+  const { violations } = useReviewRecords(review);
 
-  return (
-    <>
-      <ReviewRecordList title="Violations" empty="No Violation." records={violations} />
-      <ReviewRecordList title="Sanctions" empty="No Sanction." records={sanctions} />
-    </>
-  );
+  return <ReviewRecordList title="Violations" empty="No Violation." records={violations} />;
 }
