@@ -160,18 +160,19 @@ export const suspendPlayerIn = async (
       ),
     );
   if (existing) return "already-suspended";
-  await saveSuspension(tx, { playerId, cause, at, lengthMs });
+  await saveSuspension(tx, { playerId, cause, at, lengthMs }, repairWindowBefore(at));
   return "suspended";
 };
 
 /**
- * Saves a Suspension and voids under it every ranked Duel the Player won in the repair window before
- * it, inside the caller's transaction, and returns its id. The caller has locked the Player and keeps
- * it from being saved twice.
+ * Saves a Suspension and voids under it every ranked Duel the Player won from `withdrawSince` to its
+ * start, inside the caller's transaction, and returns its id. The caller has locked the Player and
+ * keeps it from being saved twice.
  */
 export const saveSuspension = async (
   tx: Transaction,
   { playerId, cause, at, lengthMs }: Suspension,
+  withdrawSince: Date,
 ) => {
   const [saved] = await tx
     .insert(sanction)
@@ -184,15 +185,23 @@ export const saveSuspension = async (
     })
     .returning({ id: sanction.id });
   if (!saved) throw new Error(`Could not save the Suspension of Player ${playerId}`);
-  await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
+  await withdrawRecentWins(tx, { playerId, since: withdrawSince, until: at, sanctionId: saved.id });
   return saved.id;
 };
 
-// Voids, under the Suspension or Ban `sanctionId`, every ranked Duel the Player won in the repair
-// window before `at` that is not voided yet (ADR 0015).
+/** The start of the repair window before a Suspension or Ban starting at `at` (ADR 0015). */
+export const repairWindowBefore = (at: Date) => new Date(at.getTime() - REPAIR_WINDOW_MS);
+
+// Voids, under the Suspension or Ban `sanctionId`, every ranked Duel the Player won from `since` to
+// `until` that is not voided yet (ADR 0015).
 const withdrawRecentWins = async (
   tx: Transaction,
-  { playerId, at, sanctionId }: { playerId: string; at: Date; sanctionId: string },
+  {
+    playerId,
+    since,
+    until,
+    sanctionId,
+  }: { playerId: string; since: Date; until: Date; sanctionId: string },
 ) => {
   const won = await tx
     .select({ duelId: duel.id })
@@ -204,8 +213,8 @@ const withdrawRecentWins = async (
         eq(duelParticipant.playerId, playerId),
         eq(duelParticipant.outcome, "win"),
         eq(duel.kind, "ranked"),
-        gte(duel.endedAt, new Date(at.getTime() - REPAIR_WINDOW_MS)),
-        lte(duel.endedAt, at),
+        gte(duel.endedAt, since),
+        lte(duel.endedAt, until),
         isNull(voidedDuel.duelId),
       ),
     )
@@ -241,18 +250,20 @@ export const banPlayerIn = async (
     .for("update");
   if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
   if (found.bannedAt) return "already-banned";
-  await saveBan(tx, { playerId, cause, at });
+  await saveBan(tx, { playerId, cause, at }, repairWindowBefore(at));
   return "banned";
 };
 
 /**
  * Bans a Player for one step of the Violation ladder, inside the caller's transaction, and returns
  * the id of the Ban: a new one with cause Violation, or the one that holds already when the Player
- * was banned in the meantime. The caller has locked the Player and keeps it from being saved twice.
+ * was banned in the meantime. A new Ban voids the ranked Duels the Player won from `withdrawSince`
+ * to its start. The caller has locked the Player and keeps it from being saved twice.
  */
 export const banForViolation = async (
   tx: Transaction,
   { playerId, at }: { playerId: string; at: Date },
+  withdrawSince: Date,
 ) => {
   const [holding] = await tx
     .select({ id: sanction.id })
@@ -262,12 +273,13 @@ export const banForViolation = async (
     )
     .orderBy(desc(sanction.startedAt))
     .limit(1);
-  return holding?.id ?? (await saveBan(tx, { playerId, cause: "violation", at }));
+  return holding?.id ?? (await saveBan(tx, { playerId, cause: "violation", at }, withdrawSince));
 };
 
-// Saves a Ban and applies it, as `banPlayerIn` describes, and returns its id. The caller has locked
-// the Player and checked they are not banned.
-const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban) => {
+// Saves a Ban and applies it, as `banPlayerIn` describes but voiding the ranked Duels the Player won
+// from `withdrawSince`, and returns its id. The caller has locked the Player and checked they are not
+// banned.
+const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban, withdrawSince: Date) => {
   const [found] = await tx.select({ email: user.email }).from(user).where(eq(user.id, playerId));
   if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
   const [saved] = await tx
@@ -287,6 +299,6 @@ const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban) => {
       { sanctionId: saved.id, email: found.email.toLowerCase() },
     ]);
   await tx.delete(session).where(eq(session.userId, playerId));
-  await withdrawRecentWins(tx, { playerId, at, sanctionId: saved.id });
+  await withdrawRecentWins(tx, { playerId, since: withdrawSince, until: at, sanctionId: saved.id });
   return saved.id;
 };

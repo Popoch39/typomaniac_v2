@@ -231,3 +231,23 @@ test("a revoked Sanction no longer counts on the Violation ladder: after a revok
     { kind: "suspension", lengthMs: 3 * DAY_MS },
   ]);
 });
+
+test("a Suspension applied by a late pass starts at the pass, and still voids the Duel won with its Violation", async () => {
+  const cheaterId = await signInRanked();
+  await winWithViolation(cheaterId);
+  await runFairPlayPass(testDb.db, Date.now());
+  const duelId = await winWithViolation(cheaterId);
+
+  const passAt = Date.now() + 20 * DAY_MS;
+  await runFairPlayPass(testDb.db, passAt);
+
+  const [, suspension] = await sanctionsOf(cheaterId);
+  expect(suspension).toEqual(
+    expect.objectContaining({
+      kind: "suspension",
+      startedAt: new Date(passAt),
+      endsAt: new Date(passAt + 3 * DAY_MS),
+    }),
+  );
+  expect(await voidedUnder(duelId)).toEqual([{ kind: "suspension" }]);
+});

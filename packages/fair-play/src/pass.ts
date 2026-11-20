@@ -3,7 +3,12 @@ import { nextViolationSanction } from "@repo/fair-play-engine";
 import { and, countDistinct, eq, isNull, lte } from "drizzle-orm";
 import { analyseGames } from "./analysis.ts";
 import { openReviews } from "./review.ts";
-import { banForViolation, saveSuspension, voidDuelForViolation } from "./sanction.ts";
+import {
+  banForViolation,
+  repairWindowBefore,
+  saveSuspension,
+  voidDuelForViolation,
+} from "./sanction.ts";
 
 /**
  * One pass of the fair-play worker at the instant `now`, which it reads no clock for. Every step is
@@ -35,8 +40,10 @@ const sanctionViolations = async (db: Db, at: Date) => {
 };
 
 // VIOLATION-1: the Player's Violations in one Duel count as one, sanctioned one step up from those
-// sanctioned before under a Sanction not revoked since. The Sanction starts when the Duel ended, an instant tied to the Violation rather
-// than to the pass, so that it covers that Duel too and is the same whichever pass applies it.
+// sanctioned before under a Sanction not revoked since. The Sanction starts at the pass, so that a
+// late pass never applies a Suspension already partly over; the Violation's mark, not that instant,
+// keeps a second pass from applying it again. Its repair window runs back from when the Duel ended, so
+// that it covers that Duel however late the pass.
 const sanctionDuelViolations = async (
   tx: Transaction,
   { playerId, duelId, endedAt, at }: { playerId: string; duelId: string; endedAt: Date; at: Date },
@@ -56,18 +63,18 @@ const sanctionDuelViolations = async (
     .innerJoin(sanction, eq(sanction.id, violation.sanctionId))
     .where(and(eq(violation.playerId, playerId), isNull(sanction.revokedAt)));
   const due = nextViolationSanction(sanctioned?.duels ?? 0);
+  const withdrawSince = repairWindowBefore(endedAt);
   // A Duel the Player lost is left as it was, but the step is saved as a Sanction all the same.
   const sanctionId =
     due.kind === "voided_duel"
-      ? await voidDuelForViolation(tx, { duelId, playerId, at: endedAt })
+      ? await voidDuelForViolation(tx, { duelId, playerId, at })
       : due.kind === "suspension"
-        ? await saveSuspension(tx, {
-            playerId,
-            cause: "violation",
-            at: endedAt,
-            lengthMs: due.lengthMs,
-          })
-        : await banForViolation(tx, { playerId, at: endedAt });
+        ? await saveSuspension(
+            tx,
+            { playerId, cause: "violation", at, lengthMs: due.lengthMs },
+            withdrawSince,
+          )
+        : await banForViolation(tx, { playerId, at }, withdrawSince);
   await tx
     .update(violation)
     .set({ sanctionedAt: at, sanctionId })
