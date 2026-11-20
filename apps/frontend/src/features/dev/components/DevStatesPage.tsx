@@ -1,6 +1,7 @@
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
 import { DevDuelStates } from "./DevDuelStates.tsx";
 import { DevLeaderboardStates } from "./DevLeaderboardStates.tsx";
+import { DevProfileStates } from "./DevProfileStates.tsx";
 import { DevRankedStates } from "./DevRankedStates.tsx";
 import { DevRouteStates } from "./DevRouteStates.tsx";
 
@@ -13,6 +14,7 @@ export function DevStatesPage() {
         lead="Every loading and error state, beside what it stands in for."
       />
       <DevRankedStates />
+      <DevProfileStates />
       <DevLeaderboardStates />
       <DevRouteStates />
       <DevDuelStates />
