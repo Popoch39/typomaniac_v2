@@ -13,14 +13,16 @@ export function PlayerPage() {
     <Page>
       <PageHeader title="Player" lead="A Player's Nickname, Ornament, Rank and Progress." />
       <PlayerPageGate nickname={nickname}>
-        {(player, games, isProgressUpdating) => (
+        {(player, progress, isProgressUpdating) => (
           <div className="flex flex-col gap-7 pb-2.5">
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7">
               <PlayerPanel player={player} />
               <PlayerRankCard rank={player.rank} />
             </div>
             <ProgressSection
-              games={games}
+              games={progress.games}
+              summary={progress.summary}
+              peakTier={player.peakTier}
               isUpdating={isProgressUpdating}
               emptyMessage={`${player.nickname}'s Progress fills as they play Duels.`}
             />
