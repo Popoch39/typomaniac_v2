@@ -376,13 +376,32 @@ test("neither the journal nor the MMR is in the Progress, its Rank points includ
     rank: rankAt(4, 40, "placed"),
   });
 
-  const body = await (await readProgress(nickname)).text();
+  const response = await readProgress(nickname);
 
-  expect(body.toLowerCase()).not.toContain("journal");
-  expect(body).not.toContain("KeyQ");
-  expect(body.toLowerCase()).not.toContain("mmr");
-  expect(body).not.toContain("1987");
-  expect(body).not.toContain("2011");
+  // Exactly these keys and values: no journal, no MMR, nothing else of the Duel.
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    games: [
+      {
+        endedAt: at(5).getTime(),
+        kind: "ranked",
+        wpm: 70,
+        rawWpm: 72,
+        accuracy: 95,
+        consistency: 80,
+      },
+    ],
+    summary: { won: 1, lost: 0, drawn: 0 },
+    rankPoints: [{ endedAt: at(5).getTime(), ladderIndex: 4, lp: 40, rankChange: "placed" }],
+  });
+});
+
+test("the Nickname is looked up whatever its case", async () => {
+  const nickname = uniqueNickname("MiXeD");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, { kind: "custom", endedAt: at(5), games: gameAt(64) });
+
+  expect(await wpmsOf(await readProgress(nickname.toUpperCase()))).toEqual([64]);
 });
 
 test("an unknown Nickname answers 404 with its own code", async () => {
@@ -396,7 +415,7 @@ test("a Player reading Progress beyond the progress limit is refused with 429 an
   const limitedRedis = await createTestRedis();
   try {
     const limited = createApp(testDb.db, auth, limitedRedis.redis, getLogger("api"), {
-      rateLimit: { limits: { progress: { max: 2, windowSeconds: 60 } } },
+      rateLimit: { limits: { publicReadPerRequester: { max: 2, windowSeconds: 60 } } },
     });
     const nickname = uniqueNickname("Busy");
     await playerNamed(nickname);

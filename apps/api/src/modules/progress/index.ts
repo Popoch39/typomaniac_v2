@@ -1,28 +1,21 @@
 import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
 import type { Protection } from "../auth/index.ts";
-import type { RateLimiter } from "../rate-limit/index.ts";
 import * as ProgressModel from "./model.ts";
 import { readProgress, readPublicPlayer } from "./service.ts";
 
 // Public: anyone, a Guest or a visitor without any session, may read a Player's page and Progress.
-export const createProgressRoutes = (db: Db, protection: Protection, rateLimiter: RateLimiter) =>
+export const createProgressRoutes = (db: Db, protection: Protection) =>
   new Elysia({ prefix: "/api/players" })
     .use(protection)
     .get(
       "/:nickname",
       {
-        requester: true,
+        publicRead: true,
         params: ProgressModel.NicknameGet.Params,
         response: ProgressModel.NicknameGet.Response,
       },
-      async ({ params, requesterId, request, server, set, status }) => {
-        const refused = await rateLimiter.check(
-          "progress",
-          requesterId ?? rateLimiter.clientIp(request, server),
-          set,
-        );
-        if (refused) return refused;
+      async ({ params, status }) => {
         const player = await readPublicPlayer(db, params.nickname);
         if (player === null) return status(404, { code: "PLAYER_NOT_FOUND" });
         return player;
@@ -31,18 +24,12 @@ export const createProgressRoutes = (db: Db, protection: Protection, rateLimiter
     .get(
       "/:nickname/progress",
       {
-        requester: true,
+        publicRead: true,
         params: ProgressModel.NicknameProgressGet.Params,
         query: ProgressModel.NicknameProgressGet.Query,
         response: ProgressModel.NicknameProgressGet.Response,
       },
-      async ({ params, query, requesterId, request, server, set, status }) => {
-        const refused = await rateLimiter.check(
-          "progress",
-          requesterId ?? rateLimiter.clientIp(request, server),
-          set,
-        );
-        if (refused) return refused;
+      async ({ params, query, status }) => {
         const progress = await readProgress(db, params.nickname, {
           window: query.window ?? "20-duels",
           kind: query.kind ?? "all",

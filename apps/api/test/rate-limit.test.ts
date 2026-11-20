@@ -140,13 +140,34 @@ test("new Guests from one IP beyond its limit get a 429 instead of a cookie", as
 
 test("public Player pages read without a session beyond the progress limit of one IP are refused with 429", async () => {
   await withRedis(async (redis) => {
-    const { origin, stop } = listenWith(redis, { limits: { progress: twoPerMinute } });
+    const { origin, stop } = listenWith(redis, {
+      limits: { publicReadPerRequester: generous, publicReadPerIp: twoPerMinute },
+    });
     const { nickname } = await signInPlayerWithNickname(auth, origin);
     const readPage = () => fetch(`${origin}/api/players/${nickname}`);
 
     expect((await readPage()).status).toBe(200);
     expect((await readPage()).status).toBe(200);
     await expectRateLimited(await readPage());
+    await stop();
+  });
+});
+
+test("public Player pages and Progress read from one IP beyond its limit are refused with 429, whoever reads them", async () => {
+  await withRedis(async (redis) => {
+    const { origin, stop } = listenWith(redis, {
+      limits: { publicReadPerRequester: generous, publicReadPerIp: twoPerMinute },
+    });
+    const { nickname } = await signInPlayerWithNickname(auth, origin);
+    // A new Player each time: signing in as someone else does not escape the IP's count.
+    const readAsNewPlayer = async (path: string) =>
+      fetch(`${origin}/api/players/${nickname}${path}`, {
+        headers: { cookie: (await signInPlayer(auth)).cookie },
+      });
+
+    expect((await readAsNewPlayer("")).status).toBe(200);
+    expect((await readAsNewPlayer("/progress")).status).toBe(200);
+    await expectRateLimited(await readAsNewPlayer("/progress"));
     await stop();
   });
 });

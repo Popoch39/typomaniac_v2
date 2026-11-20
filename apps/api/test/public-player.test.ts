@@ -165,17 +165,24 @@ test("the MMR is not in a Player's page", async () => {
     rank: { tier: "diamond", division: 4, lp: 5 },
   });
 
-  const body = await (await readPlayer(nickname)).text();
+  const response = await readPlayer(nickname);
 
-  expect(body).not.toContain("1987");
-  expect(body.toLowerCase()).not.toContain("mmr");
+  // Exactly these keys and values: no MMR, nor anything else of the Standing.
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    nickname,
+    avatarUrl: null,
+    ornament: { tier: "diamond", division: 4 },
+    rank: { tier: "diamond", division: 4, lp: 5 },
+    peakTier: null,
+  });
 });
 
 test("a Player reading pages beyond the progress limit is refused with 429 and told when to retry", async () => {
   const limitedRedis = await createTestRedis();
   try {
     const limited = createApp(testDb.db, auth, limitedRedis.redis, getLogger("api"), {
-      rateLimit: { limits: { progress: { max: 2, windowSeconds: 60 } } },
+      rateLimit: { limits: { publicReadPerRequester: { max: 2, windowSeconds: 60 } } },
     });
     const nickname = uniqueNickname("Busy");
     await playerNamed(nickname);
