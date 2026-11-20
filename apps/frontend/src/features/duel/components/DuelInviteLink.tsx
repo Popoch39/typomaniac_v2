@@ -1,7 +1,9 @@
-import { useDuelInviteLink } from "../hooks/useDuelInviteLink.ts";
+interface DuelInviteLinkProps {
+  /** `null` once the Opponent has arrived. */
+  link: string | null;
+}
 
-export function DuelInviteLink() {
-  const link = useDuelInviteLink();
+export function DuelInviteLink({ link }: DuelInviteLinkProps) {
   if (link === null) return null;
 
   return (

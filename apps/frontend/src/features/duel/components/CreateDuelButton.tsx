@@ -1,3 +1,4 @@
+import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { useCreateDuel } from "../hooks/useCreateDuel.ts";
 
@@ -9,11 +10,7 @@ export function CreateDuelButton() {
       <Keycap type="button" variant="brand" size="lg" onClick={create} disabled={isPending}>
         {isPending ? "Creating…" : "Create a Duel"}
       </Keycap>
-      {failure && (
-        <p role="alert" className="m-0 text-danger">
-          {failure}
-        </p>
-      )}
+      <DangerStatusLine message={failure} />
     </div>
   );
 }
