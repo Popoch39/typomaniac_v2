@@ -12,6 +12,7 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/typing-engine/package.json ./packages/typing-engine/
 COPY packages/duel-engine/package.json ./packages/duel-engine/
 COPY packages/ranked-engine/package.json ./packages/ranked-engine/
+COPY packages/fair-play-engine/package.json ./packages/fair-play-engine/
 COPY packages/matchmaking-engine/package.json ./packages/matchmaking-engine/
 COPY packages/redis/package.json ./packages/redis/
 COPY packages/db/package.json ./packages/db/
@@ -24,6 +25,7 @@ RUN bun install --frozen-lockfile --filter api
 COPY packages/typing-engine ./packages/typing-engine
 COPY packages/duel-engine ./packages/duel-engine
 COPY packages/ranked-engine ./packages/ranked-engine
+COPY packages/fair-play-engine ./packages/fair-play-engine
 COPY packages/matchmaking-engine ./packages/matchmaking-engine
 COPY packages/redis ./packages/redis
 COPY packages/db ./packages/db

@@ -91,6 +91,9 @@ export const account = pgTable(
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
     scope: text("scope"),
     password: text("password"),
+    // When the provider made the GitHub or Discord account, recorded at each sign-in: ranked play
+    // waits until it is old enough (ADR 0014). Null until the account's first sign-in that records it.
+    providerCreatedAt: timestamp("provider_created_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .$onUpdate(() => /* @__PURE__ */ new Date())

@@ -3,6 +3,7 @@ import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
 import { queueQueryOptions } from "../api/queueQueryOptions.ts";
+import { accountAgeRefusalOf } from "../refusal/accountAgeRefusalOf.ts";
 import { parseQueueMessage } from "../message/parseQueueMessage.ts";
 
 type QueueSocketHandlers = {
@@ -36,7 +37,7 @@ async function findRefusal() {
     await queryClient.fetchQuery(queueQueryOptions());
     return UNREACHABLE;
   } catch (error) {
-    return describeApiError(error, REFUSALS);
+    return accountAgeRefusalOf(error) ?? describeApiError(error, REFUSALS);
   }
 }
 

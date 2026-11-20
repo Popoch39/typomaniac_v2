@@ -7,6 +7,15 @@ const rankedDuelUnfinished = t.Object({
   duelId: t.String(),
 });
 
+// The Player's GitHub or Discord account is too young for ranked: it opens at `opensAt`. Or its age is
+// not recorded yet, and signing in again records it.
+// The protection's own refusal of a Player without a Nickname shares the status, so it is listed too.
+const forbidden = t.Union([
+  t.Object({ code: t.Literal("ACCOUNT_TOO_YOUNG"), opensAt: t.Number() }),
+  t.Object({ code: t.Literal("ACCOUNT_AGE_UNKNOWN") }),
+  t.Object({ code: t.Literal("NICKNAME_REQUIRED") }),
+]);
+
 const lp = t.Integer();
 
 // The shapes the `standing` and `ornament` modules answer with, written again since a model is not
@@ -55,6 +64,7 @@ export const RootGet = {
   Response: {
     // The instant the Player entered the Queue, `null` when they are not queued.
     200: t.Object({ queuedAt: t.Union([t.Number(), t.Null()]) }),
+    403: forbidden,
     409: rankedDuelUnfinished,
   },
 };
@@ -80,6 +90,7 @@ export const Socket = {
       t.Object({ type: t.Literal("paired"), duelId: t.String() }),
     ]),
     // The other statuses refuse the upgrade.
+    403: forbidden,
     409: rankedDuelUnfinished,
     429: RateLimited,
   },

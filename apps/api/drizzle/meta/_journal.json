@@ -85,6 +85,13 @@
       "when": 1795117557324,
       "tag": "0011_duel_game_multiplier",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795188259908,
+      "tag": "0012_account_provider_created_at",
+      "breakpoints": true
     }
   ]
 }
