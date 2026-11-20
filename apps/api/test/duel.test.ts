@@ -780,6 +780,30 @@ test("a Custom Duel accepts an insert of several characters and one no keyDown a
   }
 });
 
+test("a Custom Duel ignores the browser's hints: nothing of them is relayed nor saved", async () => {
+  const { creator, opponent, words, duelId, stop } = await startDuel(0);
+  try {
+    const sockets = [creator, opponent] as const;
+    creator.send({ type: "hints", round: 1, hints: { scriptedKeys: 7, automated: true } });
+    playGame(creator, 1, `${words[0]} `);
+    playGame(opponent, 1);
+    const second = await awaitStart(sockets, 2);
+    playGame(creator, 2, `${second.words[0]} `);
+    playGame(opponent, 2);
+    const received = await messagesUntilEnd(opponent);
+
+    expect(JSON.stringify(received)).not.toContain("scriptedKeys");
+    expect(
+      await testDb.db
+        .select({ hints: duelGame.hints })
+        .from(duelGame)
+        .where(eq(duelGame.duelId, duelId)),
+    ).toEqual([{ hints: null }, { hints: null }, { hints: null }, { hints: null }]);
+  } finally {
+    await stop();
+  }
+});
+
 test("an Event naming another Round than the current one is ignored", async () => {
   const { creator, opponent, reopenCreator, stop } = await startDuel(0);
   try {
@@ -1387,6 +1411,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: creatorJournal,
         outcome: "win",
         multiplier: 1,
+        hints: null,
       },
       {
         duelId,
@@ -1396,6 +1421,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: guestJournal,
         outcome: "loss",
         multiplier: 1,
+        hints: null,
       },
       {
         duelId,
@@ -1405,6 +1431,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: secondJournals[0],
         outcome: "win",
         multiplier: 1,
+        hints: null,
       },
       {
         duelId,
@@ -1414,6 +1441,7 @@ test("a finished Duel is saved once it ends as one Duel of the custom kind, with
         journal: secondJournals[1],
         outcome: "loss",
         multiplier: 1,
+        hints: null,
       },
     ]);
     // A Custom Duel keeps no Standing: the ranked columns stay empty.

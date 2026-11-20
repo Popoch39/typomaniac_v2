@@ -115,6 +115,7 @@ test("a Duel saved before the migration reads as a single-Round Custom Duel, and
       journal: journals[0],
       outcome: "win",
       multiplier: 1,
+      hints: null,
     },
     {
       duelId,
@@ -124,6 +125,7 @@ test("a Duel saved before the migration reads as a single-Round Custom Duel, and
       journal: journals[1],
       outcome: "loss",
       multiplier: 1,
+      hints: null,
     },
   ]);
   expect(

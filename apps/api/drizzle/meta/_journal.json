@@ -134,6 +134,13 @@
       "when": 1795191658263,
       "tag": "0018_game_analysis",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795192145872,
+      "tag": "0019_duel_game_hints",
+      "breakpoints": true
     }
   ]
 }

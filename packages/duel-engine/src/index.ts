@@ -16,6 +16,7 @@ export {
 } from "./constants.ts";
 export { VIOLATION_CLOSE_REASON } from "./messages.ts";
 export type {
+  BrowserHints,
   ClientMessage,
   FinishedRound,
   Participant,

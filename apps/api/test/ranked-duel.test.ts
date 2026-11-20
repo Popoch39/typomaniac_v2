@@ -744,6 +744,41 @@ test("a ranked Game typed one key at a time, with key rollover and a held key, r
   opponent.socket.close();
 });
 
+const savedHints = (duelId: string) =>
+  testDb.db
+    .select({ round: duelGame.round, seat: duelGame.seat, hints: duelGame.hints })
+    .from(duelGame)
+    .where(eq(duelGame.duelId, duelId))
+    .orderBy(duelGame.round, duelGame.seat);
+
+test("the browser's hints on a ranked Game are saved with that seat's Game, once per Round, and the Opponent receives nothing of them", async () => {
+  const { duelId, players } = await openRankedDuel();
+  const [hinted, opponent] = players;
+  await startFirstRound(players);
+
+  hinted.socket.send({ type: "hints", round: 1, hints: { scriptedKeys: 7, automated: true } });
+  // A second message for the same Round changes nothing: the hints are sent once.
+  hinted.socket.send({ type: "hints", round: 1, hints: { scriptedKeys: 0, automated: false } });
+  for (const { socket } of players)
+    socket.send({ type: "event", round: 1, event: { type: "tick", at: 30_010 } });
+  for (const player of players) await nextOfType(player, "roundEnd");
+  await play(players, ["first", "first"], 2);
+
+  const hintedRound = (seat: number) =>
+    seat === hinted.seat ? { scriptedKeys: 7, automated: true } : null;
+  // The first Round is drawn, the next two won: three Rounds, two Games each.
+  expect(await savedHints(duelId)).toEqual([
+    { round: 1, seat: 0, hints: hintedRound(0) },
+    { round: 1, seat: 1, hints: hintedRound(1) },
+    { round: 2, seat: 0, hints: null },
+    { round: 2, seat: 1, hints: null },
+    { round: 3, seat: 0, hints: null },
+    { round: 3, seat: 1, hints: null },
+  ]);
+  expect(JSON.stringify(opponent.received)).not.toContain("scriptedKeys");
+  for (const { socket } of players) socket.close();
+});
+
 test("each Player of a ranked Duel is shown both Avatars, none for a Player without a picture", async () => {
   const avatarUrl = "https://avatars.githubusercontent.com/u/2?v=4";
   const { players } = await openRankedDuel([], { images: [avatarUrl] });

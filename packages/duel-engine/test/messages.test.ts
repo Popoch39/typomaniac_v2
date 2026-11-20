@@ -13,6 +13,7 @@ const finished = applyEvent(
 const clientMessages: ClientMessage[] = [
   { type: "ping", clientAt: 1000 },
   { type: "event", round: 1, event: { type: "keyDown", at: 1200, code: "KeyC" } },
+  { type: "hints", round: 1, hints: { scriptedKeys: 3, automated: true } },
 ];
 
 const serverMessages: ServerMessage[] = [

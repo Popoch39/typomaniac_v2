@@ -1,0 +1,1 @@
+ALTER TABLE "duel_game" ADD COLUMN "hints" jsonb;

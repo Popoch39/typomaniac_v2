@@ -38,7 +38,12 @@ test("PURE-1: the next Sanction for a Violation depends on the count alone and p
   expect(JSON.parse(JSON.stringify(sanction))).toEqual(sanction);
 });
 
-const played = { config: DUEL_GAME_CONFIG, targetWords, journal: typeJournal(person(90)) };
+const played = {
+  config: DUEL_GAME_CONFIG,
+  targetWords,
+  journal: typeJournal(person(90)),
+  hints: { scriptedKeys: 2, automated: false },
+};
 
 test("PURE-1: reading the signals of a Game never modifies its journal nor its Target words", () => {
   const untouched = structuredClone(played);

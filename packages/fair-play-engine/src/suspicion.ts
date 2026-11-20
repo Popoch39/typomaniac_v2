@@ -11,9 +11,11 @@ export const SUSPICION_GAMES = 20;
 export const SIGNAL_WEIGHTS: GameSignals = {
   keyPressEvenness: 0.25,
   holdEvenness: 0.2,
-  missingRollover: 0.2,
-  flatWordSpeed: 0.2,
-  superhumanSpeed: 0.15,
+  missingRollover: 0.15,
+  flatWordSpeed: 0.15,
+  superhumanSpeed: 0.1,
+  // A hint is as easy to forge as to leave out: it catches the laziest bots, never a careful one.
+  browserHints: 0.15,
 };
 
 const gameSuspicion = (signals: GameSignals) =>

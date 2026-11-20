@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { SIGNALS_VERSION } from "@repo/fair-play-engine";
 import type { Standing } from "@repo/ranked-engine";
+import type { BrowserHints } from "@repo/duel-engine";
 import type { GameEvent } from "@repo/typing-engine";
 import { gameAnalysis, sanction, suspicion } from "../src/db/client.ts";
 import { saveDuel } from "../src/modules/duel/service.ts";
@@ -28,6 +29,7 @@ const saveOneRoundDuel = async (
   kind: "ranked" | "custom",
   playerIds: readonly [string, string],
   journals: readonly [GameEvent[], GameEvent[]],
+  hints?: readonly [BrowserHints | null, BrowserHints | null],
 ) => {
   const duelId = crypto.randomUUID();
   await saveDuel(testDb.db, duelId, {
@@ -41,6 +43,7 @@ const saveOneRoundDuel = async (
         startAt: Date.now() - 30_000,
         endedAt: Date.now(),
         journals,
+        hints,
         results: [resultOf(journals[0]), resultOf(journals[1])],
         multipliers: [1, 1],
         outcomes: ["win", "loss"],
@@ -128,6 +131,7 @@ test("raising the signals' version makes the pass analyse the saved Games again"
     missingRollover: 0,
     flatWordSpeed: 0,
     superhumanSpeed: 0,
+    browserHints: 0,
   };
   await testDb.db
     .update(gameAnalysis)
@@ -165,4 +169,28 @@ test("ranked Games typed by a script raise the Player's Suspicion, one unusual G
     await readStanding(testDb.db, scriptId),
     await readStanding(testDb.db, personId),
   ]).toEqual(standings);
+});
+
+test("the browser's hints saved with a ranked Game are a signal of its Player's Suspicion, shown with its value in the Game's analysis", async () => {
+  const [botId, personId] = [await signInRanked(), await signInRanked()];
+  const duelIds = [];
+  for (let duel = 0; duel < 20; duel++)
+    duelIds.push(
+      await saveOneRoundDuel(
+        "ranked",
+        [botId, personId],
+        [personJournal(duel), personJournal(duel + 100)],
+        [{ scriptedKeys: 0, automated: true }, null],
+      ),
+    );
+
+  await runFairPlayPass(testDb.db, Date.now());
+
+  const [bot, person] = await analysesOf(duelIds[0] ?? "");
+  expect(bot?.signals.browserHints).toBe(1);
+  expect(person?.signals.browserHints).toBe(0);
+  // Typed like a person in every other way: the hints alone raise the Suspicion.
+  expect((await suspicionOf(botId))?.value).toBeGreaterThan(
+    (await suspicionOf(personId))?.value ?? 1,
+  );
 });

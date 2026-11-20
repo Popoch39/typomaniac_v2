@@ -39,6 +39,7 @@ import {
   readDuel,
   readJournals,
   readRounds,
+  recordHints,
   recordViolation,
   releaseSeat,
   replayGame,
@@ -307,8 +308,18 @@ export const createDuelRoutes = (
             return;
           }
           const seating = seated.get(ws.id);
-          const { event } = message;
           if (!seating || message.round !== seating.round) return;
+          // Saved with the Game for the fair-play pass, never relayed: the Opponent has no use for
+          // them. A Custom Duel is never analysed, so it keeps none (ADR 0014).
+          if (message.type === "hints") {
+            if (seating.ranked)
+              await recordHints(redis, ws.params.id, seating.round, seating.participant.seat, {
+                hints: message.hints,
+                expiryMs,
+              });
+            return;
+          }
+          const { event } = message;
           const { status, startedAt } = seating.game;
           const { startAt } = seating;
           if (!isEventAccepted(event, { status, startAt, now })) return;
