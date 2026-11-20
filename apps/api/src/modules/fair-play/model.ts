@@ -69,12 +69,39 @@ const rank = t.Union([
   t.Object({ tier: t.Literal("master"), lp }),
 ]);
 
+// Written again from the `duel` module: the journal as saved, to be replayed by the typing engine.
+const at = t.Number();
+const gameEvent = t.Union([
+  t.Object({ type: t.Literal("start"), at }),
+  t.Object({ type: t.Literal("keyDown"), at, code: t.String() }),
+  t.Object({ type: t.Literal("keyUp"), at, code: t.String() }),
+  t.Object({ type: t.Literal("insert"), at, text: t.String() }),
+  t.Object({
+    type: t.Literal("delete"),
+    at,
+    unit: t.Union([t.Literal("char"), t.Literal("word")]),
+  }),
+  t.Object({ type: t.Literal("tick"), at }),
+  t.Object({ type: t.Literal("addWords"), words: t.Immutable(t.Array(t.String())) }),
+]);
+
 // One saved ranked Game of the reviewed Player, with what each signal said of it, in the order of the
 // fair-play engine's signals; null while the fair-play pass has not read it yet.
 const reviewedGame = t.Object({
   round: t.Integer(),
   outcome,
   signals: t.Nullable(t.Array(t.Object({ name: t.String(), value: t.Number() }))),
+  // What the replay is drawn from: the Target words of the Round and the journal of the seat.
+  words: t.Array(t.String()),
+  journal: t.Array(gameEvent),
+  // The part of the saved Result the replay ends on.
+  result: t.Object({
+    duration: t.Number(),
+    wpm: t.Number(),
+    rawWpm: t.Number(),
+    accuracy: t.Number(),
+    consistency: t.Number(),
+  }),
 });
 
 export const AdminReviewsIdGet = {
