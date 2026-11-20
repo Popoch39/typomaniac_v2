@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { rankedOpensAt } from "../src/index.ts";
+import { nextViolationSanction, rankedOpensAt } from "../src/index.ts";
 
 test("PURE-1: reading when ranked opens never modifies the creation dates it receives", () => {
   const createdAts = [Date.UTC(2026, 10, 1), null];
@@ -22,4 +22,11 @@ test("PURE-1: the creation dates and the instant pass through JSON unchanged", (
 
   expect(JSON.parse(JSON.stringify(createdAts))).toEqual(createdAts);
   expect(JSON.parse(JSON.stringify(opensAt))).toBe(opensAt);
+});
+
+test("PURE-1: the next Sanction for a Violation depends on the count alone and passes through JSON unchanged", () => {
+  const sanction = nextViolationSanction(2);
+
+  expect(nextViolationSanction(2)).toEqual(sanction);
+  expect(JSON.parse(JSON.stringify(sanction))).toEqual(sanction);
 });

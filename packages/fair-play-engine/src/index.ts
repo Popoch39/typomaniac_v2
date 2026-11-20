@@ -1,2 +1,4 @@
 export { MIN_ACCOUNT_AGE_MS, rankedOpensAt } from "./account-age.ts";
 export { FIRST_SUSPENSION_MS, LONGER_SUSPENSION_MS, REPAIR_WINDOW_MS } from "./constants.ts";
+export { nextViolationSanction } from "./violation.ts";
+export type { ViolationSanction } from "./violation.ts";

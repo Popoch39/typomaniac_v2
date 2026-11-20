@@ -21,6 +21,14 @@ A throwaway GitHub or Discord account must cost time before it can play ranked (
 | AGE-2 | With two linked accounts, the older one counts: linking a new account never closes the Queue.                                                                                           |
 | AGE-3 | An account whose creation instant is not recorded yet is left out; with none recorded, the instant ranked opens is unknown, and the Player is asked to sign in again, which records it. |
 
+## Violations
+
+A Violation is proof, so it is the only cheating sanctioned automatically, one step up the Sanctions at each repeat (ADR 0014). A first one only voids the Duel: a browser extension can produce one for a Player who is not cheating (ADR 0016).
+
+| Id          | Rule                                                                                                                                                                                          |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| VIOLATION-1 | A Player's first sanctioned Violation voids its Duel, the second suspends them for 3 days, the third for 14 days, and the fourth and any after it ban them. Several in one Duel count as one. |
+
 ## Purity
 
 | Id     | Rule                                                                                                                                              |
