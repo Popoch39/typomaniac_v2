@@ -60,6 +60,13 @@ const progressGame = t.Object({
   consistency: t.Number(),
 });
 
+// The Duels of the Progress by their Duel Outcome for the Player, each counted once.
+const progressSummary = t.Object({
+  won: t.Integer(),
+  lost: t.Integer(),
+  drawn: t.Integer(),
+});
+
 export const NicknameGet = {
   Params: t.Object({ nickname: t.String() }),
   Response: {
@@ -79,7 +86,7 @@ export const NicknameProgressGet = {
   }),
   Response: {
     // Oldest first.
-    200: t.Object({ games: t.Array(progressGame) }),
+    200: t.Object({ games: t.Array(progressGame), summary: progressSummary }),
     404: t.Object({ code: t.Literal("PLAYER_NOT_FOUND") }),
     429: RateLimited,
   },

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { DUEL_GAME_CONFIG, type Seat } from "@repo/duel-engine";
+import { DUEL_GAME_CONFIG, type Outcome, type Seat } from "@repo/duel-engine";
 import { getLogger } from "@repo/logger";
 import type { GameEvent, Result } from "@repo/typing-engine";
 import { createApp } from "../src/app.ts";
@@ -65,9 +65,17 @@ const JOURNAL: GameEvent[] = [{ type: "keyDown", at: 1, code: "KeyQ" }];
 
 const OPPONENT_MEASURES: Measures = { wpm: 1, rawWpm: 2, accuracy: 3, consistency: 4 };
 
+const OPPOSITE_OUTCOMES: Readonly<Record<Outcome, Outcome>> = {
+  win: "loss",
+  loss: "win",
+  draw: "draw",
+};
+
 /**
- * A finished Duel the Player sat in seat `seat`, one Game per entry of `games`, ended at `endedAt`.
- * The other seat is a Guest whose Games must never show in the Player's Progress.
+ * A finished Duel the Player sat in seat `seat`, one Game per entry of `games`, ended at `endedAt`,
+ * with `outcome` as its Duel Outcome for the Player and `roundOutcomes` as their Round Outcomes (each
+ * Round the Duel's Outcome when left out). The other seat is a Guest whose Games must never show in
+ * the Player's Progress.
  */
 const saveDuel = async (
   playerId: string,
@@ -76,7 +84,16 @@ const saveDuel = async (
     endedAt,
     games,
     seat = 0,
-  }: { kind: "ranked" | "custom"; endedAt: Date; games: Measures[]; seat?: Seat },
+    outcome = "win",
+    roundOutcomes = games.map(() => outcome),
+  }: {
+    kind: "ranked" | "custom";
+    endedAt: Date;
+    games: Measures[];
+    seat?: Seat;
+    outcome?: Outcome;
+    roundOutcomes?: Outcome[];
+  },
 ) => {
   const duelId = crypto.randomUUID();
   const opponentSeat: Seat = seat === 0 ? 1 : 0;
@@ -92,12 +109,12 @@ const saveDuel = async (
       duelId,
       seat,
       playerId,
-      outcome: "win",
+      outcome,
       ...(kind === "ranked"
         ? { mmrBefore: 1987, mmrAfter: 2011, duelsPlayedBefore: 12, duelsPlayedAfter: 13 }
         : {}),
     },
-    { duelId, seat: opponentSeat, playerId: null, outcome: "loss" },
+    { duelId, seat: opponentSeat, playerId: null, outcome: OPPOSITE_OUTCOMES[outcome] },
   ]);
   await testDb.db.insert(duelRound).values(
     games.map((_, index) => ({
@@ -116,7 +133,7 @@ const saveDuel = async (
         seat,
         result: resultOf(measures),
         journal: JOURNAL,
-        outcome: "win" as const,
+        outcome: roundOutcomes[index] ?? outcome,
       },
       {
         duelId,
@@ -124,7 +141,7 @@ const saveDuel = async (
         seat: opponentSeat,
         result: resultOf(OPPONENT_MEASURES),
         journal: [],
-        outcome: "loss" as const,
+        outcome: OPPOSITE_OUTCOMES[roundOutcomes[index] ?? outcome],
       },
     ]),
   );
@@ -191,6 +208,7 @@ test("anyone without a session reads a Player's Games, oldest first, with their 
         consistency: 81.2,
       },
     ],
+    summary: { won: 2, lost: 0, drawn: 0 },
   });
 });
 
@@ -311,7 +329,7 @@ test("a Player who has not played a Duel has no Game", async () => {
   const response = await readProgress(nickname);
 
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ games: [] });
+  expect(await response.json()).toEqual({ games: [], summary: { won: 0, lost: 0, drawn: 0 } });
 });
 
 test("neither the journal nor the MMR is in the Progress", async () => {
@@ -364,4 +382,107 @@ test("a Player reading Progress beyond the progress limit is refused with 429 an
   } finally {
     await limitedRedis.drop();
   }
+});
+
+const summaryOf = async (response: Response) => {
+  expect(response.status).toBe(200);
+  const { summary } = (await response.json()) as { summary: unknown };
+  return summary;
+};
+
+// Three Games a Duel of three Rounds.
+const threeGames = (n: number) => [...gameAt(n), ...gameAt(n), ...gameAt(n)];
+
+test("the summary counts each Duel once by its Duel Outcome, whatever its Rounds' Outcomes", async () => {
+  const nickname = uniqueNickname("Record");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: at(1),
+    games: threeGames(1),
+    outcome: "win",
+    roundOutcomes: ["win", "loss", "win"],
+  });
+  await saveDuel(player.id, {
+    kind: "custom",
+    endedAt: at(2),
+    games: threeGames(2),
+    outcome: "loss",
+    roundOutcomes: ["win", "loss", "loss"],
+  });
+
+  expect(await summaryOf(await readProgress(nickname))).toEqual({ won: 1, lost: 1, drawn: 0 });
+});
+
+test("a drawn Duel counts as drawn, neither won nor lost", async () => {
+  const nickname = uniqueNickname("Even");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, {
+    kind: "custom",
+    endedAt: at(1),
+    games: [...gameAt(1), ...gameAt(1)],
+    outcome: "draw",
+    roundOutcomes: ["win", "loss"],
+  });
+  await saveDuel(player.id, { kind: "custom", endedAt: at(2), games: gameAt(2), outcome: "win" });
+
+  expect(await summaryOf(await readProgress(nickname))).toEqual({ won: 1, lost: 0, drawn: 1 });
+});
+
+test("the summary counts only the Duels the window selects", async () => {
+  const nickname = uniqueNickname("Tally");
+  const { player } = await playerNamed(nickname);
+  // Two lost Duels, older than 30 days, then 20 won and one drawn within them.
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: ago(40),
+    games: gameAt(1),
+    outcome: "loss",
+  });
+  await saveDuel(player.id, {
+    kind: "ranked",
+    endedAt: ago(31),
+    games: gameAt(2),
+    outcome: "loss",
+  });
+  await saveDuel(player.id, { kind: "custom", endedAt: ago(5), games: gameAt(3), outcome: "draw" });
+  for (let n = 4; n <= 23; n += 1)
+    await saveDuel(player.id, { kind: "ranked", endedAt: ago(0, 60 - n), games: gameAt(n) });
+
+  expect(await summaryOf(await readProgress(nickname))).toEqual({ won: 20, lost: 0, drawn: 0 });
+  expect(await summaryOf(await readProgress(nickname, { window: "30-days" }))).toEqual({
+    won: 20,
+    lost: 0,
+    drawn: 1,
+  });
+  expect(await summaryOf(await readProgress(nickname, { window: "all" }))).toEqual({
+    won: 20,
+    lost: 2,
+    drawn: 1,
+  });
+});
+
+test("the summary counts only the Duels of the kind the filter keeps", async () => {
+  const nickname = uniqueNickname("Sorted");
+  const { player } = await playerNamed(nickname);
+  await saveDuel(player.id, { kind: "ranked", endedAt: at(1), games: gameAt(1), outcome: "win" });
+  await saveDuel(player.id, { kind: "ranked", endedAt: at(2), games: gameAt(2), outcome: "loss" });
+  await saveDuel(player.id, { kind: "custom", endedAt: at(3), games: gameAt(3), outcome: "draw" });
+  await saveDuel(player.id, { kind: "custom", endedAt: at(4), games: gameAt(4), outcome: "loss" });
+
+  expect(await summaryOf(await readProgress(nickname, { kind: "ranked" }))).toEqual({
+    won: 1,
+    lost: 1,
+    drawn: 0,
+  });
+  expect(await summaryOf(await readProgress(nickname, { kind: "custom" }))).toEqual({
+    won: 0,
+    lost: 1,
+    drawn: 1,
+  });
+  expect(await summaryOf(await readProgress(nickname, { kind: "all" }))).toEqual({
+    won: 1,
+    lost: 2,
+    drawn: 1,
+  });
 });
