@@ -1,9 +1,11 @@
 import { SignInPrompt } from "../../auth/components/SignInPrompt.tsx";
 import { SignedInPlayerGate } from "../../auth/components/SignedInPlayerGate.tsx";
+import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Page } from "../../../shared/components/Page.tsx";
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
 import { RankedQueue } from "../../queue/components/RankedQueue.tsx";
 import { RankCard } from "./RankCard.tsx";
+import { RankedSkeleton } from "./RankedSkeleton.tsx";
 import { StandingGate } from "./StandingGate.tsx";
 import { TierLadder } from "./TierLadder.tsx";
 
@@ -14,7 +16,14 @@ export function RankedPage() {
         title="Ranked"
         lead="1v1 Duels, best of three Rounds. Win to earn LP and climb from Bronze to Master."
       />
+      {/* Both gates show the same skeleton, so that the session check and the Standing read look like
+          one wait. */}
       <SignedInPlayerGate
+        pending={
+          <LoadingState message="Checking your session…">
+            <RankedSkeleton />
+          </LoadingState>
+        }
         guest={
           <SignInPrompt explanation="Ranked play is for signed-in Players. Sign in to get access." />
         }
@@ -22,7 +31,14 @@ export function RankedPage() {
         {/* The page waits for the Standing as a whole, so that the Rank card is never pushed in next to
             a Queue already drawn. */}
         {(player) => (
-          <StandingGate player={player}>
+          <StandingGate
+            player={player}
+            pending={
+              <LoadingState message="Reading your Standing…">
+                <RankedSkeleton />
+              </LoadingState>
+            }
+          >
             {(standing) => (
               <>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
