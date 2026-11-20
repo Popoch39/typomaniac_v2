@@ -1,10 +1,10 @@
 import { useDuelPhase } from "../hooks/useDuelPhase.ts";
 import { DuelBroadcast } from "./DuelBroadcast.tsx";
+import { DuelConnecting } from "./DuelConnecting.tsx";
 import { DuelDisconnected } from "./DuelDisconnected.tsx";
-import { DuelInviteLink } from "./DuelInviteLink.tsx";
-import { DuelParticipants } from "./DuelParticipants.tsx";
 import { DuelReconnecting } from "./DuelReconnecting.tsx";
 import { DuelRefusal } from "./DuelRefusal.tsx";
+import { DuelWaiting } from "./DuelWaiting.tsx";
 
 export function DuelScreen() {
   const phase = useDuelPhase();
@@ -26,14 +26,9 @@ export function DuelScreen() {
   return (
     // Full screen outside the shell: a centred column with room around it, like the Game screen's padding.
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-8 py-16 text-left">
-      {phase === "connecting" && <p>Joining the Duel…</p>}
+      {phase === "connecting" && <DuelConnecting />}
       {phase === "refused" && <DuelRefusal />}
-      {phase === "waiting" && (
-        <>
-          <DuelParticipants />
-          <DuelInviteLink />
-        </>
-      )}
+      {phase === "waiting" && <DuelWaiting />}
       {phase === "disconnected" && <DuelDisconnected />}
       <DuelReconnecting />
     </main>

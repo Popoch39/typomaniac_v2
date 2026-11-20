@@ -1,4 +1,5 @@
 import { PageHeader } from "../../../shared/components/PageHeader.tsx";
+import { DevDuelStates } from "./DevDuelStates.tsx";
 import { DevLeaderboardStates } from "./DevLeaderboardStates.tsx";
 import { DevRankedStates } from "./DevRankedStates.tsx";
 import { DevRouteStates } from "./DevRouteStates.tsx";
@@ -14,6 +15,7 @@ export function DevStatesPage() {
       <DevRankedStates />
       <DevLeaderboardStates />
       <DevRouteStates />
+      <DevDuelStates />
     </main>
   );
 }
