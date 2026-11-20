@@ -18,6 +18,10 @@ _Avoid_: Username, user name, handle, identifier
 A person who plays without having signed in; nothing is kept for them.
 _Avoid_: Anonymous, visitor, signed-out user
 
+**Online**:
+A **Player** is Online while they have Typomaniac open, on any page and in any number of tabs; each Player counts once. **Guests** are never counted as Online.
+_Avoid_: connected, active, present
+
 **Avatar**:
 A **Player**'s picture, taken from their GitHub or Discord account when they sign up.
 _Avoid_: profile picture, pfp, image

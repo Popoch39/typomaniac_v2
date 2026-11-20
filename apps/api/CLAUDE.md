@@ -47,7 +47,7 @@ PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / d
 - Postgres local : `docker compose up -d` depuis la racine, puis copier `apps/api/.env.example` en `apps/api/.env` (`DATABASE_URL`). `dev`, `test` et `db:*` en ont besoin.
 - Le schéma vit dans `packages/db/src/schema.ts` (`@repo/db`, `drizzle-orm/pg-core`), partagé avec le worker de fair-play, qui lit les Duels enregistrés sans importer l'API ; `openDatabase`, `migrateDatabase` et `requireDatabaseUrl` vivent dans `packages/db/src/client.ts`. Les migrations restent à l'API, seule à migrer (ADR 0002) : après chaque changement du schéma, `bun run db:generate` depuis `apps/api/` (son `drizzle.config.ts` pointe sur le schéma du package), puis commit du dossier `apps/api/drizzle/` généré.
 - Schémas d'API : TypeBox 1.x (`t` d'Elysia) écrits à la main. `drizzle-orm/typebox`, cité par `.agents/skills/elysiajs/references/drizzle.md`, n'existe qu'en Drizzle 1.0 ; ne pas installer `drizzle-typebox` (TypeBox 0.x, incompatible avec Elysia 2).
-- `src/app.ts` exporte `createApp(db, auth, redis, logger, options?)`, les options facultatives réunies dans un seul objet `AppOptions` (`{ duel, queue, dev, lifecycle, rateLimit, fairPlay }`). La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
+- `src/app.ts` exporte `createApp(db, auth, redis, logger, options?)`, les options facultatives réunies dans un seul objet `AppOptions` (`{ duel, queue, dev, lifecycle, rateLimit, fairPlay, online }`). La DB est injectée, jamais importée par les routes. `src/index.ts` ouvre `DATABASE_URL`, migre (sous advisory lock), puis crée l'app.
 - Dans les tests : `const testDb = await createTestDb()` (`test/helpers/db.ts`) crée une base Postgres migrée propre au fichier ; `afterAll(() => testDb.drop())` la supprime. `createApp(testDb.db, createTestAuth(testDb.db), testRedis.redis, getLogger("api"))`.
 
 ## Redis
@@ -58,6 +58,7 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
 - `openRedis` et `requireRedisUrl` vivent dans `packages/redis` (`@repo/redis`), que le matchmaker utilise aussi ; `src/redis/client.ts` les ré-exporte et reste le seul chemin d'import dans l'API.
 - `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.
 - Redis est injecté comme la base : `createApp(db, auth, redis, logger)`.
+- Les Players Online (`src/modules/online/`) : un sorted set (clé `online`, score = instant du dernier ping) que `POST /api/online` met à jour et compte en un `EVAL`, sur une fenêtre de `ONLINE_WINDOW_MS` (option `online.windowMs` en test).
 - Dans les tests : `const testRedis = await createTestRedis()` (`test/helpers/redis.ts`) ouvre Redis sous un namespace propre au fichier ; `afterAll` appelle `testRedis.drop()`, qui efface ses clés et ferme les connexions.
 
 ## Logs
