@@ -78,6 +78,7 @@ test("PURE-1: deciding a Review never modifies what it is given, is the same for
     master: true,
     position: 2,
     gamesSinceLastReview: [readGameSignals(played)],
+    duelSignalsSinceLastReview: readDuelSignals(recentDuels),
   };
   const untouched = structuredClone(candidate);
   const reason = reviewToOpen(candidate);

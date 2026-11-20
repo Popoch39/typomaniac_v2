@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { SIGNAL_WEIGHTS, SIGNALS_VERSION } from "@repo/fair-play-engine";
 import type { Standing } from "@repo/ranked-engine";
 import type { GameEvent } from "@repo/typing-engine";
-import { gameAnalysis, sanction, suspicion } from "../src/db/client.ts";
+import { gameAnalysis, review, sanction, suspicion } from "../src/db/client.ts";
 import { saveDuel } from "../src/modules/duel/service.ts";
 import { runFairPlayPass } from "../src/modules/fair-play/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
@@ -232,4 +232,44 @@ test("the pass reads a level jump in the order the ranked Duels were played", as
 
   expect((await suspicionOf(risingId))?.duelSignals.levelJump).toBe(1);
   expect((await suspicionOf(fallingId))?.duelSignals.levelJump).toBe(0);
+});
+
+test("the signals across Duels read only the ranked Duels started after the Player's last settled Review, as the Review does", async () => {
+  const [winnerId, loserId] = [await signInRanked(), await signInRanked()];
+  const start = Date.now() - 60 * 60_000;
+  for (let duel = 0; duel < 6; duel++)
+    await saveOneRoundDuel(
+      "ranked",
+      [winnerId, loserId],
+      [personJournal(duel), idleJournal()],
+      start + duel * 60_000,
+    );
+  await runFairPlayPass(testDb.db, start + 10 * 60_000);
+  const settledAt = new Date(start + 11 * 60_000);
+  await testDb.db
+    .insert(review)
+    .values({
+      playerId: loserId,
+      reason: "suspicion",
+      openedAt: settledAt,
+      settledAt,
+      decision: "cleared",
+    });
+  await saveOneRoundDuel(
+    "ranked",
+    [loserId, await signInRanked()],
+    [personJournal(), personJournal(8)],
+    start + 20 * 60_000,
+  );
+
+  await runFairPlayPass(testDb.db, start + 30 * 60_000);
+
+  expect((await suspicionOf(loserId))?.duelSignals).toEqual({
+    levelJump: 0,
+    errorlessSeries: 0,
+    oneSidedPair: 0,
+    lossWithoutTyping: 0,
+  });
+  // The winner was never reviewed: all their Duels still count.
+  expect((await suspicionOf(winnerId))?.duelSignals.oneSidedPair).toBe(1);
 });

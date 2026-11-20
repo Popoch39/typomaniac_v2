@@ -53,7 +53,7 @@ What a Player's recent ranked Duels say together, where no single Game says anyt
 | ACROSS-2 | `errorlessSeries`: Games in a row without a single incorrect Keystroke. A series of 5 or fewer reads 0, one of 15 or more reads 1. A Game in which the Player typed nothing ends a series.                                                       |
 | ACROSS-3 | `oneSidedPair`: an Opponent met again and again, one of the two always winning. Two meetings or fewer read 0, five or more read 1; an Opponent who won or lost no more than 60% of them reads 0. It reads the most one-sided Opponent.           |
 | ACROSS-4 | `lossWithoutTyping`: ranked Duels lost without a single Keystroke in any of their Games. One reads 0, three or more read 1. A Duel drawn or won without typing is not counted.                                                                   |
-| ACROSS-5 | The signals across Duels read the Player's `SUSPICION_DUELS` (20) most recent ranked Duels, and no older one.                                                                                                                                    |
+| ACROSS-5 | The signals across Duels read the Player's `SUSPICION_DUELS` (20) most recent ranked Duels started after their last settled Review, and no older one, as the Games of REVIEW-4.                                                                  |
 
 ## Suspicion
 
@@ -70,12 +70,12 @@ How strongly a Player's ranked Games look like they were not typed by a person. 
 
 When a person looks at a Player (ADR 0014). A Review never sanctions by itself, and a Player under Review plays ranked as usual and is told nothing.
 
-| Id       | Rule                                                                                                                                                                                 |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| REVIEW-1 | A Player whose Suspicion passes `SUSPICION_THRESHOLD` (0.6), a starting value kept high, gets a Review with reason Suspicion.                                                        |
-| REVIEW-2 | A Player whose Rank is Master gets a Review with reason Master, and one on the Podium (the first `PODIUM_POSITIONS`, 3) one with reason Podium, whatever their Suspicion; each once. |
-| REVIEW-3 | At most one Review is open per Player: none opens, whatever the reason, while one is.                                                                                                |
-| REVIEW-4 | The Suspicion that opens a Review is read only from the Games played after the Player's last settled Review, the missing ones counting as ordinary: no Game is judged twice.         |
+| Id       | Rule                                                                                                                                                                                                      |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REVIEW-1 | A Player whose Suspicion passes `SUSPICION_THRESHOLD` (0.6), a starting value kept high, gets a Review with reason Suspicion.                                                                             |
+| REVIEW-2 | A Player whose Rank is Master gets a Review with reason Master, and one on the Podium (the first `PODIUM_POSITIONS`, 3) one with reason Podium, whatever their Suspicion; each once.                      |
+| REVIEW-3 | At most one Review is open per Player: none opens, whatever the reason, while one is.                                                                                                                     |
+| REVIEW-4 | The Suspicion that opens a Review is read only from the Games played and the ranked Duels started after the Player's last settled Review, the missing ones counting as ordinary: no Game is judged twice. |
 
 ## Purity
 

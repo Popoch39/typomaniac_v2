@@ -5,6 +5,7 @@ import {
   duelParticipant,
   duelRound,
   gameAnalysis,
+  review,
   suspicion,
   type Transaction,
   user,
@@ -18,7 +19,7 @@ import {
   SUSPICION_DUELS,
   SUSPICION_GAMES,
 } from "@repo/fair-play-engine";
-import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 // A ranked Game of a Player, saved by `at`, that no analysis of the current signals has read yet:
@@ -119,7 +120,9 @@ const updateSuspicion = async (tx: Transaction, playerId: string, at: Date) => {
     )
     .orderBy(desc(duel.endedAt), desc(gameAnalysis.round))
     .limit(SUSPICION_GAMES);
-  const duelSignals = readDuelSignals(await recentDuels(tx, playerId, at));
+  const duelSignals = readDuelSignals(
+    await recentDuels(tx, playerId, at, await lastSettledReviewAt(tx, playerId)),
+  );
   const computed = {
     value: playerSuspicion(
       recent.map(({ signals }) => signals),
@@ -136,9 +139,28 @@ const updateSuspicion = async (tx: Transaction, playerId: string, at: Date) => {
 
 const opponent = alias(duelParticipant, "opponent");
 
-// ACROSS-5: the Player's most recent ranked Duels saved by `at`, newest first, each with its Opponent
-// and the Player's own Games in Round order.
-const recentDuels = async (tx: Transaction, playerId: string, at: Date): Promise<RankedDuel[]> => {
+/** When the Player's last settled Review was settled, null when none was. */
+export const lastSettledReviewAt = async (tx: Transaction, playerId: string) => {
+  const [last] = await tx
+    .select({ settledAt: review.settledAt })
+    .from(review)
+    .where(and(eq(review.playerId, playerId), isNotNull(review.settledAt)))
+    .orderBy(desc(review.settledAt))
+    .limit(1);
+  return last?.settledAt ?? null;
+};
+
+/**
+ * ACROSS-5: the Player's most recent ranked Duels saved by `at` and started after `since`, their last
+ * settled Review, newest first, each with its Opponent and the Player's own Games in Round order. The
+ * same window as the Games of REVIEW-4, so that no Duel is judged twice either.
+ */
+export const recentDuels = async (
+  tx: Transaction,
+  playerId: string,
+  at: Date,
+  since: Date | null,
+): Promise<RankedDuel[]> => {
   const duels = await tx
     .select({
       duelId: duelParticipant.duelId,
@@ -153,7 +175,12 @@ const recentDuels = async (tx: Transaction, playerId: string, at: Date): Promise
       and(eq(opponent.duelId, duelParticipant.duelId), ne(opponent.seat, duelParticipant.seat)),
     )
     .where(
-      and(eq(duelParticipant.playerId, playerId), eq(duel.kind, "ranked"), lte(duel.endedAt, at)),
+      and(
+        eq(duelParticipant.playerId, playerId),
+        eq(duel.kind, "ranked"),
+        lte(duel.endedAt, at),
+        since ? gt(duel.startedAt, since) : undefined,
+      ),
     )
     .orderBy(desc(duel.endedAt))
     .limit(SUSPICION_DUELS);

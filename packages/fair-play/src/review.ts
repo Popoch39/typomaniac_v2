@@ -11,6 +11,7 @@ import {
 } from "@repo/db";
 import {
   PODIUM_POSITIONS,
+  readDuelSignals,
   reviewToOpen,
   SIGNALS_VERSION,
   SUSPICION_GAMES,
@@ -18,6 +19,7 @@ import {
 } from "@repo/fair-play-engine";
 import { ladderIndex } from "@repo/ranked-engine";
 import { and, asc, desc, eq, gt, gte, isNotNull, isNull } from "drizzle-orm";
+import { recentDuels } from "./analysis.ts";
 
 const MASTER_LADDER_INDEX = ladderIndex({ tier: "master", lp: 0 });
 
@@ -118,6 +120,7 @@ const openReviewIn = async (
     master,
     position,
     gamesSinceLastReview: recent.map(({ signals }) => signals),
+    duelSignalsSinceLastReview: readDuelSignals(await recentDuels(tx, playerId, at, lastSettledAt)),
   });
   if (reason) await tx.insert(review).values({ playerId, reason, openedAt: at });
 };

@@ -1,3 +1,4 @@
+import type { DuelSignals } from "./duel-signals.ts";
 import type { GameSignals } from "./signals.ts";
 import { playerSuspicion } from "./suspicion.ts";
 
@@ -23,12 +24,14 @@ export type ReviewCandidate = {
   readonly position: number | null;
   /** The signals of their ranked Games played after their last settled Review, newest first. */
   readonly gamesSinceLastReview: readonly GameSignals[];
+  /** The signals across their ranked Duels started after their last settled Review. */
+  readonly duelSignalsSinceLastReview: DuelSignals;
 };
 
 /**
  * REVIEW-1 to REVIEW-4: the reason to open a Review for a Player, or null when none is due. Reaching
  * Master, then the Podium, opens one once each; Suspicion past the threshold, read from the Games
- * played since the last settled Review only, opens one each time; never while one is open.
+ * played and the Duels started since the last settled Review only, opens one each time; never while one is open.
  */
 export const reviewToOpen = ({
   underReview,
@@ -36,11 +39,13 @@ export const reviewToOpen = ({
   master,
   position,
   gamesSinceLastReview,
+  duelSignalsSinceLastReview,
 }: ReviewCandidate): ReviewReason | null => {
   if (underReview) return null;
   if (master && !reasonsOpenedBefore.includes("master")) return "master";
   const onPodium = position !== null && position <= PODIUM_POSITIONS;
   if (onPodium && !reasonsOpenedBefore.includes("podium")) return "podium";
-  if (playerSuspicion(gamesSinceLastReview) > SUSPICION_THRESHOLD) return "suspicion";
+  if (playerSuspicion(gamesSinceLastReview, duelSignalsSinceLastReview) > SUSPICION_THRESHOLD)
+    return "suspicion";
   return null;
 };
