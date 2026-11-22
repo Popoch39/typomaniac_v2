@@ -28,6 +28,12 @@ export const RATE_LIMITS = {
   queueSocket: { max: 20, windowSeconds: 60 },
   /** Reports made, per Player: one per Duel already, this stops a Player spamming them across Duels. */
   report: { max: 10, windowSeconds: 60 },
+  /** Friend requests sent, per Player, so that nobody floods others with them. */
+  friendRequest: { max: 10, windowSeconds: 60 },
+  /** Reads of the Friends, the Friend requests and the Nickname search, per Player. */
+  friendRead: { max: 120, windowSeconds: 60 },
+  /** Friend requests accepted, declined or cancelled, and Friends removed, per Player. */
+  friendChange: { max: 60, windowSeconds: 60 },
   /** Reads of a Player's public page and Progress, per Player or Guest. */
   publicReadPerRequester: { max: 60, windowSeconds: 60 },
   /** Reads of a Player's public page and Progress, per IP. */
