@@ -74,15 +74,27 @@ export const proposePairing = async (
   return proposed === 1;
 };
 
-/** The two Players of a Pairing awaiting acceptance, `null` once it is accepted by both or resolved. */
+/**
+ * The two Players of a Pairing awaiting acceptance, the instant their time to accept ends and the
+ * Player ids of those who accepted; `null` once it is accepted by both or resolved.
+ */
 export const readPairing = async (redis: Redis, pairingId: string) => {
-  const [first, second] = await redis.client.hmget(
+  const [first, second, expiresAt, firstAccepted, secondAccepted] = await redis.client.hmget(
     pairingKey(redis, pairingId),
     "player0",
     "player1",
+    "expiresAt",
+    "accepted0",
+    "accepted1",
   );
   if (!first || !second) return null;
-  return { playerIds: [first, second] as const };
+  return {
+    playerIds: [first, second] as const,
+    expiresAt: Number(expiresAt),
+    acceptedBy: [firstAccepted ? first : null, secondAccepted ? second : null].filter(
+      (playerId) => playerId !== null,
+    ),
+  };
 };
 
 /** A hash the second acceptance creates, with the fields it is created with. */
