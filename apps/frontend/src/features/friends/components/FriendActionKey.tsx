@@ -6,8 +6,9 @@ interface FriendActionKeyProps {
   labels: readonly string[];
   label: string;
   disabled: boolean;
-  onPress: () => void;
+  onPress?: () => void;
   variant?: "neutral" | "action";
+  size?: "sm" | "lg";
 }
 
 export function FriendActionKey({
@@ -16,9 +17,10 @@ export function FriendActionKey({
   disabled,
   onPress,
   variant = "neutral",
+  size = "sm",
 }: FriendActionKeyProps) {
   return (
-    <Keycap type="button" variant={variant} size="sm" onClick={onPress} disabled={disabled}>
+    <Keycap type="button" variant={variant} size={size} onClick={onPress} disabled={disabled}>
       {/* Every label stacked in one cell, the hidden ones keeping the key at the longest's size. */}
       <span aria-live="polite" className="grid">
         {labels.map((each) => (

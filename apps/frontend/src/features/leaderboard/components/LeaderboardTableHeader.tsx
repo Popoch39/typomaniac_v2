@@ -9,8 +9,12 @@ export function LeaderboardTableHeader() {
         </TableHead>
         <TableHead className="h-auto p-4 type-table-head text-ink-subtle">Player</TableHead>
         <TableHead className="h-auto p-4 type-table-head text-ink-subtle">Rank</TableHead>
-        <TableHead className="h-auto w-30 py-4 pr-6 pl-4 text-right type-table-head text-ink-subtle">
+        <TableHead className="h-auto w-30 p-4 text-right type-table-head text-ink-subtle">
           LP
+        </TableHead>
+        {/* Kept for every reader, a Guest too, so that the columns never move once the session is read. */}
+        <TableHead className="h-auto w-52 py-4 pr-6 pl-4">
+          <span className="sr-only">Friend</span>
         </TableHead>
       </TableRow>
     </TableHeader>

@@ -7,6 +7,7 @@ import { PlayerPageSkeleton } from "./PlayerPageSkeleton.tsx";
 import { PlayerPanel } from "./PlayerPanel.tsx";
 import { PlayerRankCard } from "./PlayerRankCard.tsx";
 import { ProgressSection } from "../../progress/components/ProgressSection.tsx";
+import { AddFriendSlot } from "../../friends/components/AddFriendSlot.tsx";
 
 export function PlayerPage() {
   const nickname = usePlayerPageNickname();
@@ -22,10 +23,10 @@ export function PlayerPage() {
           </LoadingState>
         }
       >
-        {(player, progress, isProgressUpdating) => (
+        {(player, progress, isProgressUpdating, addFriend) => (
           <div className="flex flex-col gap-7 pb-2.5">
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7">
-              <PlayerPanel player={player} />
+              <PlayerPanel player={player} action={<AddFriendSlot target={addFriend} />} />
               <PlayerRankCard rank={player.rank} />
             </div>
             <ProgressSection

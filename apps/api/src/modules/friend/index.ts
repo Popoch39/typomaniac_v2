@@ -10,6 +10,7 @@ import {
   deleteFriendRequest,
   readFriendRequests,
   readFriends,
+  readRelationsByNickname,
   removeFriend,
   searchPlayers,
   sendFriendRequest,
@@ -51,6 +52,19 @@ export const createFriendRoutes = (
         const refused = await rateLimiter.check("friendRead", player.id, set);
         if (refused) return refused;
         return { players: await searchPlayers(db, player.id, query.nickname) };
+      },
+    )
+    .get(
+      "/relations",
+      {
+        nicknameChosen: true,
+        query: FriendModel.RelationsGet.Query,
+        response: FriendModel.RelationsGet.Response,
+      },
+      async ({ player, query, set }) => {
+        const refused = await rateLimiter.check("friendRead", player.id, set);
+        if (refused) return refused;
+        return { players: await readRelationsByNickname(db, player.id, query.nicknames) };
       },
     )
     .get(
