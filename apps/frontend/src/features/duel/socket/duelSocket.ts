@@ -59,6 +59,11 @@ export function sendToDuel(message: ClientMessage) {
   socket.send(JSON.stringify(message));
 }
 
+/** Drops the socket as a lost connection would, so that it is reopened. */
+export function dropDuelSocket() {
+  socket.drop();
+}
+
 export function closeDuelSocket() {
   socket.close();
 }
