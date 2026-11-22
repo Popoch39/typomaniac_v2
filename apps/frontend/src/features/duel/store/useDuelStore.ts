@@ -272,6 +272,9 @@ export const useDuelStore = create<DuelState>()((set, get) => {
     // The server closes nothing a finished Duel still needs.
     if (get().phase === "finished") return false;
     stopFollowingSocket();
+    // Keys typed now would never reach the server, which rebuilds the Game from its journal on
+    // resume; buffering them would move them up to their receipt bound (ADR 0009).
+    useGameStore.getState().freeze();
     set({ isReconnecting: true });
     return true;
   };

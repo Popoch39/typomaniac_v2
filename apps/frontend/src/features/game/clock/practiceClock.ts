@@ -1,6 +1,6 @@
 import type { Game } from "@repo/typing-engine";
 
-/** The Tick and read timers of the Game store: they run exactly while its Game runs. */
+/** The Tick and read timers of the Game store: they run exactly while its Game runs, unfrozen. */
 export type PracticeClock =
   | { readonly kind: "idle" }
   // The start it ticks from: a Game loaded with another start needs its Ticks counted from that one.
@@ -12,8 +12,9 @@ export type PracticeClockEffect = "start" | "stop" | null;
 export function nextPracticeClock(
   clock: PracticeClock,
   game: Game,
+  isFrozen: boolean,
 ): { readonly clock: PracticeClock; readonly effect: PracticeClockEffect } {
-  if (game.status !== "running" || game.startedAt === null) {
+  if (isFrozen || game.status !== "running" || game.startedAt === null) {
     return { clock: { kind: "idle" }, effect: clock.kind === "ticking" ? "stop" : null };
   }
   if (clock.kind === "ticking" && clock.startedAt === game.startedAt)

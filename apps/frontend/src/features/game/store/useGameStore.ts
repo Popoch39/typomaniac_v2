@@ -33,6 +33,11 @@ type GameState = {
   readonly lastEvent: GameEvent | null;
   /** Whether words are added as the end of a time Game nears: a loaded Game keeps its given words. */
   readonly topsUpWords: boolean;
+  /**
+   * Whether the Game refuses every Event and stops ticking, until another Game replaces it: what a
+   * Duel's server would not count, such as keys typed while its link is down, never reaches it.
+   */
+  readonly isFrozen: boolean;
   readonly applyEvent: (event: GameEvent) => void;
   /**
    * Replaces the Game with one on given words, such as the Target words of a Duel; none is added.
@@ -44,6 +49,8 @@ type GameState = {
     journal?: readonly GameEvent[],
   ) => void;
   readonly restart: () => void;
+  /** Freezes the Game on screen as it is. */
+  readonly freeze: () => void;
   /** Abandons the Game for a new ready one, so a page left mid-Game leaves no clock running. */
   readonly leave: () => void;
   readonly setConfig: (config: GameConfig) => void;
@@ -96,7 +103,8 @@ export const useGameStore = create<GameState>()((set, get) => {
 
   // The only place the timers start or stop: they follow the Game's status, whatever changed it.
   const followGame = () => {
-    const step = nextPracticeClock(clock, get().game);
+    const { game, isFrozen } = get();
+    const step = nextPracticeClock(clock, game, isFrozen);
     clock = step.clock;
     if (step.effect === "start") startTickingAndReading();
     if (step.effect === "stop") stopTickingAndReading();
@@ -117,6 +125,7 @@ export const useGameStore = create<GameState>()((set, get) => {
       restartCount: state.restartCount + 1,
       lastEvent: null,
       topsUpWords,
+      isFrozen: false,
     }));
     followGame();
   };
@@ -130,8 +139,10 @@ export const useGameStore = create<GameState>()((set, get) => {
     restartCount: 0,
     lastEvent: null,
     topsUpWords: true,
+    isFrozen: false,
     applyEvent: (event) => {
-      const { game: before, topsUpWords } = get();
+      const { game: before, topsUpWords, isFrozen } = get();
+      if (isFrozen) return;
       const applied = applyEngineEvent(before, event);
       const game = topsUpWords ? withEnoughWords(applied) : applied;
       if (before.status === "ready" && game.status === "running") {
@@ -148,6 +159,10 @@ export const useGameStore = create<GameState>()((set, get) => {
       tick();
     },
     restart,
+    freeze: () => {
+      set({ isFrozen: true });
+      followGame();
+    },
     leave: restart,
     setConfig: startNewGame,
   };
