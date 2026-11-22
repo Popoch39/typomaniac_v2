@@ -119,7 +119,14 @@ const saveDuel = async (
       playerId,
       outcome,
       ...(kind === "ranked"
-        ? { mmrBefore: 1987, mmrAfter: 2011, duelsPlayedBefore: 12, duelsPlayedAfter: 13 }
+        ? {
+            mmrBefore: 1987,
+            mmrAfter: 2011,
+            duelsPlayedBefore: 12,
+            duelsPlayedAfter: 13,
+            lpDelta: 0,
+            rankChange: "none" as const,
+          }
         : {}),
       ...(rank
         ? {

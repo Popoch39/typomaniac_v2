@@ -1,30 +1,13 @@
 import { afterAll, expect, test } from "bun:test";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { DUEL_GAME_CONFIG, getAverageMultiplier, getOutcome } from "@repo/duel-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { eq, sql } from "drizzle-orm";
 import { migrateDatabase, duel, duelGame, duelParticipant, duelRound } from "../src/db/client.ts";
-import { createTestDb } from "./helpers/db.ts";
+import { createTestDb, migrationsUpTo } from "./helpers/db.ts";
 
 const migrationsFolder = join(import.meta.dir, "../drizzle");
-
-type Journal = { entries: { idx: number; tag: string }[] };
-
-// The migrations up to the one numbered `last`, as they were before a later change.
-const migrationsUpTo = async (last: number) => {
-  const folder = await mkdtemp(join(tmpdir(), `migrations-up-to-${last}-`));
-  const journal = JSON.parse(
-    await readFile(join(migrationsFolder, "meta/_journal.json"), "utf8"),
-  ) as Journal;
-  const entries = journal.entries.filter(({ idx }) => idx <= last);
-  await mkdir(join(folder, "meta"));
-  await writeFile(join(folder, "meta/_journal.json"), JSON.stringify({ ...journal, entries }));
-  for (const { tag } of entries)
-    await cp(join(migrationsFolder, `${tag}.sql`), join(folder, `${tag}.sql`));
-  return folder;
-};
 
 // Before Duels were saved per Round: up to the Standing table.
 const beforeRounds = await migrationsUpTo(5);

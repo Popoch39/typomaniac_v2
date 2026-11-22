@@ -276,6 +276,14 @@ export const banForViolation = async (
   return holding?.id ?? (await saveBan(tx, { playerId, cause: "violation", at }, withdrawSince));
 };
 
+/**
+ * Writes the Player's banned mark: the instant of their Ban, or null once it is revoked. The only
+ * writer of the mark, so that it never drifts from the Ban it denormalises.
+ */
+export const setBannedMark = async (tx: Transaction, playerId: string, bannedAt: Date | null) => {
+  await tx.update(user).set({ bannedAt }).where(eq(user.id, playerId));
+};
+
 // Saves a Ban and applies it, as `banPlayerIn` describes but voiding the ranked Duels the Player won
 // from `withdrawSince`, and returns its id. The caller has locked the Player and checked they are not
 // banned.
@@ -287,7 +295,7 @@ const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban, withdrawSi
     .values({ playerId, kind: "ban", cause, startedAt: at })
     .returning({ id: sanction.id });
   if (!saved) throw new Error(`Could not save the Ban of Player ${playerId}`);
-  await tx.update(user).set({ bannedAt: at }).where(eq(user.id, playerId));
+  await setBannedMark(tx, playerId, at);
   const accounts = await tx
     .select({ providerId: account.providerId, accountId: account.accountId })
     .from(account)
