@@ -79,7 +79,7 @@ export const createApp = (
       .use(createProgressRoutes(db, protection))
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
-      .use(createAdministrationRoutes(db, protection))
+      .use(createAdministrationRoutes(db, protection, redis))
       .use(
         createFriendRoutes(db, protection, rateLimiter, {
           push: (playerId, message) => pushToPlayer(redis, playerId, message),

@@ -6,12 +6,19 @@ import type { Standing } from "@repo/ranked-engine";
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 import { count, eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
-import { account, sanction, user, voidedDuel } from "../src/db/client.ts";
+import { account, review, sanction, user, voidedDuel } from "../src/db/client.ts";
 import { saveDuel } from "../src/modules/duel/service.ts";
 import { banPlayer, revokeSanction } from "../src/modules/fair-play/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayerWithNickname, TEST_APPEAL_ADDRESS } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
+import {
+  befriend as befriendOn,
+  call as callOn,
+  createInstances,
+  openPlayerSocket,
+  sendFriendRequest as sendFriendRequestOn,
+} from "./helpers/instance.ts";
 import { createTestRedis } from "./helpers/redis.ts";
 import { openSocketOf } from "./helpers/socket.ts";
 
@@ -52,8 +59,11 @@ const fakeProviders = async (input: string | URL | Request, init?: RequestInit) 
 const realFetch = globalThis.fetch;
 globalThis.fetch = Object.assign(fakeProviders, { preconnect: realFetch.preconnect });
 
+const instances = createInstances(testDb.db, auth);
+
 afterAll(async () => {
   globalThis.fetch = realFetch;
+  await instances.cleanup();
   await app.stop(true);
   // Stopping an app unsubscribes it from Redis, so both stop before Redis is dropped.
   await live.stop(true);
@@ -468,4 +478,71 @@ test("banning a Player cancels the Challenges they sent and received, tells thei
   const later = await openTab(challenged);
   expect((await later.nextOf("friendStates")).friends).toEqual([]);
   for (const tab of [challengedTab, challengerTab, later]) tab.close();
+});
+
+test("a Ban settling a Review cancels the banned Player's Challenges and tells their Friends and Friend requests at once, before any refresh", async () => {
+  // Refreshed every 20 seconds: only the settlement itself can tell the other sides in time.
+  const instance = instances.startInstance(await instances.createRedis());
+  const [administrator, cheater, challenged, receiver, sender] = [
+    await instances.signIn(instance),
+    await instances.signIn(instance),
+    await instances.signIn(instance),
+    await instances.signIn(instance),
+    await instances.signIn(instance),
+  ];
+  await testDb.db.update(user).set({ isAdministrator: true }).where(eq(user.id, administrator.id));
+  await befriendOn(instance, cheater, challenged);
+  await sendFriendRequestOn(instance, cheater, receiver);
+  await sendFriendRequestOn(instance, sender, cheater);
+  const openOn = async ({ cookie }: { cookie: string }) => {
+    const socket = await openPlayerSocket<PlayerMessage, PlayerClientMessage>(instance, cookie);
+    const nextOf = async (type: string) => {
+      for (;;) {
+        const message = await socket.next();
+        if (message.type === type) return message;
+      }
+    };
+    // The messages of these types, in whichever order they arrive, skipping the others.
+    const nextOfEach = async (types: readonly string[]) => {
+      const found = new Map<string, PlayerMessage>();
+      while (found.size < types.length) {
+        const message = await socket.next();
+        if (types.includes(message.type)) found.set(message.type, message);
+      }
+      return types.map((type) => found.get(type));
+    };
+    return { ...socket, nextOf, nextOfEach };
+  };
+  const [cheaterTab, challengedTab, receiverTab, senderTab] = [
+    await openOn(cheater),
+    await openOn(challenged),
+    await openOn(receiver),
+    await openOn(sender),
+  ];
+  cheaterTab.send({ type: "challenge", playerId: challenged.id });
+  const { challengeId } = await challengedTab.nextOf("challengeReceived");
+  const [opened] = await testDb.db
+    .insert(review)
+    .values({ playerId: cheater.id, reason: "suspicion", openedAt: new Date() })
+    .returning({ id: review.id });
+
+  const settled = await callOn(
+    instance,
+    "POST",
+    `/api/admin/reviews/${opened?.id}/settlement`,
+    administrator.cookie,
+    { decision: "ban" },
+  );
+
+  expect(settled.status).toBe(204);
+  expect(await challengedTab.nextOfEach(["challengeCancelled", "friendRemoved"])).toEqual([
+    { type: "challengeCancelled", challengeId },
+    { type: "friendRemoved", playerId: cheater.id },
+  ]);
+  for (const tab of [receiverTab, senderTab])
+    expect(await tab.nextOf("friendRequestRemoved")).toEqual({
+      type: "friendRequestRemoved",
+      playerId: cheater.id,
+    });
+  for (const tab of [cheaterTab, challengedTab, receiverTab, senderTab]) tab.close();
 });

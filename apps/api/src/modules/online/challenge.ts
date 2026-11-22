@@ -13,6 +13,7 @@ import type { RateLimiter } from "../rate-limit/index.ts";
 import {
   type Challenge,
   cancelChallenges,
+  cancelAllChallengesOf,
   closeChallenge,
   forgetDueChallenge,
   openChallenge,
@@ -104,11 +105,7 @@ export const createChallenges = (
   };
 
   const cancelAllOf = async (playerIds: readonly string[]) => {
-    await Promise.all(
-      playerIds.map(async (playerId) =>
-        cancelChallenges(redis, await readChallengesOf(redis, playerId)),
-      ),
-    );
+    await Promise.all(playerIds.map((playerId) => cancelAllChallengesOf(redis, playerId)));
   };
 
   // A closed Challenge was closed by exactly one caller, who alone tells both sides.
