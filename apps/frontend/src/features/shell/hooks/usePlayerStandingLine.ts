@@ -1,4 +1,4 @@
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import { useStanding } from "../../ranked/hooks/useStanding.ts";
 import { standingLine } from "../../ranked/standing/standingLine.ts";
 

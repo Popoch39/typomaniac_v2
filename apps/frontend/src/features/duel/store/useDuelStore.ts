@@ -166,8 +166,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   // Counts down to the Start of the next Round while the Round that just ended is shown. Nothing
   // starts from here: the Countdown message brings the Target words, and schedules the Start.
-  const showNextStart = (startAt: number) =>
-    useDuelCountdownStore.getState().schedule(startAt, () => undefined);
+  const showNextStart = (startAt: number) => useDuelCountdownStore.getState().display(startAt);
 
   const receive = (message: ServerMessage) => {
     if (message.type === "state") {
