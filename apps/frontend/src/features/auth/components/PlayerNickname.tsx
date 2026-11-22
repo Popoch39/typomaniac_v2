@@ -1,4 +1,4 @@
-import type { SignedInPlayer } from "../hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../session/sessionOf.ts";
 
 interface PlayerNicknameProps {
   player: Pick<SignedInPlayer, "nickname">;

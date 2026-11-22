@@ -7,7 +7,7 @@ import {
   evictFromQueue,
   type PairingChange,
   pairingChannel,
-  readPendingPairing,
+  readEntryPairingId,
 } from "../queue/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import {
@@ -70,7 +70,7 @@ export const createChallenges = (
   // A Player in a Pairing awaiting acceptance is about to enter a ranked Duel.
   const isBusy = async (playerId: string) =>
     (await isInUnfinishedDuel(redis, playerId)) ||
-    (await readPendingPairing(redis, playerId)) !== null;
+    (await readEntryPairingId(redis, playerId)) !== null;
 
   const refusal = async (tab: Tab, targetId: string) => {
     if (await rateLimiter.isOver("challenge", tab.playerId)) return "RATE_LIMITED";

@@ -201,6 +201,7 @@ test("a Review shows the Player's Standing, recent ranked Duels with their Outco
     id: suspect.reviewId,
     reason: "suspicion",
     openedAt: 5000,
+    settlement: null,
     player: { id: suspect.playerId, nickname: "suspect", banned: false },
     suspicion: 0.8,
     standing: {
@@ -282,6 +283,26 @@ test("a Review gives the journal, the Target words and the saved Result of each 
         ],
       },
     ],
+  });
+});
+
+test("reading an open Review gives no settlement, and reading a settled one gives its decision and the instant it was settled", async () => {
+  const { cookie } = await signInAdministrator();
+  const open = await underReview("open", { reason: "suspicion", openedAt: 5000, value: 0.8 });
+  const settled = await underReview("settled", { reason: "master", openedAt: 6000, value: null });
+  await testDb.db
+    .update(review)
+    .set({ settledAt: new Date(7000), decision: "suspension" })
+    .where(eq(review.playerId, settled.playerId));
+
+  const openRead = await get(`/api/admin/reviews/${open.reviewId}`, cookie);
+  const settledRead = await get(`/api/admin/reviews/${settled.reviewId}`, cookie);
+
+  expect(openRead.status).toBe(200);
+  expect(await openRead.json()).toMatchObject({ settlement: null });
+  expect(settledRead.status).toBe(200);
+  expect(await settledRead.json()).toMatchObject({
+    settlement: { decision: "suspension", settledAt: 7000 },
   });
 });
 

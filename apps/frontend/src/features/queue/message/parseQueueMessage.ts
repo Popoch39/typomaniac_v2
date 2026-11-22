@@ -44,6 +44,7 @@ const FIELDS: Record<QueueServerMessage["type"], Record<string, Check>> = {
   proposed: {
     pairingId: isString,
     acceptWithinMs: isNumber,
+    accepted: (accepted) => typeof accepted === "boolean",
     players: (players) => hasFields(players, { self: isPairingSide, opponent: isPairingSide }),
   },
   requeued: { queuedAt: isNumber, serverAt: isNumber },

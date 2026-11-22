@@ -1,7 +1,7 @@
 import type { OrnamentChoice } from "@repo/ranked-engine";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { cn } from "../../../shared/lib/utils.ts";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import type { OrnamentOption } from "../picker/ornamentOptions.ts";
 import { OrnamentedAvatar } from "./OrnamentedAvatar.tsx";
 

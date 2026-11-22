@@ -8,6 +8,7 @@ import {
 } from "@repo/typing-engine";
 import { create } from "zustand";
 import { eventTime } from "../clock/eventTime.ts";
+import { nextPracticeClock, type PracticeClock } from "../clock/practiceClock.ts";
 import { withoutSeparator } from "../words/withoutSeparator.ts";
 
 const DEFAULT_CONFIG: GameConfig = { mode: "time", seconds: 30 };
@@ -32,6 +33,11 @@ type GameState = {
   readonly lastEvent: GameEvent | null;
   /** Whether words are added as the end of a time Game nears: a loaded Game keeps its given words. */
   readonly topsUpWords: boolean;
+  /**
+   * Whether the Game refuses every Event and stops ticking, until another Game replaces it: what a
+   * Duel's server would not count, such as keys typed while its link is down, never reaches it.
+   */
+  readonly isFrozen: boolean;
   readonly applyEvent: (event: GameEvent) => void;
   /**
    * Replaces the Game with one on given words, such as the Target words of a Duel; none is added.
@@ -43,6 +49,10 @@ type GameState = {
     journal?: readonly GameEvent[],
   ) => void;
   readonly restart: () => void;
+  /** Freezes the Game on screen as it is. */
+  readonly freeze: () => void;
+  /** Abandons the Game for a new ready one, so a page left mid-Game leaves no clock running. */
+  readonly leave: () => void;
   readonly setConfig: (config: GameConfig) => void;
 };
 
@@ -61,14 +71,13 @@ function withEnoughWords(game: Game) {
 }
 
 // Owned by the store because components may not run effects; at most one Game ticks at a time.
-let tickTimer: ReturnType<typeof setInterval> | null = null;
-let readTimer: ReturnType<typeof setInterval> | null = null;
+let clock: PracticeClock = { kind: "idle" };
+let tickTimer: ReturnType<typeof setInterval> | undefined;
+let readTimer: ReturnType<typeof setInterval> | undefined;
 
 function stopTickingAndReading() {
-  if (tickTimer !== null) clearInterval(tickTimer);
-  if (readTimer !== null) clearInterval(readTimer);
-  tickTimer = null;
-  readTimer = null;
+  clearInterval(tickTimer);
+  clearInterval(readTimer);
 }
 
 export const useGameStore = create<GameState>()((set, get) => {
@@ -79,7 +88,7 @@ export const useGameStore = create<GameState>()((set, get) => {
     const event: GameEvent = { type: "tick", at: eventTime() };
     const game = applyEngineEvent(get().game, event);
     set({ game, readAt: readAtLeast(game.endedAt ?? event.at), lastEvent: event });
-    if (game.status === "finished") stopTickingAndReading();
+    followGame();
   };
 
   // Not an Event: it is not applied to the Game nor forwarded, so Ticks stay at one per second.
@@ -92,6 +101,15 @@ export const useGameStore = create<GameState>()((set, get) => {
     readTimer = setInterval(refreshReadAt, READ_INTERVAL_MS);
   };
 
+  // The only place the timers start or stop: they follow the Game's status, whatever changed it.
+  const followGame = () => {
+    const { game, isFrozen } = get();
+    const step = nextPracticeClock(clock, game, isFrozen);
+    clock = step.clock;
+    if (step.effect === "start") startTickingAndReading();
+    if (step.effect === "stop") stopTickingAndReading();
+  };
+
   const readAtAfter = (game: Game, event: GameEvent) => {
     // Read at its end, as its own Live stats are, so the Opponent is read up to the same elapsed time.
     if (game.endedAt !== null) return readAtLeast(game.endedAt);
@@ -101,17 +119,19 @@ export const useGameStore = create<GameState>()((set, get) => {
   };
 
   const replaceGame = (game: Game, topsUpWords: boolean) => {
-    stopTickingAndReading();
     set((state) => ({
       game,
       readAt: eventTime(),
       restartCount: state.restartCount + 1,
       lastEvent: null,
       topsUpWords,
+      isFrozen: false,
     }));
+    followGame();
   };
 
   const startNewGame = (config: GameConfig) => replaceGame(newGame(config), true);
+  const restart = () => startNewGame(get().game.config);
 
   return {
     game: newGame(DEFAULT_CONFIG),
@@ -119,26 +139,31 @@ export const useGameStore = create<GameState>()((set, get) => {
     restartCount: 0,
     lastEvent: null,
     topsUpWords: true,
+    isFrozen: false,
     applyEvent: (event) => {
-      const { game: before, topsUpWords } = get();
+      const { game: before, topsUpWords, isFrozen } = get();
+      if (isFrozen) return;
       const applied = applyEngineEvent(before, event);
       const game = topsUpWords ? withEnoughWords(applied) : applied;
       if (before.status === "ready" && game.status === "running") {
         set({ game, readAt: game.startedAt ?? eventTime(), lastEvent: event });
-        startTickingAndReading();
       } else {
         set({ game, readAt: readAtAfter(game, event), lastEvent: event });
       }
-      if (game.status === "finished") stopTickingAndReading();
+      followGame();
     },
     loadGame: (config, words, journal = []) => {
       replaceGame(journal.reduce(applyEngineEvent, createGame(config, words)), false);
       if (get().game.status !== "running") return;
-      startTickingAndReading();
       // The clock ran on while the Game was away: one already past its end ends at once.
       tick();
     },
-    restart: () => startNewGame(get().game.config),
+    restart,
+    freeze: () => {
+      set({ isFrozen: true });
+      followGame();
+    },
+    leave: restart,
     setConfig: startNewGame,
   };
 });

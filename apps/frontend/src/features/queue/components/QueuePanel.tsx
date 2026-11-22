@@ -7,12 +7,12 @@ import { QueueWaiting } from "./QueueWaiting.tsx";
 import { UnfinishedRankedDuel } from "./UnfinishedRankedDuel.tsx";
 
 export function QueuePanel() {
-  const { enter, isQueued, isProposed, isPaired, isEntering } = useQueueEntry();
+  const { enter, shown } = useQueueEntry();
   const unfinishedDuelId = useUnfinishedRankedDuel();
 
-  if (isQueued) return <QueueWaiting />;
-  if (isProposed) return <PairingPrompt />;
-  if (isPaired) return <PairedDuelRedirect />;
+  if (shown === "queued") return <QueueWaiting />;
+  if (shown === "proposed") return <PairingPrompt />;
+  if (shown === "paired") return <PairedDuelRedirect />;
   if (unfinishedDuelId !== null) return <UnfinishedRankedDuel duelId={unfinishedDuelId} />;
-  return <QueueIdle enter={enter} isEntering={isEntering} />;
+  return <QueueIdle enter={enter} isEntering={shown === "connecting"} />;
 }

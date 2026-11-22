@@ -1,13 +1,8 @@
+import { shownQueuePhase } from "../phase/queuePhase.ts";
 import { useQueueStore } from "../store/useQueueStore.ts";
 
 export function useQueueEntry() {
-  const phase = useQueueStore((state) => state.phase);
+  const shown = useQueueStore((state) => shownQueuePhase(state.phase).kind);
   const enter = useQueueStore((state) => state.enter);
-  return {
-    enter,
-    isQueued: phase === "queued",
-    isProposed: phase === "proposed",
-    isPaired: phase === "paired",
-    isEntering: phase === "connecting",
-  };
+  return { enter, shown };
 }

@@ -8,6 +8,7 @@ import { logSocketFailure } from "../http/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import { DUEL_EXPIRY_MS } from "../duel/service.ts";
+import { createSocketPhases } from "../lifecycle/socketPhase.ts";
 import { readBannedPlayerIds } from "../player/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { createChallenges } from "./challenge.ts";
@@ -93,6 +94,15 @@ export const createOnlineRoutes = (
   // What each open socket holds, set on open and read on close.
   const holdings = new Map<string, Holding>();
   const closing = new Set<string>();
+  const phases = createSocketPhases();
+  // Lets go of all a socket took: its channel, its presence, its Friends' watch and its Challenges.
+  const release = (id: string, holding: Holding) =>
+    Promise.all([
+      channels.release(holding.delivery),
+      presence.release(holding),
+      friendWatch.release(holding),
+      challenges.release({ playerId: holding.playerId, connection: id }),
+    ]);
 
   return (
     new Elysia({ prefix: "/api/online" })
@@ -151,26 +161,37 @@ export const createOnlineRoutes = (
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          const send = (message: PlayerServerMessage) => ws.send(message);
-          const playerId = ws.player.id;
-          const holding: Holding = {
-            playerId,
-            send,
-            tellCount: (count) => send({ type: "onlineCount", count }),
-            overCap: rateLimiter.socketMessageWindow(),
-            close: (code, reason) => ws.close(code, reason),
-            befriendable: ws.player.nickname !== null,
-            delivery: {
+          await phases.opening(ws.id, async (closed) => {
+            const send = (message: PlayerServerMessage) => ws.send(message);
+            const playerId = ws.player.id;
+            const holding: Holding = {
               playerId,
-              connection: ws.id,
-              send: (message) => friendWatch.deliver(holding, message),
-            },
-          };
-          holdings.set(ws.id, holding);
-          logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
-          await channels.hold(holding.delivery);
-          await presence.hold(holding);
-          if (holding.befriendable) await friendWatch.hold(holding);
+              send,
+              tellCount: (count) => send({ type: "onlineCount", count }),
+              overCap: rateLimiter.socketMessageWindow(),
+              close: (code, reason) => ws.close(code, reason),
+              befriendable: ws.player.nickname !== null,
+              delivery: {
+                playerId,
+                connection: ws.id,
+                send: (message) => friendWatch.deliver(holding, message),
+              },
+            };
+            holdings.set(ws.id, holding);
+            logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
+            // Closed while opening: what the open took is let go of here, its close having left it.
+            // Holding the presence regardless would keep the Player Online until the instance stops.
+            const abandon = async () => {
+              holdings.delete(ws.id);
+              await release(ws.id, holding);
+            };
+            await channels.hold(holding.delivery);
+            if (closed()) return await abandon();
+            await presence.hold(holding);
+            if (closed()) return await abandon();
+            if (holding.befriendable) await friendWatch.hold(holding);
+            if (closed()) return await abandon();
+          });
         },
         async close(ws, code) {
           lifecycle.release(ws.id);
@@ -179,15 +200,12 @@ export const createOnlineRoutes = (
             playerId: ws.player.id,
             code,
           });
-          const holding = holdings.get(ws.id);
-          if (!holding) return;
-          holdings.delete(ws.id);
-          await Promise.all([
-            channels.release(holding.delivery),
-            presence.release(holding),
-            friendWatch.release(holding),
-            challenges.release({ playerId: holding.playerId, connection: ws.id }),
-          ]);
+          await phases.closing(ws.id, async () => {
+            const holding = holdings.get(ws.id);
+            if (!holding) return;
+            holdings.delete(ws.id);
+            await release(ws.id, holding);
+          });
         },
         error: logSocketFailure(logger, "Player socket failed"),
       })

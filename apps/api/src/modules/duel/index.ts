@@ -21,8 +21,10 @@ import { type Protection, personOf } from "../auth/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
+import { createSocketPhases } from "../lifecycle/socketPhase.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
+import { isAnnounced, startOf } from "./phase.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
@@ -105,6 +107,24 @@ export const createDuelRoutes = (
     { readonly overCap: (now: number) => boolean; readonly key: string; readonly duelId: string }
   >();
   const closing = new Set<string>();
+  // A socket closed while opening is let go of by its open, at its next step: its close cannot
+  // release a seat the open has not finished taking.
+  const phases = createSocketPhases();
+
+  // `connection` is the one the seat is let go of from: the socket's own once it held the seat.
+  const leaveSeat = async (
+    duelId: string,
+    { participant, delivery }: Seating,
+    connection: string | null,
+  ) => {
+    await relay.leave(duelId, delivery);
+    // Replaced by a reconnection: the Participant is not away.
+    if (!(await releaseSeat(redis, duelId, participant.seat, connection))) return;
+    await relay.publish(duelId, participant.seat, {
+      type: "presence",
+      participant: { ...participant, connected: false },
+    });
+  };
 
   // Every instance sweeps the Duels that have something due, its own or not: a Duel moves forward
   // whoever is connected to it, and on whichever instance. One sweep at a time: a slow one is not
@@ -201,106 +221,135 @@ export const createDuelRoutes = (
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          messageWindows.set(ws.id, {
-            overCap: rateLimiter.socketMessageWindow(),
-            key: ws.identity.id,
-            duelId: ws.params.id,
-          });
-          const duel = await readDuel(redis, ws.params.id);
-          const seat = duel?.holderIds.indexOf(ws.identity.id);
-          const self = duel?.participants.find((participant) => participant.seat === seat);
-          // Only when the Duel expired between the claim and the opening.
-          if (!duel || !self) return ws.close();
-          logger.info("Seat {seat} of Duel {duelId} opened", {
-            duelId: ws.params.id,
-            seat: self.seat,
-            ...personOf(ws),
-          });
-          const round = duel.round.number;
-          const { words, startAt, announced, anchorAts } = duel.round;
-          const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
-          const journals = await readJournals(redis, ws.params.id, round);
-          const lateStart = await startLateGame(redis, ws.params.id, round, self.seat, {
-            journal: journals[self.seat],
-            startAt,
-            now: Date.now(),
-            expiryMs,
-          });
-          if (lateStart) journals[self.seat] = lateStart;
-          const game = replayGame(words, journals[self.seat]);
-          const send = (message: ServerMessage) => {
-            // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
-            if (message.type === "countdown") {
-              // The Countdown of a new Round: its Game is the one this socket plays from now on.
-              if (message.round !== entry.round) {
-                entry.round = message.round;
-                entry.game = replayGame(message.words, []);
-                entry.keys = NO_KEYS_PAIRED;
-                entry.anchorAt = null;
+          await phases.opening(ws.id, async (closed) => {
+            messageWindows.set(ws.id, {
+              overCap: rateLimiter.socketMessageWindow(),
+              key: ws.identity.id,
+              duelId: ws.params.id,
+            });
+            const duel = await readDuel(redis, ws.params.id);
+            const seat = duel?.holderIds.indexOf(ws.identity.id);
+            const self = duel?.participants.find((participant) => participant.seat === seat);
+            // Only when the Duel expired between the claim and the opening.
+            if (!duel || !self) return ws.close();
+            logger.info("Seat {seat} of Duel {duelId} opened", {
+              duelId: ws.params.id,
+              seat: self.seat,
+              ...personOf(ws),
+            });
+            const round = duel.round.number;
+            const { words, phase } = duel.round;
+            const startAt = startOf(phase);
+            const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
+            const journals = await readJournals(redis, ws.params.id, round);
+            const lateStart = await startLateGame(redis, ws.params.id, round, self.seat, {
+              journal: journals[self.seat],
+              startAt,
+              now: Date.now(),
+              expiryMs,
+            });
+            if (lateStart) journals[self.seat] = lateStart;
+            const game = replayGame(words, journals[self.seat]);
+            const send = (message: ServerMessage) => {
+              // Kept as it is sent, so that judging a start never waits on Redis and overtakes nothing.
+              if (message.type === "countdown") {
+                // The Countdown of a new Round: its Game is the one this socket plays from now on.
+                if (message.round !== entry.round) {
+                  entry.round = message.round;
+                  entry.game = replayGame(message.words, []);
+                  entry.keys = NO_KEYS_PAIRED;
+                  entry.anchorAt = null;
+                }
+                entry.startAt = message.startAt;
               }
-              entry.startAt = message.startAt;
+              ws.send(message);
+            };
+            const connection = crypto.randomUUID();
+            // The relay delivers from the join on, which comes before the state: what it delivers
+            // until then is held back, so that the state is always the first message of a socket.
+            let heldBack: ServerMessage[] | null = [];
+            const delivery = {
+              seat: self.seat,
+              connection,
+              send: (message: ServerMessage) => (heldBack ? heldBack.push(message) : send(message)),
+              evict: () => ws.close(),
+            };
+            // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
+            const anchorAt = lateStart
+              ? startAt
+              : phase.kind === "running"
+                ? (phase.anchors[self.seat] ?? null)
+                : null;
+            const entry: Seating = {
+              participant: self,
+              round,
+              connection,
+              delivery,
+              startAt: null,
+              anchorAt,
+              game,
+              ranked: duel.kind === "ranked",
+              keys: journals[self.seat].reduce(pairKeys, NO_KEYS_PAIRED),
+            };
+            // Closed while opening: the seat the upgrade claimed is let go of as a close would, from
+            // the connection that held it before this socket until this socket holds it, so that a
+            // reconnection that took the seat meanwhile keeps it.
+            let holding = duel.connections[self.seat] ?? null;
+            const abandon = async () => {
+              seated.delete(ws.id);
+              await leaveSeat(ws.params.id, entry, holding);
+            };
+            if (closed()) return abandon();
+            seated.set(ws.id, entry);
+            await holdSeat(redis, ws.params.id, self.seat, connection);
+            holding = connection;
+            if (closed()) return abandon();
+            await relay.join(ws.params.id, delivery);
+            if (closed()) return abandon();
+            // A reconnection: the socket that held the seat until now stops acting for it.
+            await relay.takeOver(ws.params.id, self.seat, connection);
+            if (closed()) return abandon();
+            send({
+              type: "state",
+              seat: self.seat,
+              round,
+              rounds,
+              startAt,
+              // Held back until the Countdown, which brings them to both Participants at once.
+              words: isAnnounced(phase) ? words : null,
+              participants: duel.participants,
+              ranks: duel.ranks,
+              journals,
+            });
+            for (const message of heldBack) send(message);
+            heldBack = null;
+            await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
+            if (closed()) return abandon();
+            for (const event of lateStart ?? [])
+              await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });
+            if (closed()) return abandon();
+            // A Round that has ended has no Countdown left to be told of.
+            const start =
+              phase.kind !== "ended"
+                ? await announceStart(redis, ws.params.id, round, {
+                    startAt: Date.now() + countdownMs,
+                    expiryMs,
+                  })
+                : null;
+            if (closed()) return abandon();
+            if (start) {
+              const countdown = {
+                type: "countdown",
+                round,
+                startAt: start.startAt,
+                words,
+              } as const;
+              send(countdown);
+              if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
             }
-            ws.send(message);
-          };
-          const connection = crypto.randomUUID();
-          // The relay delivers from the join on, which comes before the state: what it delivers
-          // until then is held back, so that the state is always the first message of a socket.
-          let heldBack: ServerMessage[] | null = [];
-          const delivery = {
-            seat: self.seat,
-            connection,
-            send: (message: ServerMessage) => (heldBack ? heldBack.push(message) : send(message)),
-            evict: () => ws.close(),
-          };
-          // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
-          const anchorAt = lateStart ? startAt : (anchorAts[self.seat] ?? null);
-          const entry: Seating = {
-            participant: self,
-            round,
-            connection,
-            delivery,
-            startAt: null,
-            anchorAt,
-            game,
-            ranked: duel.kind === "ranked",
-            keys: journals[self.seat].reduce(pairKeys, NO_KEYS_PAIRED),
-          };
-          seated.set(ws.id, entry);
-          await holdSeat(redis, ws.params.id, self.seat, connection);
-          await relay.join(ws.params.id, delivery);
-          // A reconnection: the socket that held the seat until now stops acting for it.
-          await relay.takeOver(ws.params.id, self.seat, connection);
-          send({
-            type: "state",
-            seat: self.seat,
-            round,
-            rounds,
-            startAt,
-            // Held back until the Countdown, which brings them to both Participants at once.
-            words: announced ? words : null,
-            participants: duel.participants,
-            ranks: duel.ranks,
-            journals,
+            if (closed()) return abandon();
+            if (duel.phase.kind === "finalised") send(duel.phase.end);
           });
-          for (const message of heldBack) send(message);
-          heldBack = null;
-          await relay.publish(ws.params.id, self.seat, { type: "presence", participant: self });
-          for (const event of lateStart ?? [])
-            await relay.publish(ws.params.id, self.seat, { type: "opponentEvent", event });
-          // A Round that has ended has no Countdown left to be told of.
-          const start =
-            duel.round.end === null
-              ? await announceStart(redis, ws.params.id, round, {
-                  startAt: Date.now() + countdownMs,
-                  expiryMs,
-                })
-              : null;
-          if (start) {
-            const countdown = { type: "countdown", round, startAt: start.startAt, words } as const;
-            send(countdown);
-            if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
-          }
-          if (duel.end) send(duel.end);
         },
         async message(ws, message) {
           const now = Date.now();
@@ -396,15 +445,11 @@ export const createDuelRoutes = (
             ...personOf(ws),
             code,
           });
-          if (!seating) return;
-          seated.delete(ws.id);
-          const { participant, connection, delivery } = seating;
-          await relay.leave(ws.params.id, delivery);
-          // Replaced by a reconnection: the Participant is not away.
-          if (!(await releaseSeat(redis, ws.params.id, participant.seat, connection))) return;
-          await relay.publish(ws.params.id, participant.seat, {
-            type: "presence",
-            participant: { ...participant, connected: false },
+          // Still opening: its open lets go of whatever it has taken by then.
+          await phases.closing(ws.id, async () => {
+            if (!seating) return;
+            seated.delete(ws.id);
+            await leaveSeat(ws.params.id, seating, seating.connection);
           });
         },
         error: logSocketFailure(logger, "Socket on Duel {duelId} failed", (context, id) => {

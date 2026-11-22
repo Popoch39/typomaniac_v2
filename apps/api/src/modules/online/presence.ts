@@ -67,6 +67,8 @@ export const createOnlinePresence = (
       held.add(holder);
       following ??= redis.subscriber.subscribe(channel, listener);
       await following;
+      // Released during the await: refreshing now would outlive the last socket.
+      if (!held.has(holder)) return;
       refreshing ??= setInterval(
         () =>
           void refreshAll().catch((error: unknown) =>

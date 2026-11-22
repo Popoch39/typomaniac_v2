@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { reconnectDelay } from "../src/shared/lib/reconnectDelay.ts";
+import { endlessReconnectDelay, reconnectDelay } from "../src/shared/lib/reconnectDelay.ts";
 
 const SERVICE_RESTART = 1012;
 const ABNORMAL_CLOSURE = 1006;
@@ -27,4 +27,22 @@ test("a socket the server closed on purpose is never tried again", () => {
   expect(reconnectDelay(1000, 1)).toBeNull();
   expect(reconnectDelay(1008, 1)).toBeNull();
   expect(reconnectDelay(1011, 1)).toBeNull();
+});
+
+test("a socket that must come back is tried again with no last try, at most 30 s apart", () => {
+  expect(endlessReconnectDelay(SERVICE_RESTART, 1)).toBe(500);
+  expect(endlessReconnectDelay(ABNORMAL_CLOSURE, 6)).toBe(16_000);
+  expect(endlessReconnectDelay(ABNORMAL_CLOSURE, 7)).toBe(30_000);
+  expect(endlessReconnectDelay(ABNORMAL_CLOSURE, 1000)).toBe(30_000);
+});
+
+test("a socket that must come back is tried again after a server error or a closing by a proxy", () => {
+  expect(endlessReconnectDelay(1001, 1)).toBe(500);
+  expect(endlessReconnectDelay(1011, 2)).toBe(1000);
+  expect(endlessReconnectDelay(1013, 7)).toBe(30_000);
+});
+
+test("a socket that must come back is still never tried again after the server closed it on purpose", () => {
+  expect(endlessReconnectDelay(1000, 1)).toBeNull();
+  expect(endlessReconnectDelay(1008, 1)).toBeNull();
 });

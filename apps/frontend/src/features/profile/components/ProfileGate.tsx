@@ -1,35 +1,23 @@
 import type { ReactNode } from "react";
 import { ReadGate } from "../../../shared/components/ReadGate.tsx";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
-import type { OwnStanding } from "../../ranked/standing/describeStanding.ts";
-import { type ProfileProgress, useProfileReads } from "../hooks/useProfileReads.ts";
+import type { ChainedSession } from "../../auth/session/sessionOf.ts";
+import { type Profile, useProfileReads } from "../hooks/useProfileReads.ts";
 
 interface ProfileGateProps {
-  /** Null while the session is checked: the gate then only shows its pending view. */
-  player: SignedInPlayer | null;
+  /** While it is checked, the gate only shows its pending view. */
+  session: ChainedSession;
   /** Shown while the Profile is read, and again while a failed read is tried again. */
   pending: ReactNode;
-  /**
-   * `progress` is null for a Player without a Nickname, whose Progress is not read;
-   * `isProgressUpdating` while it is that of the previous period or kind.
-   */
-  children: (
-    standing: OwnStanding,
-    player: SignedInPlayer,
-    progress: ProfileProgress | null,
-    isProgressUpdating: boolean,
-  ) => ReactNode;
+  children: (profile: Profile) => ReactNode;
 }
 
 // Holds the Profile back until every panel can be drawn whole, so that none is pushed in or grows later.
-export function ProfileGate({ player, pending, children }: ProfileGateProps) {
-  const { standing, progress, isProgressUpdating, stage, failure, retry } = useProfileReads(player);
+export function ProfileGate({ session, pending, children }: ProfileGateProps) {
+  const gate = useProfileReads(session);
 
   return (
-    <ReadGate stage={stage} pending={pending} title="Profile" failure={failure} retry={retry}>
-      {standing !== null &&
-        player !== null &&
-        children(standing, player, progress, isProgressUpdating)}
+    <ReadGate state={gate} pending={pending} title="Profile">
+      {children}
     </ReadGate>
   );
 }

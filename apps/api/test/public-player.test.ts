@@ -56,9 +56,14 @@ const saveRankedDuelOf = async (playerId: string, after: Rank) => {
     seat: 0,
     playerId,
     outcome: "win",
+    mmrBefore: 1300,
+    mmrAfter: 1316,
     duelsPlayedBefore: 10,
+    duelsPlayedAfter: 11,
     ladderIndexAfter: ladderIndex(after),
     lpAfter: after.lp,
+    lpDelta: 0,
+    rankChange: "placed",
   });
 };
 

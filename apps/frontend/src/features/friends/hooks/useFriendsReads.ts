@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
-import { readStage, retryFailed } from "../../../shared/api/readStage.ts";
+import { readGate, readStage, retryFailed } from "../../../shared/api/readStage.ts";
 import { friendRequestsQueryOptions } from "../api/friendRequestsQueryOptions.ts";
 import { friendsQueryOptions } from "../api/friendsQueryOptions.ts";
 import { useFriendStateStore } from "../store/useFriendStateStore.ts";
@@ -16,11 +16,12 @@ export function useFriendsReads() {
   const error = friends.error ?? requests.error;
   const statesKnown = useFriendStateStore((state) => state.states !== null);
   const stage = readStage([friends, requests]);
-  return {
-    friends: friends.data,
-    requests: requests.data,
-    stage: stage === "ready" && !statesKnown ? "loading" : stage,
-    failure: error === null ? null : describeApiError(error),
-    retry: () => retryFailed([friends, requests]),
-  };
+  return readGate(
+    stage === "ready" && !statesKnown ? "loading" : stage,
+    friends.data === undefined || requests.data === undefined
+      ? undefined
+      : { friends: friends.data, requests: requests.data },
+    error === null ? null : describeApiError(error),
+    () => retryFailed([friends, requests]),
+  );
 }

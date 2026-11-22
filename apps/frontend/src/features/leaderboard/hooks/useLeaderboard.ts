@@ -1,12 +1,13 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
-import { loadingOnly, readStage, retryFailed } from "../../../shared/api/readStage.ts";
+import { type ReadyData, readGate, readStage, retryFailed } from "../../../shared/api/readStage.ts";
+import { useSession } from "../../auth/hooks/useSession.ts";
 import { useLeaderboardAddFriendTargets } from "../../friends/hooks/useLeaderboardAddFriendTargets.ts";
 import { leaderboardQueryOptions } from "../api/leaderboardQueryOptions.ts";
 import { pageToReplace } from "../page/pageToReplace.ts";
 
-export type Leaderboard = NonNullable<ReturnType<typeof useLeaderboard>["leaderboard"]>;
+export type Leaderboard = ReadyData<ReturnType<typeof useLeaderboard>["gate"]>;
 
 export type LeaderboardPlayer = Leaderboard["podium"][number];
 
@@ -20,18 +21,25 @@ export type LeaderboardPlayer = Leaderboard["podium"][number];
  */
 export function useLeaderboard() {
   const { page } = useSearch({ from: "/_shell/leaderboard" });
+  const { session } = useSession();
   const read = useQuery({ ...leaderboardQueryOptions(page), placeholderData: keepPreviousData });
   const { data, isPlaceholderData } = read;
-  const { targetOf, me, relations } = useLeaderboardAddFriendTargets(page, isPlaceholderData);
+  const { targetOf, isSessionChecking, relations } = useLeaderboardAddFriendTargets(
+    page,
+    isPlaceholderData,
+  );
   const reads = relations === null ? [read] : [read, relations];
   const error = reads.find((each) => each.error !== null)?.error ?? null;
+  const stage = readStage(reads);
   return {
-    leaderboard: data ?? null,
+    gate: readGate(
+      stage === "ready" && isSessionChecking ? "loading" : stage,
+      data,
+      error === null ? null : describeApiError(error),
+      () => retryFailed(reads),
+    ),
     addFriendOf: targetOf,
-    stage: readStage([...reads, loadingOnly(me)]),
-    isGuest: me.data === null,
-    failure: error === null ? null : describeApiError(error),
-    retry: () => retryFailed(reads),
+    isGuest: session.kind === "guest",
     replacingPage:
       data === undefined
         ? null
