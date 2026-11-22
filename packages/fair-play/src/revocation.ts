@@ -3,11 +3,11 @@ import {
   duelParticipant,
   sanction,
   type Transaction,
-  user,
   voidedDuel,
   voidedDuelCorrection,
 } from "@repo/db";
 import { and, eq } from "drizzle-orm";
+import { setBannedMark } from "./sanction.ts";
 import { correctStandings } from "./standing.ts";
 
 export type RevokeSanctionResult = "revoked" | "already-revoked" | "not-found";
@@ -33,8 +33,7 @@ export const revokeSanction = (
     if (found.revokedAt) return "already-revoked";
     await tx.update(sanction).set({ revokedAt: at }).where(eq(sanction.id, sanctionId));
     // The identities a Ban refused are refused only under a Ban not revoked, so they are lifted with it.
-    if (found.kind === "ban")
-      await tx.update(user).set({ bannedAt: null }).where(eq(user.id, found.playerId));
+    if (found.kind === "ban") await setBannedMark(tx, found.playerId, null);
     await restoreVoidedDuels(tx, sanctionId);
     return "revoked";
   });

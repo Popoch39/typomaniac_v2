@@ -183,6 +183,13 @@
       "when": 1795336998554,
       "tag": "0025_friend",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795338896058,
+      "tag": "0026_integrity_checks",
+      "breakpoints": true
     }
   ]
 }

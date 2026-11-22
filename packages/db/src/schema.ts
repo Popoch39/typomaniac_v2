@@ -263,6 +263,15 @@ export const duelParticipant = pgTable(
     primaryKey({ columns: [table.duelId, table.seat] }),
     // A Player's ranked Duels in the order they played them, for the Outcomes of their Placement.
     index("duel_participant_player_idx").on(table.playerId, table.duelsPlayedBefore),
+    // All ranked columns set or all null, the Rank before and after as whole as in `standing`, so
+    // that the ranked end screen and Progress never read a half-saved Duel.
+    check(
+      "duel_participant_ranked_whole",
+      sql`num_nulls(${table.mmrBefore}, ${table.mmrAfter}, ${table.duelsPlayedBefore}, ${table.duelsPlayedAfter}, ${table.lpDelta}, ${table.rankChange}) in (0, 6)
+        and (${table.ladderIndexBefore} is null) = (${table.lpBefore} is null)
+        and (${table.ladderIndexAfter} is null) = (${table.lpAfter} is null)
+        and (${table.mmrBefore} is not null or num_nulls(${table.ladderIndexBefore}, ${table.ladderIndexAfter}) = 2)`,
+    ),
   ],
 );
 
@@ -288,7 +297,13 @@ export const violation = pgTable(
     // Duel was not voided.
     sanctionId: uuid("sanction_id").references(() => sanction.id, { onDelete: "set null" }),
   },
-  (table) => [index("violation_player_idx").on(table.playerId, table.duelId)],
+  (table) => [
+    index("violation_player_idx").on(table.playerId, table.duelId),
+    check(
+      "violation_sanctioned_whole",
+      sql`(${table.sanctionedAt} is null) = (${table.sanctionId} is null)`,
+    ),
+  ],
 );
 
 // What the signals said of one saved ranked Game (ADR 0014), with the version of the signals that
@@ -449,7 +464,13 @@ export const sanction = pgTable(
     endsAt: timestamp("ends_at"),
     revokedAt: timestamp("revoked_at"),
   },
-  (table) => [index("sanction_player_idx").on(table.playerId)],
+  (table) => [
+    index("sanction_player_idx").on(table.playerId),
+    check(
+      "sanction_ends_with_suspension",
+      sql`(${table.kind} = 'suspension') = (${table.endsAt} is not null)`,
+    ),
+  ],
 );
 
 // A ranked Duel withdrawn where the cheating paid (ADR 0015), and the Sanction it comes from. Keyed on
