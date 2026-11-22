@@ -102,6 +102,14 @@ export const createChallenges = (
     if (change.type === "proposed") cancelLogged([change.playerId], "pairing");
   };
 
+  const cancelAllOf = async (playerIds: readonly string[]) => {
+    await Promise.all(
+      playerIds.map(async (playerId) =>
+        cancelChallenges(redis, await readChallengesOf(redis, playerId)),
+      ),
+    );
+  };
+
   // A closed Challenge was closed by exactly one caller, who alone tells both sides.
   const expire = async (challengeId: string) => {
     const challenge = await readChallenge(redis, challengeId);
@@ -218,13 +226,12 @@ export const createChallenges = (
     /** Cancels the Challenges of those of these Players who went offline. */
     whenChanged: async (playerIds: readonly string[]) => {
       const states = await readPlayerStates(redis, playerIds, { now: Date.now(), windowMs });
-      const offline = [...states].filter(([, state]) => state === "offline");
-      await Promise.all(
-        offline.map(async ([playerId]) =>
-          cancelChallenges(redis, await readChallengesOf(redis, playerId)),
-        ),
+      await cancelAllOf(
+        [...states].flatMap(([playerId, state]) => (state === "offline" ? [playerId] : [])),
       );
     },
+    /** Cancels every Challenge these Players sent or received. */
+    cancelAllOf,
     start: () => {
       sweeper ??= setInterval(runSweep, CHALLENGE_SWEEP_INTERVAL_MS);
       following ??= Promise.all([

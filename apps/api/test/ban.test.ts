@@ -8,11 +8,12 @@ import { count, eq } from "drizzle-orm";
 import { createApp } from "../src/app.ts";
 import { account, sanction, user, voidedDuel } from "../src/db/client.ts";
 import { saveDuel } from "../src/modules/duel/service.ts";
-import { banPlayer } from "../src/modules/fair-play/service.ts";
+import { banPlayer, revokeSanction } from "../src/modules/fair-play/service.ts";
 import { readStanding, saveStanding } from "../src/modules/standing/service.ts";
 import { createTestAuth, signInPlayerWithNickname, TEST_APPEAL_ADDRESS } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
 import { createTestRedis } from "./helpers/redis.ts";
+import { openSocketOf } from "./helpers/socket.ts";
 
 const testDb = await createTestDb();
 const testRedis = await createTestRedis();
@@ -54,6 +55,8 @@ globalThis.fetch = Object.assign(fakeProviders, { preconnect: realFetch.preconne
 afterAll(async () => {
   globalThis.fetch = realFetch;
   await app.stop(true);
+  // Stopping an app unsubscribes it from Redis, so both stop before Redis is dropped.
+  await live.stop(true);
   await testRedis.drop();
   await testDb.drop();
 });
@@ -312,4 +315,157 @@ test("banning a Player again, even at once, saves no second Ban and repairs nobo
     await testDb.db.select().from(sanction).where(eq(sanction.playerId, cheater.player.id)),
   ).toHaveLength(1);
   expect(await readStanding(testDb.db, victim.player.id)).toEqual({ ...even, duelsPlayed: 41 });
+});
+
+const call = (method: string, path: string, cookie: string, body?: unknown) =>
+  fetch(`${origin}${path}`, {
+    method,
+    headers: { cookie, ...(body === undefined ? {} : { "content-type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+type SignedIn = Awaited<ReturnType<typeof signInPlayerWithNickname>>;
+
+const sendFriendRequest = async (from: SignedIn, to: SignedIn) =>
+  expect(
+    (await call("POST", "/api/friends/requests", from.cookie, { playerId: to.player.id })).status,
+  ).toBe(200);
+
+const befriend = async (one: SignedIn, other: SignedIn) => {
+  await sendFriendRequest(one, other);
+  const accepted = await call(
+    "POST",
+    `/api/friends/requests/${one.player.id}/accept`,
+    other.cookie,
+  );
+  expect(accepted.status).toBe(204);
+};
+
+const readFriendNicknames = async ({ cookie }: SignedIn) => {
+  const { friends } = (await (await call("GET", "/api/friends", cookie)).json()) as {
+    friends: { nickname: string }[];
+  };
+  return friends.map(({ nickname }) => nickname);
+};
+
+const readRequestNicknames = async ({ cookie }: SignedIn) => {
+  const { received, sent } = (await (
+    await call("GET", "/api/friends/requests", cookie)
+  ).json()) as {
+    received: { nickname: string }[];
+    sent: { nickname: string }[];
+  };
+  return {
+    received: received.map(({ nickname }) => nickname),
+    sent: sent.map(({ nickname }) => nickname),
+  };
+};
+
+const search = async ({ cookie }: SignedIn, nickname: string) =>
+  (await (await call("GET", `/api/friends/search?nickname=${nickname}`, cookie)).json()) as {
+    players: { nickname: string; relation: string }[];
+  };
+
+test("a banned Player leaves their Friends' lists, their Friend requests and the search, and a revoked Ban brings none of them back", async () => {
+  const [cheater, friend, receiver, sender] = [
+    await signInPlayerWithNickname(auth, origin),
+    await signInPlayerWithNickname(auth, origin),
+    await signInPlayerWithNickname(auth, origin),
+    await signInPlayerWithNickname(auth, origin),
+  ];
+  await befriend(friend, cheater);
+  await sendFriendRequest(cheater, receiver);
+  await sendFriendRequest(sender, cheater);
+
+  await ban(cheater.player.id);
+
+  expect(await readFriendNicknames(friend)).toEqual([]);
+  expect(await readRequestNicknames(receiver)).toEqual({ received: [], sent: [] });
+  expect(await readRequestNicknames(sender)).toEqual({ received: [], sent: [] });
+  expect((await search(friend, cheater.nickname)).players).toEqual([]);
+  // Lifted on appeal, the Player is found again, but as a stranger to everyone.
+  const [banned] = await testDb.db
+    .select({ id: sanction.id })
+    .from(sanction)
+    .where(eq(sanction.playerId, cheater.player.id));
+  expect(await revokeSanction(testDb.db, { sanctionId: banned?.id ?? "", at: new Date() })).toBe(
+    "revoked",
+  );
+  expect(await readFriendNicknames(friend)).toEqual([]);
+  expect(await readRequestNicknames(receiver)).toEqual({ received: [], sent: [] });
+  expect(await readRequestNicknames(sender)).toEqual({ received: [], sent: [] });
+  expect((await search(friend, cheater.nickname)).players).toEqual([
+    expect.objectContaining({ nickname: cheater.nickname, relation: "none" }),
+  ]);
+});
+
+// An instance whose Players are refreshed often, so that it notices a Ban within a moment.
+const live = createApp(testDb.db, auth, testRedis.redis, getLogger("api"), {
+  online: { windowMs: 300 },
+}).listen(0);
+const liveSocketUrl = `ws://localhost:${live.server?.port}/api/online/socket`;
+
+type PlayerMessage = {
+  type: string;
+  playerId?: string;
+  challengeId?: string;
+  friends?: { playerId: string }[];
+};
+type PlayerClientMessage = { type: "challenge"; playerId: string };
+
+// A Player tab that hands over the next message of a type, skipping the others.
+const openTab = async ({ cookie }: SignedIn) => {
+  const socket = await openSocketOf<PlayerMessage, PlayerClientMessage>(liveSocketUrl, cookie);
+  const nextOf = async (type: string) => {
+    for (;;) {
+      const message = await socket.next();
+      if (message.type === type) return message;
+    }
+  };
+  // The messages of these types, in whichever order they arrive, skipping the others.
+  const nextOfEach = async (types: readonly string[]) => {
+    const found = new Map<string, PlayerMessage>();
+    while (found.size < types.length) {
+      const message = await socket.next();
+      if (types.includes(message.type)) found.set(message.type, message);
+    }
+    return types.map((type) => found.get(type));
+  };
+  return { ...socket, nextOf, nextOfEach };
+};
+
+test("banning a Player cancels the Challenges they sent and received, tells their former Friends live and closes their tabs", async () => {
+  const [cheater, challenged, challenger] = [
+    await signInPlayerWithNickname(auth, origin),
+    await signInPlayerWithNickname(auth, origin),
+    await signInPlayerWithNickname(auth, origin),
+  ];
+  await befriend(cheater, challenged);
+  await befriend(challenger, cheater);
+  const [cheaterTab, challengedTab, challengerTab] = [
+    await openTab(cheater),
+    await openTab(challenged),
+    await openTab(challenger),
+  ];
+  cheaterTab.send({ type: "challenge", playerId: challenged.player.id });
+  const sent = await challengedTab.nextOf("challengeReceived");
+  challengerTab.send({ type: "challenge", playerId: cheater.player.id });
+  const received = await challengerTab.nextOf("challengeSent");
+
+  await ban(cheater.player.id);
+
+  const removed = { type: "friendRemoved", playerId: cheater.player.id };
+  expect(await challengedTab.nextOfEach(["challengeCancelled", "friendRemoved"])).toEqual([
+    { type: "challengeCancelled", challengeId: sent.challengeId },
+    removed,
+  ]);
+  expect(await challengerTab.nextOfEach(["challengeCancelled", "friendRemoved"])).toEqual([
+    { type: "challengeCancelled", challengeId: received.challengeId },
+    removed,
+  ]);
+  expect(await cheaterTab.closed).toBe(1008);
+  // A tab opened afterwards is not told the banned Player's state either.
+  const later = await openTab(challenged);
+  expect((await later.nextOf("friendStates")).friends).toEqual([]);
+  for (const tab of [challengedTab, challengerTab, later]) tab.close();
 });
