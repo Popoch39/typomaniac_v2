@@ -30,6 +30,8 @@
     "../src/features/duel/report",
     "../src/features/duel/round",
     "../src/features/duel/scene",
+    "../src/features/duel/store/useDuelClockStore.ts",
+    "../src/features/duel/store/useDuelCountdownStore.ts",
     "../src/features/duel/store/useTierPromotionStore.ts",
     "../src/features/admin/replay",
     "../src/features/admin/review",
