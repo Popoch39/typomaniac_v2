@@ -121,8 +121,7 @@ export const createQueueRoutes = (
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          phases.open(ws.id);
-          try {
+          await phases.opening(ws.id, async (closed) => {
             const send = (message: QueueServerMessage) => ws.send(message);
             const presence: Presence = {
               playerId: ws.player.id,
@@ -137,7 +136,6 @@ export const createQueueRoutes = (
             present.set(ws.id, presence);
             logger.info("Player {playerId} opened a Queue socket", { playerId: presence.playerId });
             // Closed while opening: what the open took is let go of here, its close having left it.
-            const closed = () => !phases.isOpening(ws.id);
             const abandon = async () => {
               present.delete(ws.id);
               refreshes.release(presence);
@@ -164,9 +162,7 @@ export const createQueueRoutes = (
             if (closed()) return await abandon();
             if (pairingId === null) send({ type: "queued", queuedAt, serverAt: Date.now() });
             else pairings.repropose(presence, pairingId);
-          } finally {
-            phases.advance(ws.id, { kind: "opened" });
-          }
+          });
         },
         async message(ws, { pairingId }) {
           await acceptPairingAsPlayer(
@@ -182,8 +178,7 @@ export const createQueueRoutes = (
             playerId: ws.player.id,
             code,
           });
-          if (phases.advance(ws.id, { kind: "close" }) !== "release") return;
-          try {
+          await phases.closing(ws.id, async () => {
             const presence = present.get(ws.id);
             if (!presence) return;
             present.delete(ws.id);
@@ -193,9 +188,7 @@ export const createQueueRoutes = (
             // instant of entry and its Pairing: it is kept for a full expiry, then expires unclaimed.
             if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
             else await leaveQueue(redis, presence);
-          } finally {
-            phases.advance(ws.id, { kind: "released" });
-          }
+          });
         },
         error: logSocketFailure(logger, "Queue socket failed"),
       })

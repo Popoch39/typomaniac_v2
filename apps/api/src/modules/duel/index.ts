@@ -217,8 +217,7 @@ export const createDuelRoutes = (
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          phases.open(ws.id);
-          try {
+          await phases.opening(ws.id, async (closed) => {
             messageWindows.set(ws.id, {
               overCap: rateLimiter.socketMessageWindow(),
               key: ws.identity.id,
@@ -292,7 +291,6 @@ export const createDuelRoutes = (
             // the connection that held it before this socket until this socket holds it, so that a
             // reconnection that took the seat meanwhile keeps it.
             let holding = duel.connections[self.seat] ?? null;
-            const closed = () => !phases.isOpening(ws.id);
             const abandon = async () => {
               seated.delete(ws.id);
               await leaveSeat(ws.params.id, entry, holding);
@@ -347,9 +345,7 @@ export const createDuelRoutes = (
             }
             if (closed()) return abandon();
             if (duel.phase.kind === "finalised") send(duel.phase.end);
-          } finally {
-            phases.advance(ws.id, { kind: "opened" });
-          }
+          });
         },
         async message(ws, message) {
           const now = Date.now();
@@ -446,14 +442,11 @@ export const createDuelRoutes = (
             code,
           });
           // Still opening: its open lets go of whatever it has taken by then.
-          if (phases.advance(ws.id, { kind: "close" }) !== "release") return;
-          try {
+          await phases.closing(ws.id, async () => {
             if (!seating) return;
             seated.delete(ws.id);
             await leaveSeat(ws.params.id, seating, seating.connection);
-          } finally {
-            phases.advance(ws.id, { kind: "released" });
-          }
+          });
         },
         error: logSocketFailure(logger, "Socket on Duel {duelId} failed", (context, id) => {
           const seating = seated.get(id);

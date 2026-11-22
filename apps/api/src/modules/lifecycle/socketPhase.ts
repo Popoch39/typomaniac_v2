@@ -47,23 +47,39 @@ export function nextSocketPhase(
 }
 
 /**
- * The phase of each socket of a route, by socket id. `open` must be called synchronously at the
- * start of the open handler, and `isOpening` checked after each of its awaits.
+ * The phase of each socket of a route, by socket id, which its open and close handlers run through:
+ * `opening` called synchronously at the start of the open handler, `closing` in the close handler.
  */
 export const createSocketPhases = () => {
   // A socket absent is closed, so that a closed socket holds no memory.
   const phases = new Map<string, SocketPhase>();
+  const advance = (id: string, event: SocketPhaseEvent) => {
+    const { phase, effect } = nextSocketPhase(phases.get(id) ?? CLOSED, event);
+    if (phase.kind === "closed") phases.delete(id);
+    else phases.set(id, phase);
+    return effect;
+  };
   return {
-    open: (id: string) => {
+    /**
+     * Runs the open of socket `id`. `open` checks `closed` after each of its awaits: once the socket
+     * closed, it lets go of what it took instead of going on, its close having left it.
+     */
+    opening: async (id: string, open: (closed: () => boolean) => Promise<unknown>) => {
       phases.set(id, OPENING);
+      try {
+        await open(() => phases.get(id)?.kind !== "opening");
+      } finally {
+        advance(id, { kind: "opened" });
+      }
     },
-    /** Whether the open may go on: false once the socket closed, when it lets go of what it took. */
-    isOpening: (id: string) => phases.get(id)?.kind === "opening",
-    advance: (id: string, event: SocketPhaseEvent) => {
-      const { phase, effect } = nextSocketPhase(phases.get(id) ?? CLOSED, event);
-      if (phase.kind === "closed") phases.delete(id);
-      else phases.set(id, phase);
-      return effect;
+    /** Runs the close of socket `id`: `release` lets go of what its open took, unless the open still runs. */
+    closing: async (id: string, release: () => Promise<unknown>) => {
+      if (advance(id, { kind: "close" }) !== "release") return;
+      try {
+        await release();
+      } finally {
+        advance(id, { kind: "released" });
+      }
     },
   };
 };
