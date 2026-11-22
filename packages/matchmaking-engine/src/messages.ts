@@ -21,11 +21,15 @@ export type QueueRemovalReason =
 export type QueueServerMessage =
   /** `serverAt` is the instant the message was sent, so the client can tell how long ago `queuedAt` was. */
   | { readonly type: "queued"; readonly queuedAt: number; readonly serverAt: number }
-  /** A Duel was found: `pairingId` names the Pairing to accept, `players` both sides of it. */
+  /**
+   * A Duel was found: `pairingId` names the Pairing to accept, `players` both sides of it. Sent again
+   * to a socket that reconnects during the Pairing, `accepted` telling whether the Player already did.
+   */
   | {
       readonly type: "proposed";
       readonly pairingId: string;
       readonly acceptWithinMs: number;
+      readonly accepted: boolean;
       readonly players: { readonly self: PairingSide; readonly opponent: PairingSide };
     }
   /** The Opponent did not accept: the Player waits again, from their original instant of entry. */

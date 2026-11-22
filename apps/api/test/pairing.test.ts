@@ -33,11 +33,13 @@ const openQueue = async (instances = 1) => {
   const origins = apps.map((app) => `http://localhost:${app.server?.port}`);
   const origin = origins[0] ?? "";
 
-  const enter = async (player: { cookie: string }, from = origin) => {
-    const socket = await openSocketOf<QueueServerMessage, QueueClientMessage>(
+  const open = (player: { cookie: string }, from = origin) =>
+    openSocketOf<QueueServerMessage, QueueClientMessage>(
       `${from.replace(/^http/, "ws")}/api/queue/socket`,
       player.cookie,
     );
+  const enter = async (player: { cookie: string }, from = origin) => {
+    const socket = await open(player, from);
     const queued = await socket.next();
     if (queued.type !== "queued") throw new Error(`Expected queued, got ${queued.type}`);
     return { ...socket, queuedAt: queued.queuedAt };
@@ -62,7 +64,17 @@ const openQueue = async (instances = 1) => {
   };
   const tick = (now = Date.now(), options?: MatchmakerTickOptions) =>
     tickMatchmaker(testRedis.redis, now, options);
-  return { redis: testRedis.redis, origins, origin, signIn, enter, queuedAtOf, hasLeft, tick };
+  return {
+    redis: testRedis.redis,
+    origins,
+    origin,
+    signIn,
+    open,
+    enter,
+    queuedAtOf,
+    hasLeft,
+    tick,
+  };
 };
 
 type QueueSocket = {
@@ -131,6 +143,7 @@ test("both Players receive the proposal with the time left to accept, and each s
     type: "proposed",
     pairingId: expect.any(String),
     acceptWithinMs: expect.any(Number),
+    accepted: false,
     players: { self: adaSide, opponent: bobSide },
   });
   expect(adaProposal.acceptWithinMs).toBeGreaterThan(9000);
@@ -373,6 +386,50 @@ test("closing the socket during a Pairing counts as not accepting", async () => 
   expect(await adaSocket.next()).toMatchObject({ type: "requeued", queuedAt: adaSocket.queuedAt });
   expect(await queue.queuedAtOf(bob)).toBeNull();
   adaSocket.close();
+});
+
+test("a Player whose connection drops during a Pairing is proposed it again on reconnecting, with the time left to accept", async () => {
+  const queue = await openQueue();
+  const ada = await queue.signIn();
+  const adaSocket = await queue.enter(ada);
+  const bobSocket = await queue.enter(await queue.signIn());
+  await queue.tick();
+  const proposal = await nextProposal(adaSocket);
+  await nextProposal(bobSocket);
+
+  adaSocket.drop();
+  await adaSocket.closed;
+  await Bun.sleep(50);
+  const again = await queue.open(ada);
+
+  const reproposal = await nextProposal(again);
+  expect(reproposal).toEqual({ ...proposal, acceptWithinMs: expect.any(Number) });
+  expect(reproposal.acceptWithinMs).toBeGreaterThan(0);
+  expect(reproposal.acceptWithinMs).toBeLessThan(proposal.acceptWithinMs);
+  again.close();
+});
+
+test("a Player who accepted, then reconnected, is still accepted, and the Pairing becomes a ranked Duel when the other accepts", async () => {
+  const queue = await openQueue();
+  const ada = await queue.signIn();
+  const adaSocket = await queue.enter(ada);
+  const bobSocket = await queue.enter(await queue.signIn());
+  await queue.tick();
+  await accept(adaSocket);
+  const { pairingId } = await nextProposal(bobSocket);
+  // The acceptance is taken by the server before the drop that follows it on the same connection.
+  await Bun.sleep(50);
+
+  adaSocket.drop();
+  await adaSocket.closed;
+  await Bun.sleep(50);
+  const again = await queue.open(ada);
+
+  expect(await nextProposal(again)).toMatchObject({ pairingId, accepted: true });
+  bobSocket.send({ type: "accept", pairingId });
+  const duelId = await nextDuelId(again);
+  expect(await nextDuelId(bobSocket)).toBe(duelId);
+  expect((await readDuel(queue.redis, duelId))?.kind).toBe("ranked");
 });
 
 test("a Player who accepted, then closed the socket, is not queued again", async () => {
