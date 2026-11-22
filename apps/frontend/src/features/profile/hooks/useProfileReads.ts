@@ -17,8 +17,6 @@ import { useStanding } from "../../ranked/hooks/useStanding.ts";
 /** The Profile as drawn: a named Player's also holds their Progress. */
 export type Profile = ReadyData<ReturnType<typeof useProfileReads>>;
 
-export type ProfileProgress = Extract<Profile, { kind: "named" }>["progress"];
-
 /**
  * The reads the Profile lays out, sent together so that the page is drawn once they are all back, and
  * tried again together. Waits without reading while the session is checked. The Ornament, the

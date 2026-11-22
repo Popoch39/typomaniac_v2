@@ -46,10 +46,9 @@ export const REVIEW_RECENT_DUELS = 20;
 
 /**
  * A Review as the administrator reads it, or null when there is none with this id: how it was settled,
- * the Player, their
- * Suspicion and whole Standing, their recent ranked Duels with what each signal said of each Game and
- * what it is replayed from,
- * their Violations and every Sanction they were given, revoked ones included.
+ * the Player, their Suspicion and whole Standing, their recent ranked Duels with what each signal said
+ * of each Game and what it is replayed from, their Violations and every Sanction they were given,
+ * revoked ones included.
  */
 export const readReview = async (db: Db, reviewId: string) => {
   const [found] = await db
