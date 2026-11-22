@@ -64,9 +64,22 @@ const saveDuelOf = async (playerId: string, outcome: Outcome, duelsPlayedBefore:
     startedAt: new Date(),
     endedAt: new Date(),
   });
-  await testDb.db
-    .insert(duelParticipant)
-    .values({ duelId, seat: 0, playerId, outcome, duelsPlayedBefore });
+  await testDb.db.insert(duelParticipant).values({
+    duelId,
+    seat: 0,
+    playerId,
+    outcome,
+    ...(duelsPlayedBefore === null
+      ? {}
+      : {
+          mmrBefore: 1200,
+          mmrAfter: 1200,
+          duelsPlayedBefore,
+          duelsPlayedAfter: duelsPlayedBefore + 1,
+          lpDelta: 0,
+          rankChange: "none" as const,
+        }),
+  });
 };
 
 test("a Player in Placement reads the Outcome of each Placement Duel, in the order they played them", async () => {

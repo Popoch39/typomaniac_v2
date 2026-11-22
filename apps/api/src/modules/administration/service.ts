@@ -45,10 +45,10 @@ export const readOpenReviews = async (db: Db) => {
 export const REVIEW_RECENT_DUELS = 20;
 
 /**
- * A Review as the administrator reads it, or null when there is none with this id: the Player, their
- * Suspicion and whole Standing, their recent ranked Duels with what each signal said of each Game and
- * what it is replayed from,
- * their Violations and every Sanction they were given, revoked ones included.
+ * A Review as the administrator reads it, or null when there is none with this id: how it was settled,
+ * the Player, their Suspicion and whole Standing, their recent ranked Duels with what each signal said
+ * of each Game and what it is replayed from, their Violations and every Sanction they were given,
+ * revoked ones included.
  */
 export const readReview = async (db: Db, reviewId: string) => {
   const [found] = await db
@@ -56,6 +56,8 @@ export const readReview = async (db: Db, reviewId: string) => {
       id: review.id,
       reason: review.reason,
       openedAt: review.openedAt,
+      settledAt: review.settledAt,
+      decision: review.decision,
       playerId: user.id,
       nickname: user.nickname,
       bannedAt: user.bannedAt,
@@ -87,6 +89,11 @@ export const readReview = async (db: Db, reviewId: string) => {
     id: found.id,
     reason: found.reason,
     openedAt: found.openedAt.getTime(),
+    // Both or neither are set (`review_settled_whole`).
+    settlement:
+      found.settledAt && found.decision
+        ? { decision: found.decision, settledAt: found.settledAt.getTime() }
+        : null,
     player: { id: playerId, nickname: found.nickname, banned: found.bannedAt !== null },
     suspicion: found.suspicion,
     standing,

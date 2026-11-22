@@ -26,11 +26,12 @@ test("a removed message is read back as it was sent", () => {
 
 test("a proposed, a requeued and a paired message are read back as they were sent", () => {
   const messages: QueueServerMessage[] = [
-    { type: "proposed", pairingId: "pairing", acceptWithinMs: 10_000, players },
+    { type: "proposed", pairingId: "pairing", acceptWithinMs: 10_000, accepted: false, players },
     {
       type: "proposed",
       pairingId: "pairing",
       acceptWithinMs: 10_000,
+      accepted: false,
       players: {
         self: { ...players.opponent, ornament: { tier: "unranked", division: null } },
         opponent: { ...players.self, rank: { tier: "master", lp: 320 }, ornament: null },
@@ -43,6 +44,18 @@ test("a proposed, a requeued and a paired message are read back as they were sen
   for (const message of messages) {
     expect(parseQueueMessage(JSON.stringify(message))).toEqual(message);
   }
+});
+
+test("a Pairing proposed again after a reconnect, which the Player already accepted, is read back as it was sent", () => {
+  const message: QueueServerMessage = {
+    type: "proposed",
+    pairingId: "pairing",
+    acceptWithinMs: 4000,
+    accepted: true,
+    players,
+  };
+
+  expect(parseQueueMessage(JSON.stringify(message))).toEqual(message);
 });
 
 test("a message removing a Player who did not accept is read back as it was sent", () => {
@@ -69,6 +82,8 @@ test("a frame of an unknown type, or missing what its type requires, is not a me
     { type: "paired" },
     { type: "paired", duelId: 7 },
     { type: "proposed", pairingId: "pairing", players },
+    { type: "proposed", pairingId: "pairing", acceptWithinMs: 10_000, players },
+    { type: "proposed", pairingId: "pairing", acceptWithinMs: 10_000, accepted: "yes", players },
     { type: "proposed", pairingId: 7, acceptWithinMs: 10_000, players },
     { type: "proposed", pairingId: "pairing", acceptWithinMs: 10_000 },
     {

@@ -3,7 +3,7 @@ import { ErrorPanel } from "../../../shared/components/ErrorPanel.tsx";
 import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { Panel } from "../../../shared/components/Panel.tsx";
 import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import { useOrnamentPicker } from "../hooks/useOrnamentPicker.ts";
 import { OrnamentOptionGrid } from "./OrnamentOptionGrid.tsx";
 import { OrnamentPickerSkeleton } from "./OrnamentPickerSkeleton.tsx";

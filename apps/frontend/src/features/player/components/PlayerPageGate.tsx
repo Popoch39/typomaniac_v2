@@ -22,14 +22,13 @@ interface PlayerPageGateProps {
 
 // Holds the page back until every panel can be drawn whole, so that none is pushed in or grows later.
 export function PlayerPageGate({ nickname, pending, children }: PlayerPageGateProps) {
-  const { player, progress, isProgressUpdating, addFriend, stage, failure, retry } =
-    usePlayerPageReads(nickname);
+  const gate = usePlayerPageReads(nickname);
 
   return (
-    <ReadGate stage={stage} pending={pending} title="Player" failure={failure} retry={retry}>
-      {player !== null &&
-        progress !== null &&
-        children(player, progress, isProgressUpdating, addFriend)}
+    <ReadGate state={gate} pending={pending} title="Player">
+      {({ player, progress, isProgressUpdating, addFriend }) =>
+        children(player, progress, isProgressUpdating, addFriend)
+      }
     </ReadGate>
   );
 }

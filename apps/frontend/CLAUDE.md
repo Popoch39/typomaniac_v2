@@ -71,6 +71,14 @@ La logique pure d'une feature (fonctions sans React ni store, testées directeme
 
 Un fichier ne contient qu'un composant, un hook ou un store, et porte son nom.
 
+## Cycles de vie
+
+Voir `docs/adr/0018-lifecycles-are-discriminated-unions-with-a-pure-transition-function.md`.
+
+- Aucun booléen, champ nullable ou timestamp ne code une phase. Un cycle de vie à plus de deux états, ou dont une donnée n'a de sens que dans certains états, est une union discriminée sur `kind` (`type` reste aux messages du WebSocket), chaque variante ne portant que ses propres données.
+- Ses transitions vivent dans une seule fonction pure et testée, nommée par son domaine (`next<Thing>(state, event)`, comme `nextDuel` ou `nextSocketLink`), dans le dossier pur nommé par son domaine (voir « Organisation des fichiers »). Le store n'exécute que les effets choisis par la transition (minuteurs, envois, abonnements), il ne décide jamais de la phase.
+- Un store qui possède un WebSocket se teste par son API vanilla (`getState()`) contre un serveur WebSocket Bun local qui joue un script de messages serveur.
+
 ## React Compiler
 
 Le React Compiler est activé via le port Rust d'Oxc (`oxc-transform-react`), branché par `react({ compiler: true })` de `@vitejs/plugin-react` dans `vite.config.ts`. Ce n'est pas le plugin Babel. Doc : https://oxc.rs/docs/guide/usage/transformer/react-compiler

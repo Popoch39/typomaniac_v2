@@ -5,12 +5,15 @@ import { PairingSides } from "./PairingSides.tsx";
 import { QueueStatusLine } from "./QueueStatusLine.tsx";
 
 export function PairingPrompt() {
-  const { players, timeLeft, drainedShare, isAccepted, accept } = usePairingPrompt();
+  const prompt = usePairingPrompt();
+
+  if (prompt === null) return null;
+  const { players, timeLeft, drainedShare, isAccepted, canAccept, accept } = prompt;
 
   return (
     <div className="flex flex-1 flex-col gap-5">
       <p className="m-0 type-card-title text-action">Opponent found</p>
-      {players && <PairingSides players={players} />}
+      <PairingSides players={players} />
       {isAccepted ? (
         <QueueStatusLine message="Accepted. Waiting for your Opponent…" />
       ) : (
@@ -25,6 +28,7 @@ export function PairingPrompt() {
               variant="action"
               size="lg"
               onClick={accept}
+              disabled={!canAccept}
               className="w-full text-2xl"
             >
               Accept

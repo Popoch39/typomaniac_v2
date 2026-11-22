@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
+import { useSession } from "../../auth/hooks/useSession.ts";
 import { leaderboardRelationsQueryOptions } from "../api/leaderboardRelationsQueryOptions.ts";
 import { addFriendTarget } from "../relation/addFriendTarget.ts";
 
@@ -10,8 +10,8 @@ import { addFriendTarget } from "../relation/addFriendTarget.ts";
  * is the read a page gate waits on, null for a viewer who cannot have Friends.
  */
 export function useLeaderboardAddFriendTargets(page: number, isPagePlaceholder: boolean) {
-  const me = useQuery(meQueryOptions());
-  const viewer = me.data ?? null;
+  const { session, gate } = useSession();
+  const viewer = session.kind === "player" || session.kind === "named" ? session.player : null;
   const canHaveFriends = viewer !== null && viewer.nickname !== null;
   const relations = useQuery({
     ...leaderboardRelationsQueryOptions(canHaveFriends ? page : null),
@@ -21,7 +21,8 @@ export function useLeaderboardAddFriendTargets(page: number, isPagePlaceholder: 
   return {
     targetOf: (nickname: string | null) =>
       addFriendTarget({ viewer, nickname, relations: matching }),
-    me,
+    /** Whether the session, which decides whether there is a lookup at all, is still being read. */
+    isSessionChecking: gate.kind === "loading",
     relations: canHaveFriends ? relations : null,
   };
 }

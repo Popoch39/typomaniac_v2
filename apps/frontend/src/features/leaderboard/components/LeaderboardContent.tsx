@@ -8,23 +8,20 @@ import { LeaderboardSkeleton } from "./LeaderboardSkeleton.tsx";
 // Until the reader is known to be a Guest, the skeleton reserves the box of "Your position", so that a
 // signed-in reader's Panel never pushes the list down when it arrives.
 export function LeaderboardContent() {
-  const { leaderboard, addFriendOf, stage, isGuest, failure, retry, replacingPage } =
-    useLeaderboard();
+  const { gate, addFriendOf, isGuest, replacingPage } = useLeaderboard();
 
   return (
     <ReadGate
-      stage={stage}
+      state={gate}
       pending={
         <LoadingState message="Reading the Leaderboard…">
           <LeaderboardSkeleton withYourPosition={!isGuest} />
         </LoadingState>
       }
       title="Leaderboard"
-      failure={failure}
-      retry={retry}
     >
-      {leaderboard !== null &&
-        (leaderboard.total === 0 ? (
+      {(leaderboard) =>
+        leaderboard.total === 0 ? (
           <p className="m-0 text-ink-muted">No Player is ranked yet.</p>
         ) : (
           <>
@@ -33,7 +30,8 @@ export function LeaderboardContent() {
             )}
             <LeaderboardSections leaderboard={leaderboard} addFriendOf={addFriendOf} />
           </>
-        ))}
+        )
+      }
     </ReadGate>
   );
 }

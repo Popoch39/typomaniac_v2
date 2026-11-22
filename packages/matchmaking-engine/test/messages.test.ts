@@ -7,6 +7,7 @@ const serverMessages: QueueServerMessage[] = [
     type: "proposed",
     pairingId: "pairing",
     acceptWithinMs: 10_000,
+    accepted: false,
     players: {
       self: {
         nickname: "ada",

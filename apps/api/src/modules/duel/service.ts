@@ -4,7 +4,6 @@ import {
   DUEL_GAME_CONFIG,
   DUEL_WORD_COUNT,
   drawWords,
-  END_GRACE_MS,
   type FinishedRound,
   finalTickAt,
   getAverageMultiplier,
@@ -46,6 +45,14 @@ import {
   storedRank,
   visibleStanding,
 } from "../standing/service.ts";
+import {
+  CLOSE_AFTER_MS,
+  type DuelPhase,
+  decodeDuelPhase,
+  decodeRoundPhase,
+  nextStep,
+  type RoundPhase,
+} from "./phase.ts";
 import type { Relay } from "./relay.ts";
 
 /** How long a Duel can be joined after its creation. */
@@ -83,22 +90,7 @@ export type Round = {
   /** Rounds are numbered from 1. */
   readonly number: number;
   readonly words: readonly string[];
-  /**
-   * The Start instant in server time, `null` until it is fixed: with its Countdown for the first
-   * Round, when the Round before it ends for a later one.
-   */
-  readonly startAt: number | null;
-  /** Whether the Countdown was announced: only then do the Participants hold the Target words. */
-  readonly announced: boolean;
-  /** The server instant the `start` of each seat's Game is anchored at, `null` until it starts. */
-  readonly anchorAts: readonly (number | null)[];
-  /** Whether each seat's Game has ended. */
-  readonly gamesEnded: readonly boolean[];
-  /**
-   * Both Results, both Multipliers and both Outcomes of the Round and the instant it ended, `null`
-   * until then.
-   */
-  readonly end: (FinishedRound & { readonly endedAt: number }) | null;
+  readonly phase: RoundPhase;
 };
 
 export type Duel = {
@@ -109,14 +101,18 @@ export type Duel = {
   /** The Player holding each seat, `null` for a Guest or an empty seat. */
   readonly playerIds: readonly (string | null)[];
   /**
+   * The connection of the socket holding each seat as the Duel was read, `null` before any socket
+   * held it, never sent to a client.
+   */
+  readonly connections: readonly (string | null)[];
+  /**
    * The Rank of each Player of a ranked Duel as it was created, indexed by seat, `null` for an
    * Unranked Player; `null` for a Custom Duel.
    */
   readonly ranks: readonly [Rank | null, Rank | null] | null;
   /** The current Round. */
   readonly round: Round;
-  /** What both Participants were told at the end, `null` until the Duel is finalised. */
-  readonly end: DuelEnd | null;
+  readonly phase: DuelPhase;
 };
 
 export type DuelEnd = Extract<ServerMessage, { type: "end" }>;
@@ -140,6 +136,28 @@ const dueKey = (redis: Redis) => redis.name("duels", "due");
  */
 const rankedDuelKey = (redis: Redis, playerId: string) =>
   redis.name("player", playerId, "rankedDuel");
+
+/** What `rankedDuelKey` puts before and after a Player id, for the scripts that build it themselves. */
+const rankedDuelKeyEnds = (redis: Redis) => {
+  // Cut around an id no Player has, so that the separator `name` puts is not assumed.
+  const placeholder = "\u0000";
+  const [prefix = "", suffix = ""] = rankedDuelKey(redis, placeholder).split(placeholder);
+  return [prefix, suffix] as const;
+};
+
+// Lua run with each expiry of a Duel, so that the record against its Players never expires before
+// it: the Queue would accept them again while the Duel goes on. The keys are built from the Player
+// ids the Duel holds, between the two ends of `rankedDuelKeyEnds`, which every script running this
+// passes as its last two arguments. A Player recorded against another Duel keeps that one's expiry.
+const refreshRankedDuelKeys = (duelId: string, expiryMs: string) => `
+for seat = 0, 1 do
+  local player = redis.call('HGET', KEYS[1], 'player' .. seat)
+  if player then
+    local marker = ARGV[#ARGV - 1] .. player .. ARGV[#ARGV]
+    if redis.call('HGET', marker, 'duelId') == ${duelId} then redis.call('PEXPIRE', marker, ${expiryMs}) end
+  end
+end
+`;
 
 /**
  * The Duels a Player holds a seat in, ranked or Custom, each a field, from the claim until the Duel
@@ -167,19 +185,12 @@ export const isInUnfinishedDuel = async (redis: Redis, playerId: string) => {
   const duelIds: string[] = await redis.client.send("HKEYS", [playerDuelsKey(redis, playerId)]);
   const unfinished = await Promise.all(
     duelIds.map(async (duelId) => {
-      const [round, end]: (string | null)[] = await redis.client.send("HMGET", [
-        duelKey(redis, duelId),
-        "round",
-        "end",
-      ]);
-      return round !== null && end === null;
+      const duel = await readDuel(redis, duelId);
+      return duel !== null && duel.phase.kind !== "finalised";
     }),
   );
   return unfinished.includes(true);
 };
-
-/** From the Start of a Round to the instant the server closes the Games still open. */
-const CLOSE_AFTER_MS = DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS;
 
 // One script, so the expiry is set with the Duel and its first Round: neither can outlive it. The
 // Duel is due once it has expired, when the sweep forgets it.
@@ -326,24 +337,30 @@ export const holdSeat = async (redis: Redis, duelId: string, seat: Seat, connect
   await redis.client.eval(HOLD, 1, duelKey(redis, duelId), seat, connection);
 };
 
-// Only the socket that holds the seat lets it go: one replaced by a reconnection closes later.
+// Only the socket that holds the seat lets it go: one replaced by a reconnection closes later. An
+// empty connection stands for a seat no socket has held yet.
 const RELEASE = `
-if redis.call('HGET', KEYS[1], 'connection' .. ARGV[1]) ~= ARGV[2] then return 0 end
+if (redis.call('HGET', KEYS[1], 'connection' .. ARGV[1]) or '') ~= ARGV[2] then return 0 end
 redis.call('HSET', KEYS[1], 'connected' .. ARGV[1], '0')
 return 1
 `;
 
 /**
  * The seat stays held by its identity: only its connection is let go. Gives whether `connection`
- * was still the one holding the seat.
+ * was still the one holding the seat, `null` standing for no socket having held it yet.
  */
-export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat, connection: string) => {
+export const releaseSeat = async (
+  redis: Redis,
+  duelId: string,
+  seat: Seat,
+  connection: string | null,
+) => {
   const released: number = await redis.client.eval(
     RELEASE,
     1,
     duelKey(redis, duelId),
     seat,
-    connection,
+    connection ?? "",
   );
   return released === 1;
 };
@@ -351,19 +368,7 @@ export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat, conn
 const readRound = async (redis: Redis, duelId: string, number: number): Promise<Round | null> => {
   const round = await redis.client.hgetall(roundKey(redis, duelId, number));
   if (round.words === undefined) return null;
-  const anchorAts = SEATS.map((seat) => {
-    const anchorAt = round[`anchor${seat}`];
-    return anchorAt === undefined ? null : Number(anchorAt);
-  });
-  return {
-    number,
-    words: JSON.parse(round.words) as string[],
-    startAt: round.startAt === undefined ? null : Number(round.startAt),
-    announced: round.announced === "1",
-    anchorAts,
-    gamesEnded: SEATS.map((seat) => round[`ended${seat}`] === "1"),
-    end: round.end === undefined ? null : (JSON.parse(round.end) as Round["end"]),
-  };
+  return { number, words: JSON.parse(round.words) as string[], phase: decodeRoundPhase(round) };
 };
 
 /** The Rounds of a Duel from the first one to Round `upTo`, in order. */
@@ -378,11 +383,11 @@ export const readRounds = async (redis: Redis, duelId: string, upTo: number) => 
 
 /** What a client is told of the finished Rounds among `rounds`. */
 export const finishedRounds = (rounds: readonly Round[]) =>
-  rounds.flatMap(({ end }): FinishedRound[] =>
-    end === null
-      ? []
-      : [{ results: end.results, multipliers: end.multipliers, outcomes: end.outcomes }],
-  );
+  rounds.flatMap(({ phase }): FinishedRound[] => {
+    if (phase.kind !== "ended") return [];
+    const { results, multipliers, outcomes } = phase.end;
+    return [{ results, multipliers, outcomes }];
+  });
 
 export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | null> => {
   const fields = await redis.client.hgetall(duelKey(redis, duelId));
@@ -402,7 +407,7 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
-  const end = fields.end === undefined ? null : (JSON.parse(fields.end) as DuelEnd);
+  const connections = SEATS.map((seat) => fields[`connection${seat}`] ?? null);
   const kind = fields.kind === "ranked" ? "ranked" : "custom";
   const rankOf = (seat: Seat) => JSON.parse(fields[`rank${seat}`] ?? "null") as Rank | null;
   return {
@@ -410,9 +415,10 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     participants,
     holderIds,
     playerIds,
+    connections,
     ranks: kind === "ranked" ? [rankOf(0), rankOf(1)] : null,
     round,
-    end,
+    phase: decodeDuelPhase(fields, round.phase),
   };
 };
 
@@ -439,6 +445,7 @@ redis.call('ZADD', KEYS[3], tonumber(ARGV[1]) + tonumber(ARGV[4]), ARGV[5])
 -- Counted again from the Start, so that a Duel joined late does not expire before it is finalised.
 redis.call('PEXPIRE', KEYS[1], ARGV[2])
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
+${refreshRankedDuelKeys("ARGV[5]", "ARGV[2]")}
 return {ARGV[1], '1'}
 `;
 
@@ -470,6 +477,7 @@ export const announceStart = async (
     CLOSE_AFTER_MS,
     duelId,
     forced ? "1" : "0",
+    ...rankedDuelKeyEnds(redis),
   );
   const [announcedAt, announced] = answer;
   if (announcedAt === undefined) return null;
@@ -651,6 +659,7 @@ else
 end
 redis.call('PEXPIRE', KEYS[1], ARGV[6])
 redis.call('PEXPIRE', KEYS[2], ARGV[6])
+${refreshRankedDuelKeys("ARGV[8]", "ARGV[6]")}
 redis.call('ZADD', KEYS[4], ARGV[7], ARGV[8])
 return 1
 `;
@@ -707,7 +716,7 @@ export const readUnfinishedRankedDuel = async (redis: Redis, playerId: string) =
   const duelId = await redis.client.hget(rankedDuelKey(redis, playerId), "duelId");
   if (duelId === null) return null;
   const duel = await readDuel(redis, duelId);
-  return duel === null || duel.end !== null ? null : duelId;
+  return duel === null || duel.phase.kind === "finalised" ? null : duelId;
 };
 
 /** Whether this call claimed the finalisation of a Duel that its Rounds have decided. */
@@ -911,16 +920,12 @@ const finaliseDuel = async (
     // Expired meanwhile: nothing is left to save.
     if (!duel) return;
     const rounds: PlayedRound[] = [];
-    for (const { number, words, startAt, end } of await readRounds(
-      redis,
-      duelId,
-      duel.round.number,
-    )) {
-      if (startAt === null || end === null)
+    for (const { number, words, phase } of await readRounds(redis, duelId, duel.round.number)) {
+      if (phase.kind !== "ended")
         throw new Error(`Round ${number} of Duel ${duelId} has not ended`);
       const journals = await readJournals(redis, duelId, number);
       const hints = await readHints(redis, duelId, number);
-      rounds.push({ number, words, startAt, journals, hints, ...end });
+      rounds.push({ number, words, startAt: phase.startAt, journals, hints, ...phase.end });
     }
     const outcomes = getDuelOutcomes(rounds.map((round) => round.outcomes));
     if (outcomes === null) throw new Error(`Duel ${duelId} is not decided`);
@@ -964,8 +969,9 @@ export const endRound = async (
 ) => {
   const rounds = await readRounds(redis, duelId, round);
   const current = rounds.at(-1);
-  const isOver = current?.gamesEnded.every((ended) => ended) === true;
-  if (current?.number === round && rounds.length === round && current.end === null && isOver) {
+  const isOver =
+    current?.phase.kind === "running" && current.phase.gamesEnded.every((ended) => ended);
+  if (current?.number === round && rounds.length === round && isOver) {
     const journals = await readJournals(redis, duelId, round);
     const games = [
       replayGame(current.words, journals[0]),
@@ -1002,6 +1008,7 @@ export const endRound = async (
       expiryMs,
       nextStartAt === null ? endedAt : nextStartAt - countdownMs,
       duelId,
+      ...rankedDuelKeyEnds(redis),
     );
     if (ended === 1)
       await relay.publish(duelId, null, {
@@ -1054,8 +1061,9 @@ const closeOverdueGames = async (
 ) => {
   const duel = await readDuel(redis, duelId);
   if (!duel) return;
-  const { number, words, startAt } = duel.round;
-  if (number === round && startAt !== null) {
+  const { number, words, phase } = duel.round;
+  if (number === round && (phase.kind === "countdown" || phase.kind === "running")) {
+    const { startAt } = phase;
     const journals = await readJournals(redis, duelId, round);
     for (const seat of SEATS) {
       const game = replayGame(words, journals[seat]);
@@ -1098,40 +1106,26 @@ const advanceDuel = async (
   delays: RoundDelays,
   now: number,
 ) => {
-  const duel = await readDuel(redis, duelId);
-  // Expired, or finalised by an instance that stopped before forgetting it.
-  if (!duel || duel.end) {
-    await forgetDuel(redis, duelId);
-    return;
-  }
-  const { number, startAt, announced, end } = duel.round;
-  // The current Round has ended only once the Duel is decided: its finalisation failed so far.
-  if (end !== null) {
-    await finaliseDuel(db, redis, relay, duelId);
-    return;
-  }
-  const { expiryMs, countdownMs } = delays;
-  // Still waiting for its first Start. A Custom Duel is due only once it has expired; a ranked one
-  // once its Players had the time to connect, when its Countdown begins whoever is there.
-  if (startAt === null) {
-    if (duel.kind === "ranked")
-      await announceCountdown(redis, relay, duelId, number, {
-        startAt: now + countdownMs,
-        expiryMs,
-        forced: true,
+  const step = nextStep(await readDuel(redis, duelId), now, delays.countdownMs);
+  switch (step?.kind) {
+    case "forget":
+      await forgetDuel(redis, duelId);
+      return;
+    case "finalise":
+      await finaliseDuel(db, redis, relay, duelId);
+      return;
+    case "announce": {
+      const { round, startAt, forced } = step;
+      await announceCountdown(redis, relay, duelId, round, {
+        startAt,
+        expiryMs: delays.expiryMs,
+        forced,
       });
-    return;
+      return;
+    }
+    case "close":
+      await closeOverdueGames(db, redis, relay, duelId, step.round, delays, now);
   }
-  if (!announced) {
-    if (now >= startAt - countdownMs)
-      await announceCountdown(redis, relay, duelId, number, {
-        startAt: Math.max(now + countdownMs, startAt),
-        expiryMs,
-      });
-    return;
-  }
-  if (now >= startAt + CLOSE_AFTER_MS)
-    await closeOverdueGames(db, redis, relay, duelId, number, delays, now);
 };
 
 /**

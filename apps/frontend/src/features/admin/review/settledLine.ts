@@ -7,7 +7,7 @@ const LINES: Readonly<Record<ReviewEnding, string>> = {
   ban: "Settled: the Player is banned.",
 };
 
-/** How a Review the administrator just settled ended, as the page says it. */
+/** How a settled Review ended, as the page says it. */
 export function settledLine(ending: ReviewEnding) {
   return LINES[ending];
 }

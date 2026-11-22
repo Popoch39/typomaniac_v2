@@ -1,4 +1,4 @@
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import { usePlayerStandingLine } from "../hooks/usePlayerStandingLine.ts";
 
 interface PlayerStandingLineProps {

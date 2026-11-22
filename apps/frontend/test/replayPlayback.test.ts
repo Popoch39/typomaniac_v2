@@ -1,65 +1,128 @@
 import { expect, test } from "bun:test";
 import {
-  isPlaying,
-  pausePlayback,
+  CLOSED_PLAYBACK,
+  nextReplayPlayback,
+  playbackEndsIn,
   playbackPosition,
-  restartPlayback,
-  resumePlayback,
-  slowPlayback,
-  startPlayback,
+  type ReplayPlayback,
 } from "../src/features/admin/replay/replayPlayback.ts";
 
 const DURATION = 30_000;
 
-test("a replay plays the journal at its real rhythm from its start", () => {
-  const playback = startPlayback(1000);
+// The playback a transition moves to, its effects read by their own test.
+const playbackAfter = (...[playback, event]: Parameters<typeof nextReplayPlayback>) =>
+  nextReplayPlayback(playback, event).playback;
 
-  expect(playbackPosition(playback, 1000, DURATION)).toBe(0);
-  expect(playbackPosition(playback, 3500, DURATION)).toBe(2500);
-  expect(isPlaying(playback, 3500, DURATION)).toBe(true);
+const opened = (at: number) =>
+  playbackAfter(CLOSED_PLAYBACK, { kind: "open", replayed: "duel/1", duration: DURATION, at });
+
+test("a replay plays the journal at its real rhythm from its start", () => {
+  const playback = opened(1000);
+
+  expect(playback.kind).toBe("playing");
+  expect(playbackPosition(playback, 1000)).toBe(0);
+  expect(playbackPosition(playback, 3500)).toBe(2500);
 });
 
-test("a replay stops on the end of the journal", () => {
-  const playback = startPlayback(0);
+test("a replay that plays shows the end of the journal once past it, and reaches it then", () => {
+  const playback = opened(0);
 
-  expect(playbackPosition(playback, 40_000, DURATION)).toBe(DURATION);
-  expect(isPlaying(playback, 40_000, DURATION)).toBe(false);
+  expect(playbackPosition(playback, 40_000)).toBe(DURATION);
+  expect(playbackEndsIn(playback, 10_000)).toBe(20_000);
+  const ended = playbackAfter(playback, { kind: "reachEnd" });
+  expect(ended.kind).toBe("ended");
+  expect(playbackPosition(ended, 50_000)).toBe(DURATION);
+  expect(playbackEndsIn(ended, 50_000)).toBeNull();
 });
 
 test("a paused replay stays where it was paused, and resumes from there", () => {
-  const paused = pausePlayback(startPlayback(0), 2000, DURATION);
+  const paused = playbackAfter(opened(0), { kind: "togglePause", at: 2000 });
 
-  expect(playbackPosition(paused, 9000, DURATION)).toBe(2000);
-  expect(isPlaying(paused, 9000, DURATION)).toBe(false);
-  const resumed = resumePlayback(paused, 9000, DURATION);
-  expect(playbackPosition(resumed, 10_000, DURATION)).toBe(3000);
+  expect(paused.kind).toBe("paused");
+  expect(playbackPosition(paused, 9000)).toBe(2000);
+  expect(playbackEndsIn(paused, 9000)).toBeNull();
+  const resumed = playbackAfter(paused, { kind: "togglePause", at: 9000 });
+  expect(playbackPosition(resumed, 10_000)).toBe(3000);
 });
 
 test("resuming a replay that reached the end plays it again from the start", () => {
-  const ended = pausePlayback(startPlayback(0), 40_000, DURATION);
+  const ended = playbackAfter(opened(0), { kind: "reachEnd" });
 
-  expect(playbackPosition(resumePlayback(ended, 50_000, DURATION), 51_000, DURATION)).toBe(1000);
+  expect(playbackPosition(playbackAfter(ended, { kind: "togglePause", at: 50_000 }), 51_000)).toBe(
+    1000,
+  );
 });
 
 test("a restarted replay plays again from the start", () => {
-  const restarted = restartPlayback(startPlayback(0), 5000);
+  const restarted = playbackAfter(opened(0), { kind: "restart", at: 5000 });
 
-  expect(playbackPosition(restarted, 6000, DURATION)).toBe(1000);
-  expect(isPlaying(restarted, 6000, DURATION)).toBe(true);
+  expect(restarted.kind).toBe("playing");
+  expect(playbackPosition(restarted, 6000)).toBe(1000);
 });
 
 test("a slowed replay goes on from where it is at the chosen share of the real rhythm", () => {
-  const slowed = slowPlayback(startPlayback(0), 0.25, 4000, DURATION);
+  const slowed = playbackAfter(opened(0), { kind: "slow", speed: 0.25, at: 4000 });
 
-  expect(playbackPosition(slowed, 4000, DURATION)).toBe(4000);
-  expect(playbackPosition(slowed, 8000, DURATION)).toBe(5000);
+  expect(playbackPosition(slowed, 4000)).toBe(4000);
+  expect(playbackPosition(slowed, 8000)).toBe(5000);
+  expect(playbackEndsIn(slowed, 8000)).toBe(100_000);
 });
 
 test("a paused replay keeps the speed chosen meanwhile, and a restart keeps it too", () => {
-  const paused = pausePlayback(startPlayback(0), 2000, DURATION);
-  const slowed = slowPlayback(paused, 0.5, 3000, DURATION);
+  const paused = playbackAfter(opened(0), { kind: "togglePause", at: 2000 });
+  const slowed = playbackAfter(paused, { kind: "slow", speed: 0.5, at: 3000 });
 
-  expect(playbackPosition(slowed, 5000, DURATION)).toBe(2000);
-  expect(playbackPosition(resumePlayback(slowed, 5000, DURATION), 7000, DURATION)).toBe(3000);
-  expect(playbackPosition(restartPlayback(slowed, 10_000), 12_000, DURATION)).toBe(1000);
+  expect(playbackPosition(slowed, 5000)).toBe(2000);
+  expect(playbackPosition(playbackAfter(slowed, { kind: "togglePause", at: 5000 }), 7000)).toBe(
+    3000,
+  );
+  expect(playbackPosition(playbackAfter(slowed, { kind: "restart", at: 10_000 }), 12_000)).toBe(
+    1000,
+  );
+});
+
+test("closing a replay forgets where it stood, and opening another plays it from its start", () => {
+  const paused = playbackAfter(opened(0), { kind: "togglePause", at: 2000 });
+  const closed = playbackAfter(paused, { kind: "close" });
+
+  expect(closed.kind).toBe("closed");
+  const reopened = playbackAfter(closed, {
+    kind: "open",
+    replayed: "duel/2",
+    duration: DURATION,
+    at: 9000,
+  });
+  expect(reopened).toEqual({
+    kind: "playing",
+    replayed: "duel/2",
+    duration: DURATION,
+    speed: 1,
+    from: 0,
+    since: 9000,
+  } satisfies ReplayPlayback);
+});
+
+test("a closed replay ignores the controls", () => {
+  expect(playbackAfter(CLOSED_PLAYBACK, { kind: "togglePause", at: 0 })).toBe(CLOSED_PLAYBACK);
+  expect(playbackAfter(CLOSED_PLAYBACK, { kind: "restart", at: 0 })).toBe(CLOSED_PLAYBACK);
+  expect(playbackAfter(CLOSED_PLAYBACK, { kind: "reachEnd" })).toBe(CLOSED_PLAYBACK);
+});
+
+test("a replay that plays arms its end at the end of its journal, and one that stops playing disarms it", () => {
+  const open = { kind: "open", replayed: "duel/1", duration: DURATION, at: 1000 } as const;
+  const playing = nextReplayPlayback(CLOSED_PLAYBACK, open);
+  expect(playing.effects).toEqual([{ kind: "endIn", ms: DURATION }]);
+
+  const paused = nextReplayPlayback(playing.playback, { kind: "togglePause", at: 11_000 });
+  expect(paused.effects).toEqual([{ kind: "cancelEnd" }]);
+
+  const slowed = nextReplayPlayback(
+    nextReplayPlayback(paused.playback, { kind: "togglePause", at: 20_000 }).playback,
+    { kind: "slow", speed: 0.5, at: 20_000 },
+  );
+  expect(slowed.effects).toEqual([{ kind: "endIn", ms: 40_000 }]);
+
+  expect(nextReplayPlayback(slowed.playback, { kind: "close" }).effects).toEqual([
+    { kind: "cancelEnd" },
+  ]);
 });
