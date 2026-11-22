@@ -20,6 +20,7 @@ const serverMessages: QueueServerMessage[] = [
   { type: "requeued", queuedAt: 1000, serverAt: 12_000 },
   { type: "removed", reason: "replaced" },
   { type: "removed", reason: "notAccepted" },
+  { type: "removed", reason: "challenged" },
   { type: "paired", duelId: "duel" },
 ];
 

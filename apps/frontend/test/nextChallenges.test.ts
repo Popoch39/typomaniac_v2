@@ -9,6 +9,7 @@ import {
   nextChallenges,
   withdrawnChallenge,
 } from "../src/features/challenge/outcome/nextChallenges.ts";
+import type { ChallengeRefusal } from "../src/features/online/message/parsePlayerMessage.ts";
 
 const ada = {
   id: "ada",
@@ -51,10 +52,12 @@ test("a Challenge being sent waits for the server, then counts down from what it
 
 test("a refused Challenge leaves nothing waiting and says why, naming the Friend", () => {
   const sending = challengeSending(NO_CHALLENGES, bob);
-  const say = (code: "NOT_FRIENDS" | "FRIEND_OFFLINE" | "CHALLENGE_PENDING" | "RATE_LIMITED") =>
+  const say = (code: ChallengeRefusal) =>
     nextChallenges(sending, { type: "challengeRefused", playerId: "bob", code }, 0);
   expect(say("NOT_FRIENDS")).toEqual({ ...NO_CHALLENGES, notice: "Bob is no longer your Friend." });
   expect(say("FRIEND_OFFLINE").notice).toBe("Bob is offline: they cannot be challenged now.");
+  expect(say("FRIEND_BUSY").notice).toBe("Bob is busy in a Duel: challenge them once it is over.");
+  expect(say("IN_DUEL").notice).toBe("You are in a Duel: finish it before challenging Bob.");
   expect(say("CHALLENGE_PENDING").notice).toBe(
     "You already have a Challenge waiting. Cancel it to challenge Bob.",
   );

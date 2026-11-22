@@ -15,6 +15,8 @@ type QueueState = {
     | "paired"
     | "replaced"
     | "notAccepted"
+    /** The Player accepted a Challenge, whose Custom Duel took them out of the Queue. */
+    | "challenged"
     | "refused"
     | "disconnected";
   /** Whole seconds waited in the Queue, refreshed while the Player is queued. */
@@ -78,7 +80,7 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     }
     usePairingStore.getState().close();
     if (message.type === "paired") set({ phase: "paired", duelId: message.duelId });
-    else set({ phase: message.reason === "replaced" ? "replaced" : "notAccepted" });
+    else set({ phase: message.reason });
   };
 
   // A removed or paired Player was already told why: the close that follows adds nothing.

@@ -92,6 +92,8 @@ test("each Challenge message is read back as it was sent", () => {
   const messages = [
     { type: "challengeSent", challengeId: "c1", playerId: "bob", answerWithinMs: 60_000 },
     { type: "challengeRefused", playerId: "bob", code: "FRIEND_OFFLINE" },
+    { type: "challengeRefused", playerId: "bob", code: "FRIEND_BUSY" },
+    { type: "challengeRefused", playerId: "bob", code: "IN_DUEL" },
     { type: "challengeReceived", challengeId: "c1", challenger, answerWithinMs: 59_000 },
     {
       type: "challengeReceived",

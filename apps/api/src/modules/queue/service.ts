@@ -1,5 +1,5 @@
 import type { Logger } from "@repo/logger";
-import type { PairingSide } from "@repo/matchmaking-engine";
+import type { PairingSide, QueueRemovalReason } from "@repo/matchmaking-engine";
 import type { EntryHolder } from "@repo/queue";
 import { rankedOpensAt } from "@repo/fair-play-engine";
 import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
@@ -21,11 +21,35 @@ export {
   proposePairing,
   QUEUE_ENTRY_EXPIRY_MS,
   readPairing,
+  readPendingPairing,
   readQueueEntry,
   refreshQueueEntry,
   tickMatchmaker,
 } from "@repo/queue";
 export type { DuelCreation, EntryHolder, PairingChange } from "@repo/queue";
+
+/** The channel on which every API instance holding a Queue socket learns that it must leave the Queue. */
+export const queueEvictionChannel = (redis: Redis) => redis.name("queue", "evictions");
+
+/**
+ * What travels on that channel: every Queue socket of the Player but `connection` leaves the Queue,
+ * all of them when `connection` is `null`, telling its Player why.
+ */
+export type QueueEviction = {
+  readonly playerId: string;
+  readonly connection: string | null;
+  readonly reason: QueueRemovalReason;
+};
+
+/** Takes the Player out of the Queue for that reason, whichever instance holds their socket. */
+export const evictFromQueue = async (
+  redis: Redis,
+  playerId: string,
+  reason: QueueRemovalReason,
+) => {
+  const eviction: QueueEviction = { playerId, connection: null, reason };
+  await redis.client.publish(queueEvictionChannel(redis), JSON.stringify(eviction));
+};
 
 /**
  * Records that the Player accepts the Pairing at `now`, as `acceptPairing` answers. The ranked Duel

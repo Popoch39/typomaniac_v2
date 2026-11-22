@@ -42,6 +42,10 @@ const refusalNotice = (code: ChallengeRefusal, nickname: string) => {
       return `${nickname} is no longer your Friend.`;
     case "FRIEND_OFFLINE":
       return `${nickname} is offline: they cannot be challenged now.`;
+    case "FRIEND_BUSY":
+      return `${nickname} is busy in a Duel: challenge them once it is over.`;
+    case "IN_DUEL":
+      return `You are in a Duel: finish it before challenging ${nickname}.`;
     case "CHALLENGE_PENDING":
       return `You already have a Challenge waiting. Cancel it to challenge ${nickname}.`;
     case "RATE_LIMITED":
