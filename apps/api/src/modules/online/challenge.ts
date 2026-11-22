@@ -21,6 +21,7 @@ import {
   readChallenge,
   readChallengesOf,
   readDueChallenges,
+  onlineWindowNow,
   readPlayerStates,
 } from "./service.ts";
 
@@ -62,7 +63,7 @@ export const createChallenges = (
   let following: Promise<unknown> | null = null;
 
   const isOnline = async (playerId: string) =>
-    (await readPlayerStates(redis, [playerId], { now: Date.now(), windowMs })).get(playerId) !==
+    (await readPlayerStates(redis, [playerId], onlineWindowNow(windowMs))).get(playerId) !==
     "offline";
 
   // A Player in a Pairing awaiting acceptance is about to enter a ranked Duel.
@@ -225,7 +226,7 @@ export const createChallenges = (
     },
     /** Cancels the Challenges of those of these Players who went offline. */
     whenChanged: async (playerIds: readonly string[]) => {
-      const states = await readPlayerStates(redis, playerIds, { now: Date.now(), windowMs });
+      const states = await readPlayerStates(redis, playerIds, onlineWindowNow(windowMs));
       await cancelAllOf(
         [...states].flatMap(([playerId, state]) => (state === "offline" ? [playerId] : [])),
       );

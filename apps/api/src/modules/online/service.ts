@@ -51,6 +51,9 @@ export const refreshOnline = async (
   return { count, changed: [...joined, ...left] };
 };
 
+/** The window as it stands now, for refreshing or reading who is Online. */
+export const onlineWindowNow = (windowMs: number) => ({ now: Date.now(), windowMs });
+
 /**
  * The state each Player shows their Friends at `now`: Online while refreshed within the window, and
  * In a Duel while also seated in an unfinished Duel.
