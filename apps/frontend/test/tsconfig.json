@@ -35,6 +35,7 @@
     "../src/features/admin/review",
     "../src/features/auth/refusal",
     "../src/features/fair-play/notice",
+    "../src/features/online/message",
     "../src/features/leaderboard/own",
     "../src/features/leaderboard/page",
     "../src/features/ornament/art",
