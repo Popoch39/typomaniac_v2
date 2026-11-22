@@ -8,12 +8,14 @@ interface FriendsPlayerRowProps {
   player: ListedPlayer;
   /** Why the row's last action failed; its line is kept even when empty, so that nothing moves. */
   failure: string | null;
+  /** Shown beside the Rank. */
+  detail?: ReactNode;
   /** The keys on the right of the row. */
   children: ReactNode;
 }
 
 /** A Player on the Friends page: Avatar, Nickname leading to their page, Rank, and their keys. */
-export function FriendsPlayerRow({ player, failure, children }: FriendsPlayerRowProps) {
+export function FriendsPlayerRow({ player, failure, detail, children }: FriendsPlayerRowProps) {
   return (
     <li className="flex flex-col gap-1 border-t-2 border-surface-plate pt-3 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pb-1">
@@ -22,7 +24,10 @@ export function FriendsPlayerRow({ player, failure, children }: FriendsPlayerRow
           <span className="truncate text-base font-extrabold">
             <PlayerPageLink player={player} />
           </span>
-          <PlayerRank rank={player.rank} />
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <PlayerRank rank={player.rank} />
+            {detail}
+          </span>
         </span>
         <span className="flex gap-2.5">{children}</span>
       </div>

@@ -35,6 +35,7 @@
     "../src/features/admin/review",
     "../src/features/auth/refusal",
     "../src/features/fair-play/notice",
+    "../src/features/friends/presence",
     "../src/features/friends/relation",
     "../src/features/friends/request",
     "../src/features/friends/search",

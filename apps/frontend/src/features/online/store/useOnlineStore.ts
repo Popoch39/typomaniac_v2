@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import { refreshFriendReads } from "../../friends/api/friendsQueryOptions.ts";
+import { useFriendStateStore } from "../../friends/store/useFriendStateStore.ts";
+import type { PlayerServerMessage } from "../message/parsePlayerMessage.ts";
 import { closePlayerSocket, openPlayerSocket } from "../socket/playerSocket.ts";
 
 type OnlineState = {
@@ -10,6 +13,11 @@ type OnlineState = {
   readonly follow: (playerId: string | null) => void;
 };
 
+// The Friends and Friend requests read again when the socket says they changed, and when it tells
+// the Friends' states on opening, since a reconnection may have missed a change.
+const changesFriendReads = (message: PlayerServerMessage) =>
+  message.type !== "onlineCount" && message.type !== "friendState";
+
 export const useOnlineStore = create<OnlineState>()((set, get) => ({
   playerId: null,
   count: null,
@@ -17,13 +25,25 @@ export const useOnlineStore = create<OnlineState>()((set, get) => ({
     if (playerId === get().playerId) return;
     closePlayerSocket();
     set({ playerId, count: null });
+    const friendStates = useFriendStateStore.getState();
+    friendStates.reset();
     if (playerId === null) return;
     openPlayerSocket({
-      receive: ({ count }) => set({ count }),
-      refuse: () => set({ count: null }),
+      receive: (message) => {
+        if (message.type === "onlineCount") return set({ count: message.count });
+        friendStates.receive(message);
+        if (changesFriendReads(message)) void refreshFriendReads();
+      },
+      refuse: () => {
+        set({ count: null });
+        friendStates.giveUp();
+      },
       // The count stays shown while the socket is reopened, so that a restart does not blank it.
       reconnect: () => get().playerId === playerId,
-      disconnect: () => set({ count: null }),
+      disconnect: () => {
+        set({ count: null });
+        friendStates.giveUp();
+      },
     });
   },
 }));
