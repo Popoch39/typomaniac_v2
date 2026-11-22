@@ -61,9 +61,9 @@ const server = Bun.serve({
 });
 afterAll(() => server.stop(true));
 
-// The Duel socket is opened on the page's own origin.
-Object.assign(globalThis, {
-  window: { location: { protocol: "http:", host: `localhost:${server.port}`, origin: "" } },
+// The Duel socket is opened on the page's own host, which is this server here.
+Object.defineProperty(globalThis, "window", {
+  value: { location: new URL(`http://localhost:${server.port}/`) },
 });
 const { useDuelStore } = await import("../src/features/duel/store/useDuelStore.ts");
 const { useGameStore } = await import("../src/features/game/store/useGameStore.ts");
