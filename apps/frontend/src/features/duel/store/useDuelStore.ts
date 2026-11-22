@@ -236,6 +236,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const { results, multipliers, outcomes } = message;
       set({
         phase: "roundEnd",
+        isReconnecting: false,
         rounds: [...rounds, { results, multipliers, outcomes }],
         opponentGame: null,
       });
@@ -248,7 +249,12 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const { seat } = get();
       // Opened with the end, so that the LP bar it holds mounts held.
       if (ranked !== null && seat !== null) useTierPromotionStore.getState().end(ranked[seat]);
-      set({ phase: "finished", rounds: message.rounds, end: { outcomes, ranked } });
+      set({
+        phase: "finished",
+        isReconnecting: false,
+        rounds: message.rounds,
+        end: { outcomes, ranked },
+      });
       // The Standing moved: the Ranked page and the profile read the new one.
       if (ranked !== null) void queryClient.invalidateQueries({ queryKey: standingQueryKey });
     }
