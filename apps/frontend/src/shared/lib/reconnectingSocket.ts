@@ -1,4 +1,4 @@
-import { reconnectDelay } from "./reconnectDelay.ts";
+import { CloseCode, reconnectDelay } from "./reconnectDelay.ts";
 
 type ReconnectDelay = (code: number, attempt: number) => number | null;
 
@@ -28,6 +28,8 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   // The try the pending retry makes, so that `retryNow` can make it at once.
   let retry: (() => void) | null = null;
+  // Drops the socket as it stands, `null` once it closed.
+  let dropSocket: (() => void) | null = null;
 
   // `attempt` counts the tries to reopen the socket since it last read a message, 0 for a first opening.
   function connect(url: string, handlers: ReconnectingSocketHandlers, attempt: number) {
@@ -39,8 +41,9 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
       received = true;
       receive(String(event.data));
     });
-    opened.addEventListener("close", async ({ code, reason }) => {
+    const closed = async ({ code, reason }: { readonly code: number; readonly reason: string }) => {
       if (socket !== opened) return;
+      dropSocket = null;
       if (received || attempt > 0) {
         // A reopening is a fresh opening: the server sends its first message again.
         const nextAttempt = received ? 1 : attempt + 1;
@@ -55,7 +58,14 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
       }
       const refusal = await findRefusal();
       if (socket === opened) refuse(refusal);
-    });
+    };
+    opened.addEventListener("close", closed);
+    dropSocket = () => {
+      // Its own close event would come later, and reopen it a second time.
+      opened.removeEventListener("close", closed);
+      opened.close();
+      void closed({ code: CloseCode.abnormal, reason: "" });
+    };
   }
 
   function cancelRetry() {
@@ -66,6 +76,7 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
 
   function close() {
     cancelRetry();
+    dropSocket = null;
     socket?.close();
     socket = null;
   }
@@ -81,6 +92,8 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
     },
     /** Makes the pending try to reopen the socket at once, if one is waiting. */
     retryNow: () => retry?.(),
+    /** Drops the socket as a lost connection would, so that it is reopened as long as its owner needs it. */
+    drop: () => dropSocket?.(),
     close,
   };
 }
