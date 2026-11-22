@@ -36,6 +36,12 @@ test("a socket that must come back is tried again with no last try, at most 30 s
   expect(endlessReconnectDelay(ABNORMAL_CLOSURE, 1000)).toBe(30_000);
 });
 
+test("a socket that must come back is tried again after a server error or a closing by a proxy", () => {
+  expect(endlessReconnectDelay(1001, 1)).toBe(500);
+  expect(endlessReconnectDelay(1011, 2)).toBe(1000);
+  expect(endlessReconnectDelay(1013, 7)).toBe(30_000);
+});
+
 test("a socket that must come back is still never tried again after the server closed it on purpose", () => {
   expect(endlessReconnectDelay(1000, 1)).toBeNull();
   expect(endlessReconnectDelay(1008, 1)).toBeNull();

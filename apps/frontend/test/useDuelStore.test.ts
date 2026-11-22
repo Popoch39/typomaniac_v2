@@ -134,6 +134,26 @@ test("a Participant back mid-Round is no longer reconnecting once the Duel end c
   expect(store.getState().isReconnecting).toBe(false);
 });
 
+test("a Participant back mid-Round is no longer reconnecting once the state comes, and stays frozen until the Game resumes", async () => {
+  const opponent = {
+    seat: 1,
+    name: "opponent",
+    avatarUrl: null,
+    ornament: null,
+    connected: true,
+  } as const;
+  scripts.push(dropped, {
+    messages: [{ ...midRound, participants: [opponent] }],
+    closeWith: null,
+  });
+
+  store.getState().join("duel-state");
+  await until(({ participants }) => participants.length === 1);
+
+  expect(store.getState().isReconnecting).toBe(false);
+  expect(useGameStore.getState().isFrozen).toBe(true);
+});
+
 test("Keystrokes applied while reconnecting do not change the Game, which resumes as the server journal", async () => {
   received.length = 0;
   const startAt = serverTime() + 200;

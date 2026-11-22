@@ -24,7 +24,7 @@ import type { Lifecycle } from "../lifecycle/service.ts";
 import { createSocketPhases } from "../lifecycle/socketPhase.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
-import { isAnnounced, startOf } from "./lifecycle.ts";
+import { isAnnounced, startOf } from "./phase.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
@@ -110,7 +110,12 @@ export const createDuelRoutes = (
   // release a seat the open has not finished taking.
   const phases = createSocketPhases();
 
-  const leaveSeat = async (duelId: string, { participant, connection, delivery }: Seating) => {
+  // `connection` is the one the seat is let go of from: the socket's own once it held the seat.
+  const leaveSeat = async (
+    duelId: string,
+    { participant, delivery }: Seating,
+    connection: string | null,
+  ) => {
     await relay.leave(duelId, delivery);
     // Replaced by a reconnection: the Participant is not away.
     if (!(await releaseSeat(redis, duelId, participant.seat, connection))) return;
@@ -212,8 +217,7 @@ export const createDuelRoutes = (
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          phases.open(ws.id);
-          try {
+          await phases.opening(ws.id, async (closed) => {
             messageWindows.set(ws.id, {
               overCap: rateLimiter.socketMessageWindow(),
               key: ws.identity.id,
@@ -283,17 +287,18 @@ export const createDuelRoutes = (
               ranked: duel.kind === "ranked",
               keys: journals[self.seat].reduce(pairKeys, NO_KEYS_PAIRED),
             };
-            // Closed while opening: the seat the upgrade claimed is let go of as a close would. It is
-            // held first, since the claim marks it connected before any connection holds it.
-            const closed = () => !phases.isOpening(ws.id);
+            // Closed while opening: the seat the upgrade claimed is let go of as a close would, from
+            // the connection that held it before this socket until this socket holds it, so that a
+            // reconnection that took the seat meanwhile keeps it.
+            let holding = duel.connections[self.seat] ?? null;
             const abandon = async () => {
               seated.delete(ws.id);
-              await holdSeat(redis, ws.params.id, self.seat, connection);
-              await leaveSeat(ws.params.id, entry);
+              await leaveSeat(ws.params.id, entry, holding);
             };
             if (closed()) return abandon();
             seated.set(ws.id, entry);
             await holdSeat(redis, ws.params.id, self.seat, connection);
+            holding = connection;
             if (closed()) return abandon();
             await relay.join(ws.params.id, delivery);
             if (closed()) return abandon();
@@ -340,9 +345,7 @@ export const createDuelRoutes = (
             }
             if (closed()) return abandon();
             if (duel.phase.kind === "finalised") send(duel.phase.end);
-          } finally {
-            phases.advance(ws.id, { kind: "opened" });
-          }
+          });
         },
         async message(ws, message) {
           const now = Date.now();
@@ -439,14 +442,11 @@ export const createDuelRoutes = (
             code,
           });
           // Still opening: its open lets go of whatever it has taken by then.
-          if (phases.advance(ws.id, { kind: "close" }) !== "release") return;
-          try {
+          await phases.closing(ws.id, async () => {
             if (!seating) return;
             seated.delete(ws.id);
-            await leaveSeat(ws.params.id, seating);
-          } finally {
-            phases.advance(ws.id, { kind: "released" });
-          }
+            await leaveSeat(ws.params.id, seating, seating.connection);
+          });
         },
         error: logSocketFailure(logger, "Socket on Duel {duelId} failed", (context, id) => {
           const seating = seated.get(id);

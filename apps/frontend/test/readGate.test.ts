@@ -27,6 +27,10 @@ test("a gate is never ready before its data is there", () => {
   expect(readGate("ready", undefined, null, retry)).toEqual({ kind: "loading" });
 });
 
-test("a failure with nothing to say keeps the gate pending rather than blank", () => {
-  expect(readGate("failed", undefined, null, retry)).toEqual({ kind: "loading" });
+test("a failure with nothing to say is still shown, in general words, with a way to try again", () => {
+  expect(readGate("failed", undefined, null, retry)).toEqual({
+    kind: "failed",
+    failure: "Something went wrong. Try again.",
+    retry,
+  });
 });

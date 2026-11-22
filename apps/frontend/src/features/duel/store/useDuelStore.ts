@@ -1,5 +1,4 @@
 import { DUEL_GAME_CONFIG } from "@repo/duel-engine";
-import type { GameEvent } from "@repo/typing-engine";
 import { create } from "zustand";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretStore.ts";
@@ -28,10 +27,12 @@ import { useDuelClockStore } from "./useDuelClockStore.ts";
 import { useDuelCountdownStore } from "./useDuelCountdownStore.ts";
 import { useTierPromotionStore } from "./useTierPromotionStore.ts";
 
+// `phase` and `isReconnecting` mirror the lifecycle, computed once in `readOut`: components narrow on
+// `lifecycle`, and the store's tests read them through `getState()`.
 type DuelState = Duel & {
   /** The phase the screen shows, read from the lifecycle. */
   readonly phase: DuelPhase;
-  /** Whether the socket dropped and is being reopened, read from the lifecycle. */
+  /** Whether the socket dropped and the server has not answered its reopening yet. */
   readonly isReconnecting: boolean;
   /** The Duel joined, which a navigation to another one must leave for it. */
   readonly duelId: string | null;
@@ -44,7 +45,7 @@ type DuelState = Duel & {
 const readOut = (duel: Duel) => ({
   ...duel,
   phase: shownPhase(duel.lifecycle).kind,
-  isReconnecting: duel.lifecycle.kind === "rejoining",
+  isReconnecting: duel.lifecycle.kind === "reconnecting",
 });
 
 let stopForwarding: (() => void) | null = null;
@@ -109,17 +110,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
   };
 
   // Resumes the Game of a Participant who is back mid-Game, on the clock that Game was started on.
-  const resume = ({
-    round,
-    words,
-    journal,
-    startAt,
-  }: {
-    readonly round: number;
-    readonly words: readonly string[];
-    readonly journal: readonly GameEvent[];
-    readonly startAt: number;
-  }) => {
+  const resume = ({ round, words, journal, startAt }: Extract<DuelEffect, { kind: "resume" }>) => {
     const [started] = journal;
     if (started?.type !== "start") return;
     const load = (clockOffset: number | null) => {

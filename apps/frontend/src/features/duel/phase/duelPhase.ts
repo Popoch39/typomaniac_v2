@@ -39,8 +39,13 @@ export type DuelLifecycle =
   | { readonly kind: "refused"; readonly refusal: string }
   | SeatedPhase
   /**
-   * The socket dropped and is being reopened: the phase it dropped in stays shown until the server
-   * says where the Duel is. `round` and `journal` are as the server handed them back on reopening.
+   * The socket dropped and is being reopened: the phase it dropped in stays shown, typing frozen,
+   * until the server sends its first message on the reopened socket.
+   */
+  | { readonly kind: "reconnecting"; readonly dropped: SeatedPhase }
+  /**
+   * Back in a Round under way: the phase the socket dropped in stays shown, typing frozen, until the
+   * Countdown that follows resumes the Game. `round` and `journal` are as the server handed them back.
    */
   | {
       readonly kind: "rejoining";
@@ -53,7 +58,7 @@ export type DuelLifecycle =
   | { readonly kind: "disconnected"; readonly closeReason: string };
 
 /** The phase the Duel screen shows. */
-export type ShownPhase = Exclude<DuelLifecycle, { readonly kind: "rejoining" }>;
+export type ShownPhase = Exclude<DuelLifecycle, { readonly kind: "reconnecting" | "rejoining" }>;
 export type DuelPhase = ShownPhase["kind"];
 
 export type Duel = {
@@ -115,8 +120,17 @@ export const INITIAL_DUEL: Duel = {
 type Transition = { readonly duel: Duel; readonly effects: readonly DuelEffect[] };
 
 export function shownPhase(lifecycle: DuelLifecycle): ShownPhase {
-  return lifecycle.kind === "rejoining" ? lifecycle.dropped : lifecycle;
+  return lifecycle.kind === "reconnecting" || lifecycle.kind === "rejoining"
+    ? lifecycle.dropped
+    : lifecycle;
 }
+
+/** Whether the Participant is seated in a Duel still under way, on a socket that is open. */
+const isSeated = (lifecycle: DuelLifecycle): lifecycle is SeatedPhase =>
+  lifecycle.kind === "waiting" ||
+  lifecycle.kind === "countdown" ||
+  lifecycle.kind === "running" ||
+  lifecycle.kind === "roundEnd";
 
 /** The Round being played, or the last one played; `null` before any is known and once the Duel is over. */
 export function roundOf(lifecycle: DuelLifecycle) {
@@ -127,6 +141,8 @@ export function roundOf(lifecycle: DuelLifecycle) {
     case "roundEnd":
     case "rejoining":
       return lifecycle.round;
+    case "reconnecting":
+      return lifecycle.dropped.round;
     case "connecting":
     case "refused":
     case "finished":
@@ -169,17 +185,15 @@ function followLink(duel: Duel, link: SocketLink): Transition {
     case "backoff": {
       // The server closes nothing a finished Duel still needs.
       if (lifecycle.kind === "finished") return { duel, effects: [{ kind: "closeSocket" }] };
-      const rejoining: DuelLifecycle =
-        lifecycle.kind === "waiting" ||
-        lifecycle.kind === "countdown" ||
-        lifecycle.kind === "running" ||
-        lifecycle.kind === "roundEnd"
-          ? { kind: "rejoining", dropped: lifecycle, round: lifecycle.round, journal: [] }
+      const reconnecting: DuelLifecycle = isSeated(lifecycle)
+        ? { kind: "reconnecting", dropped: lifecycle }
+        : lifecycle.kind === "rejoining"
+          ? { kind: "reconnecting", dropped: lifecycle.dropped }
           : lifecycle;
       // Keys typed now would never reach the server, which rebuilds the Game from its journal on
       // resume; buffering them would move them up to their receipt bound (ADR 0009).
       return {
-        duel: { ...duel, lifecycle: rejoining },
+        duel: { ...duel, lifecycle: reconnecting },
         effects: [{ kind: "stopSync" }, { kind: "stopRound" }, { kind: "freeze" }],
       };
     }
@@ -269,12 +283,7 @@ function receive(duel: Duel, message: ServerMessage): Transition {
       const withWords = { ...duel, opponentGame };
       // A Game already running or over has no Start left to wait for, unless it ran on a socket
       // that dropped since.
-      if (
-        lifecycle.kind !== "waiting" &&
-        lifecycle.kind !== "rejoining" &&
-        lifecycle.kind !== "countdown" &&
-        lifecycle.kind !== "roundEnd"
-      )
+      if (!isSeated(lifecycle) && lifecycle.kind !== "rejoining")
         return { duel: withWords, effects: [] };
       // The journal handed back on joining is the one of the Round joined, not of a later one.
       const journal =
@@ -329,8 +338,24 @@ function receive(duel: Duel, message: ServerMessage): Transition {
 
 export function nextDuel(duel: Duel, event: DuelEvent): Transition {
   switch (event.kind) {
-    case "message":
-      return receive(duel, event.message);
+    case "message": {
+      const { lifecycle } = duel;
+      // The link is back with the server's first message, whichever it is: the Game stays frozen until
+      // the Countdown that follows resumes it from the journal (ADR 0009).
+      const back: Duel =
+        lifecycle.kind === "reconnecting"
+          ? {
+              ...duel,
+              lifecycle: {
+                kind: "rejoining",
+                dropped: lifecycle.dropped,
+                round: lifecycle.dropped.round,
+                journal: [],
+              },
+            }
+          : duel;
+      return receive(back, event.message);
+    }
     case "link":
       return followLink(duel, event.link);
     case "run":

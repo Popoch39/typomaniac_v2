@@ -27,10 +27,10 @@ test("a Player without a Nickname is told apart from one with a Nickname", () =>
 });
 
 test("a Player with a Nickname is named, and says whether they are the administrator", () => {
-  expect(sessionOf(lumen)).toEqual({ kind: "named", player: lumen, isAdministrator: false });
+  expect(sessionOf(lumen)).toEqual({ kind: "named", player: lumen });
   expect(sessionOf({ ...lumen, isAdministrator: true })).toMatchObject({
     kind: "named",
-    isAdministrator: true,
+    player: { isAdministrator: true },
   });
 });
 

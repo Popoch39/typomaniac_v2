@@ -62,7 +62,25 @@ export function playbackEndsIn(playback: ReplayPlayback, now: number) {
   return (playback.duration - playbackPosition(playback, now)) / playback.speed;
 }
 
-export function next(playback: ReplayPlayback, event: ReplayEvent): ReplayPlayback {
+/** `endIn` fires `reachEnd` after `ms`, in place of any timer armed before; `cancelEnd` disarms it. */
+export type ReplayEffect =
+  | { readonly kind: "endIn"; readonly ms: number }
+  | { readonly kind: "cancelEnd" };
+
+export function nextReplayPlayback(
+  playback: ReplayPlayback,
+  event: ReplayEvent,
+): { readonly playback: ReplayPlayback; readonly effects: readonly ReplayEffect[] } {
+  const next = step(playback, event);
+  // Only an event carrying its instant can leave the replay playing.
+  const endsIn = "at" in event ? playbackEndsIn(next, event.at) : null;
+  return {
+    playback: next,
+    effects: endsIn === null ? [{ kind: "cancelEnd" }] : [{ kind: "endIn", ms: endsIn }],
+  };
+}
+
+function step(playback: ReplayPlayback, event: ReplayEvent): ReplayPlayback {
   if (event.kind === "open") {
     const { replayed, duration, at } = event;
     return { kind: "playing", replayed, duration, speed: 1, from: 0, since: at };

@@ -45,11 +45,27 @@ export type QueuePhaseEvent =
   /** `receivedAt` is the instant this client received `message`, on its own clock. */
   | { readonly kind: "receive"; readonly message: QueueServerMessage; readonly receivedAt: number }
   | { readonly kind: "link"; readonly link: SocketLink }
+  /** The Player accepts the Pairing proposed to them. */
+  | { readonly kind: "accept" }
   /** The Player's acceptance of the Pairing reached the socket. */
   | { readonly kind: "accepted"; readonly pairingId: string };
 
-/** `close` closes the Queue socket, `open` opens it in place of any other. */
-export type QueuePhaseEffect = { readonly kind: "close" } | { readonly kind: "open" };
+/**
+ * `close` closes the Queue socket, `open` opens it in place of any other. `sendAccept` sends the
+ * acceptance, which is only one once the socket carried it. The clock runs from `startClock` to
+ * `stopClock`, exactly while a waiting time or an accept countdown is on screen.
+ */
+export type QueuePhaseEffect =
+  | { readonly kind: "close" }
+  | { readonly kind: "open" }
+  | { readonly kind: "sendAccept"; readonly pairingId: string }
+  | { readonly kind: "startClock" }
+  | { readonly kind: "stopClock" };
+
+type QueueTransition = {
+  readonly phase: QueuePhase;
+  readonly effects: readonly QueuePhaseEffect[];
+};
 
 export const IDLE_QUEUE: QueuePhase = { kind: "idle" };
 
@@ -101,10 +117,7 @@ function nextOfMessage(
   }
 }
 
-function nextOfLink(
-  phase: QueuePhase,
-  link: SocketLink,
-): { readonly phase: QueuePhase; readonly effects: readonly QueuePhaseEffect[] } {
+function nextOfLink(phase: QueuePhase, link: SocketLink): QueueTransition {
   if (link.kind === "refused")
     return { phase: { kind: "refused", refusal: link.refusal }, effects: [] };
   if (link.kind === "backoff") {
@@ -119,10 +132,7 @@ function nextOfLink(
   return { phase, effects: [] };
 }
 
-export function nextQueuePhase(
-  phase: QueuePhase,
-  event: QueuePhaseEvent,
-): { readonly phase: QueuePhase; readonly effects: readonly QueuePhaseEffect[] } {
+function nextOfEvent(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition {
   switch (event.kind) {
     case "enter":
       return { phase: { kind: "connecting" }, effects: [{ kind: "close" }, { kind: "open" }] };
@@ -134,6 +144,14 @@ export function nextQueuePhase(
       return { phase: nextOfMessage(phase, event.message, event.receivedAt), effects: [] };
     case "link":
       return nextOfLink(phase, event.link);
+    case "accept":
+      return {
+        phase,
+        effects:
+          phase.kind === "proposed" && !phase.accepted
+            ? [{ kind: "sendAccept", pairingId: phase.pairingId }]
+            : [],
+      };
     case "accepted":
       return {
         phase:
@@ -143,4 +161,20 @@ export function nextQueuePhase(
         effects: [],
       };
   }
+}
+
+const isShowingTime = (phase: QueuePhase) => {
+  const { kind } = shownQueuePhase(phase);
+  return kind === "queued" || kind === "proposed";
+};
+
+export function nextQueuePhase(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition {
+  const next = nextOfEvent(phase, event);
+  const wasShowingTime = isShowingTime(phase);
+  const showsTime = isShowingTime(next.phase);
+  if (wasShowingTime === showsTime) return next;
+  return {
+    phase: next.phase,
+    effects: [...next.effects, { kind: showsTime ? "startClock" : "stopClock" }],
+  };
 }

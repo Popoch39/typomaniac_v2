@@ -75,6 +75,33 @@ test("the Online count comes back by itself after an outage longer than the reco
   expect(store.getState().isDown).toBe(false);
 });
 
+test("the Online count comes up once the server is back when it was down as the Player signed in", async () => {
+  refusing = true;
+  count = 7;
+  const before = openings;
+  store.getState().follow("player-1", url);
+  await until(() => openings > before);
+
+  refusing = false;
+  await Bun.sleep(50);
+  store.getState().retry();
+  await until(() => store.getState().presence.kind === "live");
+
+  expect(store.getState().presence).toEqual({ kind: "live", playerId: "player-1", count: 7 });
+});
+
+test("the Online count comes back after the server closed the Player socket with an error", async () => {
+  count = 2;
+  store.getState().follow("player-1", url);
+  await until(() => store.getState().count === 2);
+
+  count = 8;
+  for (const ws of sockets) ws.close(1011);
+  await until(() => store.getState().count === 8);
+
+  expect(store.getState().presence).toEqual({ kind: "live", playerId: "player-1", count: 8 });
+});
+
 test("signing out while the server is down stops the retries", async () => {
   store.getState().follow("player-1", url);
   await until(() => store.getState().count !== null);

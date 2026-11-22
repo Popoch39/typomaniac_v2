@@ -1,13 +1,12 @@
+import { onlineCountOf } from "../presence/onlinePresence.ts";
 import { useOnlineStore } from "../store/useOnlineStore.ts";
 
 /**
- * How many Players are Online, as the Player socket last told, or null while unknown, and whether
- * the socket is down and retrying. The last count stays through a first reopening and goes blank
- * once the socket is closed for good: a deliberate exception to showing every error, since the count
- * is ambient and no action of the Player's failed.
+ * Where the Online count stands, and the count to show, `null` while unknown: the last count stays
+ * through a first reopening and goes blank once the socket is closed for good, a deliberate exception
+ * to showing every error, since the count is ambient and no action of the Player's failed.
  */
 export function useOnlinePlayers() {
-  const count = useOnlineStore((state) => state.count);
-  const isDown = useOnlineStore((state) => state.isDown);
-  return { count, isDown };
+  const presence = useOnlineStore((state) => state.presence);
+  return { kind: presence.kind, count: onlineCountOf(presence) };
 }

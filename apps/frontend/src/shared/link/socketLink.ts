@@ -4,6 +4,16 @@
  */
 export type ReconnectDelay = (code: number, attempt: number) => number | null;
 
+/** How a reconnecting socket answers a closing. */
+export type ReconnectPolicy = {
+  readonly delayOf: ReconnectDelay;
+  /**
+   * Whether a first opening that closes before any message was refused, for a reason to find,
+   * rather than retried like a drop.
+   */
+  readonly refusesFirstOpening: boolean;
+};
+
 /** Where a reconnecting socket stands with its server, as its owner is told. */
 export type SocketLink =
   /** No socket: never opened, or closed by its owner. */
@@ -32,10 +42,10 @@ export type SocketLinkEvent =
 
 export const IDLE_LINK: SocketLink = { kind: "idle" };
 
-export function next(
+export function nextSocketLink(
   link: SocketLink,
   event: SocketLinkEvent,
-  delayOf: ReconnectDelay,
+  { delayOf, refusesFirstOpening }: ReconnectPolicy,
 ): SocketLink {
   switch (event.kind) {
     case "connect":
@@ -43,8 +53,9 @@ export function next(
     case "receive":
       return link.kind === "opening" ? { kind: "open" } : link;
     case "close": {
-      if (link.kind === "opening" && link.attempt === 0) return { kind: "refusing" };
       if (link.kind !== "opening" && link.kind !== "open") return link;
+      if (link.kind === "opening" && link.attempt === 0 && refusesFirstOpening)
+        return { kind: "refusing" };
       // A reopening is a fresh opening: the server sends its first message again.
       const attempt = link.kind === "open" ? 1 : link.attempt + 1;
       const delay = delayOf(event.code, attempt);

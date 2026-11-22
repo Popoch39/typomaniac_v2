@@ -11,7 +11,7 @@ export type Session =
   | { kind: "checking" }
   | { kind: "guest" }
   | { kind: "player"; player: SignedInPlayer & { nickname: null } }
-  | { kind: "named"; player: SignedInPlayer & { nickname: string }; isAdministrator: boolean };
+  | { kind: "named"; player: SignedInPlayer & { nickname: string } };
 
 /** The session of a signed-in Player, with or without a Nickname. */
 export type SignedInSession = Extract<Session, { player: SignedInPlayer }>;
@@ -25,8 +25,8 @@ export function sessionOf(me: SignedInPlayer | null | undefined): Session {
   if (me === null) return { kind: "guest" };
   const { nickname } = me;
   if (nickname === null) return { kind: "player", player: { ...me, nickname } };
-  return { kind: "named", player: { ...me, nickname }, isAdministrator: me.isAdministrator };
+  return { kind: "named", player: { ...me, nickname } };
 }
 
 export const isAdministrator = (session: Session) =>
-  session.kind === "named" && session.isAdministrator;
+  session.kind === "named" && session.player.isAdministrator;

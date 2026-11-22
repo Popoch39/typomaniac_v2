@@ -637,6 +637,78 @@ test("a socket closed before its opening completes leaves its seat away, and a C
   }
 });
 
+test("a socket closed during its opening leaves the seat to the reconnection that took it meanwhile", async () => {
+  // The instance the first socket opens on stalls that opening on its first journal read, while the
+  // same Participant reconnects on another instance and the first socket closes.
+  const { promise: stalled, resolve: stall } = Promise.withResolvers<void>();
+  const { promise: released, resolve: release } = Promise.withResolvers<void>();
+  let armed = true;
+  const client = new Proxy(testRedis.redis.client, {
+    get: (target, property) => {
+      if (property === "lrange")
+        return async (key: string, start: number, stop: number) => {
+          if (armed) {
+            armed = false;
+            stall();
+            await released;
+          }
+          return target.lrange(key, start, stop);
+        };
+      const value: unknown = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const stalling = createApp(
+    testDb.db,
+    auth,
+    { ...testRedis.redis, client },
+    getLogger("api"),
+  ).listen(0);
+  try {
+    const creatorCookie = await signInPlayerWithNickname(uniqueNickname());
+    const opponentCookie = await signInPlayerWithNickname(uniqueNickname());
+    const { id } = (await (await createDuel(creatorCookie)).json()) as { id: string };
+    const creator = await openSocket(duelSocketUrl(id), creatorCookie);
+    await creator.next();
+
+    const dead = await openSocket(
+      `ws://localhost:${stalling.server?.port}/api/duels/${id}/socket`,
+      opponentCookie,
+    );
+    await stalled;
+    const reconnected = await openSocket(duelSocketUrl(id), opponentCookie);
+    expect((await reconnected.next()).type).toBe("state");
+    dead.close();
+    await dead.closed;
+    release();
+    // Whatever the creator is told while the dead socket's opening runs to its end.
+    const told: ServerMessage[] = [];
+    for (;;) {
+      const message = await Promise.race([creator.next(), Bun.sleep(300).then(() => null)]);
+      if (message === null) break;
+      told.push(message);
+    }
+    const seats = await fetch(`${origin}/api/duels/${id}`, { headers: { cookie: creatorCookie } });
+    creator.close();
+    reconnected.close();
+
+    expect(told).not.toContainEqual(
+      expect.objectContaining({
+        type: "presence",
+        participant: expect.objectContaining({ seat: 1, connected: false }),
+      }),
+    );
+    expect(await seats.json()).toMatchObject({
+      participants: [
+        { seat: 0, connected: true },
+        { seat: 1, connected: true },
+      ],
+    });
+  } finally {
+    await stalling.stop(true);
+  }
+});
+
 test("a Player reads who sits in a Duel, and is told when it does not exist", async () => {
   const creatorName = uniqueNickname();
   const cookie = await signInPlayerWithNickname(creatorName);

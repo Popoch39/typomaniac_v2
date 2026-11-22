@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { DUEL_GAME_CONFIG, END_GRACE_MS } from "@repo/duel-engine";
 import { getResult } from "@repo/typing-engine";
-import { type DuelPhase, nextStep, type RoundPhase } from "../src/modules/duel/lifecycle.ts";
+import { type DuelPhase, nextStep, type RoundPhase } from "../src/modules/duel/phase.ts";
 import { type DuelKind, replayGame } from "../src/modules/duel/service.ts";
 
 const COUNTDOWN_MS = 3000;

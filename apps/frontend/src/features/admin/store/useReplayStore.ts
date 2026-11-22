@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import {
   CLOSED_PLAYBACK,
-  next,
-  playbackEndsIn,
+  nextReplayPlayback,
+  type ReplayEffect,
   type ReplayEvent,
   type ReplayPlayback,
 } from "../replay/replayPlayback.ts";
@@ -25,11 +25,15 @@ let endTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useReplayStore = create<ReplayState>()((set, get) => {
   const apply = (event: ReplayEvent) => {
-    const playback = next(get().playback, event);
+    const { playback, effects } = nextReplayPlayback(get().playback, event);
     set({ playback });
+    for (const effect of effects) perform(effect);
+  };
+
+  const perform = (effect: ReplayEffect) => {
     clearTimeout(endTimer);
-    const endsIn = playbackEndsIn(playback, now());
-    if (endsIn !== null) endTimer = setTimeout(() => apply({ kind: "reachEnd" }), endsIn);
+    if (effect.kind === "endIn")
+      endTimer = setTimeout(() => apply({ kind: "reachEnd" }), effect.ms);
   };
 
   return {

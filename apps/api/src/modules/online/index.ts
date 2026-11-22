@@ -72,8 +72,7 @@ export const createOnlineRoutes = (
         message() {},
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          phases.open(ws.id);
-          try {
+          await phases.opening(ws.id, async (closed) => {
             const send = (message: PlayerServerMessage) => ws.send(message);
             const holding: Holding = {
               playerId: ws.player.id,
@@ -85,7 +84,6 @@ export const createOnlineRoutes = (
             logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
             // Closed while opening: what the open took is let go of here, its close having left it.
             // Holding the presence regardless would keep the Player Online until the instance stops.
-            const closed = () => !phases.isOpening(ws.id);
             const abandon = async () => {
               holdings.delete(ws.id);
               await Promise.all([channels.release(holding), presence.release(holding)]);
@@ -94,9 +92,7 @@ export const createOnlineRoutes = (
             if (closed()) return await abandon();
             await presence.hold(holding);
             if (closed()) return await abandon();
-          } finally {
-            phases.advance(ws.id, { kind: "opened" });
-          }
+          });
         },
         async close(ws, code) {
           lifecycle.release(ws.id);
@@ -105,15 +101,12 @@ export const createOnlineRoutes = (
             playerId: ws.player.id,
             code,
           });
-          if (phases.advance(ws.id, { kind: "close" }) !== "release") return;
-          try {
+          await phases.closing(ws.id, async () => {
             const holding = holdings.get(ws.id);
             if (!holding) return;
             holdings.delete(ws.id);
             await Promise.all([channels.release(holding), presence.release(holding)]);
-          } finally {
-            phases.advance(ws.id, { kind: "released" });
-          }
+          });
         },
         error: logSocketFailure(logger, "Player socket failed"),
       })

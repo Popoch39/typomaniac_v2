@@ -52,7 +52,7 @@ import {
   decodeRoundPhase,
   nextStep,
   type RoundPhase,
-} from "./lifecycle.ts";
+} from "./phase.ts";
 import type { Relay } from "./relay.ts";
 
 /** How long a Duel can be joined after its creation. */
@@ -101,6 +101,11 @@ export type Duel = {
   /** The Player holding each seat, `null` for a Guest or an empty seat. */
   readonly playerIds: readonly (string | null)[];
   /**
+   * The connection of the socket holding each seat as the Duel was read, `null` before any socket
+   * held it, never sent to a client.
+   */
+  readonly connections: readonly (string | null)[];
+  /**
    * The Rank of each Player of a ranked Duel as it was created, indexed by seat, `null` for an
    * Unranked Player; `null` for a Custom Duel.
    */
@@ -129,22 +134,26 @@ const dueKey = (redis: Redis) => redis.name("duels", "due");
  * The ranked Duel a Player is in, recorded against them from its creation until it is finalised:
  * what the Queue reads to refuse them. It expires with the Duel, should the Duel never be finalised.
  */
-const rankedDuelKeyEnds = (redis: Redis) => [redis.name("player", ""), ":rankedDuel"] as const;
+const rankedDuelKey = (redis: Redis, playerId: string) =>
+  redis.name("player", playerId, "rankedDuel");
 
-const rankedDuelKey = (redis: Redis, playerId: string) => {
-  const [prefix, suffix] = rankedDuelKeyEnds(redis);
-  return `${prefix}${playerId}${suffix}`;
+/** What `rankedDuelKey` puts before and after a Player id, for the scripts that build it themselves. */
+const rankedDuelKeyEnds = (redis: Redis) => {
+  // Cut around an id no Player has, so that the separator `name` puts is not assumed.
+  const placeholder = "\u0000";
+  const [prefix = "", suffix = ""] = rankedDuelKey(redis, placeholder).split(placeholder);
+  return [prefix, suffix] as const;
 };
 
 // Lua run with each expiry of a Duel, so that the record against its Players never expires before
 // it: the Queue would accept them again while the Duel goes on. The keys are built from the Player
-// ids the Duel holds, between the two ends of `rankedDuelKeyEnds`. A Player recorded against
-// another Duel keeps that one's expiry.
-const refreshRankedDuelKeys = (ends: string, duelId: string, expiryMs: string) => `
+// ids the Duel holds, between the two ends of `rankedDuelKeyEnds`, which every script running this
+// passes as its last two arguments. A Player recorded against another Duel keeps that one's expiry.
+const refreshRankedDuelKeys = (duelId: string, expiryMs: string) => `
 for seat = 0, 1 do
   local player = redis.call('HGET', KEYS[1], 'player' .. seat)
   if player then
-    local marker = ARGV[${ends}] .. player .. ARGV[${ends} + 1]
+    local marker = ARGV[#ARGV - 1] .. player .. ARGV[#ARGV]
     if redis.call('HGET', marker, 'duelId') == ${duelId} then redis.call('PEXPIRE', marker, ${expiryMs}) end
   end
 end
@@ -274,24 +283,30 @@ export const holdSeat = async (redis: Redis, duelId: string, seat: Seat, connect
   await redis.client.eval(HOLD, 1, duelKey(redis, duelId), seat, connection);
 };
 
-// Only the socket that holds the seat lets it go: one replaced by a reconnection closes later.
+// Only the socket that holds the seat lets it go: one replaced by a reconnection closes later. An
+// empty connection stands for a seat no socket has held yet.
 const RELEASE = `
-if redis.call('HGET', KEYS[1], 'connection' .. ARGV[1]) ~= ARGV[2] then return 0 end
+if (redis.call('HGET', KEYS[1], 'connection' .. ARGV[1]) or '') ~= ARGV[2] then return 0 end
 redis.call('HSET', KEYS[1], 'connected' .. ARGV[1], '0')
 return 1
 `;
 
 /**
  * The seat stays held by its identity: only its connection is let go. Gives whether `connection`
- * was still the one holding the seat.
+ * was still the one holding the seat, `null` standing for no socket having held it yet.
  */
-export const releaseSeat = async (redis: Redis, duelId: string, seat: Seat, connection: string) => {
+export const releaseSeat = async (
+  redis: Redis,
+  duelId: string,
+  seat: Seat,
+  connection: string | null,
+) => {
   const released: number = await redis.client.eval(
     RELEASE,
     1,
     duelKey(redis, duelId),
     seat,
-    connection,
+    connection ?? "",
   );
   return released === 1;
 };
@@ -336,6 +351,7 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
+  const connections = SEATS.map((seat) => fields[`connection${seat}`] ?? null);
   const kind = fields.kind === "ranked" ? "ranked" : "custom";
   const rankOf = (seat: Seat) => JSON.parse(fields[`rank${seat}`] ?? "null") as Rank | null;
   return {
@@ -343,6 +359,7 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     participants,
     holderIds,
     playerIds,
+    connections,
     ranks: kind === "ranked" ? [rankOf(0), rankOf(1)] : null,
     round,
     phase: decodeDuelPhase(fields, round.phase),
@@ -372,7 +389,7 @@ redis.call('ZADD', KEYS[3], tonumber(ARGV[1]) + tonumber(ARGV[4]), ARGV[5])
 -- Counted again from the Start, so that a Duel joined late does not expire before it is finalised.
 redis.call('PEXPIRE', KEYS[1], ARGV[2])
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
-${refreshRankedDuelKeys("7", "ARGV[5]", "ARGV[2]")}
+${refreshRankedDuelKeys("ARGV[5]", "ARGV[2]")}
 return {ARGV[1], '1'}
 `;
 
@@ -586,7 +603,7 @@ else
 end
 redis.call('PEXPIRE', KEYS[1], ARGV[6])
 redis.call('PEXPIRE', KEYS[2], ARGV[6])
-${refreshRankedDuelKeys("9", "ARGV[8]", "ARGV[6]")}
+${refreshRankedDuelKeys("ARGV[8]", "ARGV[6]")}
 redis.call('ZADD', KEYS[4], ARGV[7], ARGV[8])
 return 1
 `;

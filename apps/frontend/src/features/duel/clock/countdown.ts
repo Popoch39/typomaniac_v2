@@ -34,8 +34,16 @@ export type CountdownEvent =
   | { readonly kind: "due"; readonly localStartAt: number }
   | { readonly kind: "cancel" };
 
-/** `start` starts the Round. */
-export type CountdownEffect = "start" | null;
+/**
+ * `arm` refreshes the Countdown and fires `due` at `localStartAt`, in place of any timer armed
+ * before; `disarm` stops the timers and the following of the clock; `start` starts the Round.
+ */
+export type CountdownEffect =
+  | { readonly kind: "arm"; readonly localStartAt: number }
+  | { readonly kind: "disarm" }
+  | { readonly kind: "start" };
+
+type CountdownStep = { readonly countdown: Countdown; readonly starts: boolean };
 
 function counting(
   startAt: number,
@@ -49,27 +57,24 @@ function counting(
   return { kind: "counting", startAt, localStartAt, secondsLeft, purpose };
 }
 
-export function nextCountdown(
-  countdown: Countdown,
-  event: CountdownEvent,
-): { readonly countdown: Countdown; readonly effect: CountdownEffect } {
+function step(countdown: Countdown, event: CountdownEvent): CountdownStep {
   switch (event.kind) {
     case "schedule": {
       const { startAt, purpose, clockOffset, at } = event;
       if (clockOffset === null)
-        return { countdown: { kind: "awaitingOffset", startAt, purpose }, effect: null };
-      return { countdown: counting(startAt, purpose, clockOffset, at), effect: null };
+        return { countdown: { kind: "awaitingOffset", startAt, purpose }, starts: false };
+      return { countdown: counting(startAt, purpose, clockOffset, at), starts: false };
     }
     case "clockOffset":
       // Waits for the clock offset when it comes last, and follows a newer estimate of it.
       if (countdown.kind === "idle" || event.clockOffset === null)
-        return { countdown, effect: null };
+        return { countdown, starts: false };
       return {
         countdown: counting(countdown.startAt, countdown.purpose, event.clockOffset, event.at),
-        effect: null,
+        starts: false,
       };
     case "tick": {
-      if (countdown.kind !== "counting") return { countdown, effect: null };
+      if (countdown.kind !== "counting") return { countdown, starts: false };
       const refreshed = counting(
         countdown.startAt,
         countdown.purpose,
@@ -82,17 +87,34 @@ export function nextCountdown(
           refreshed.kind === "counting" && refreshed.secondsLeft === countdown.secondsLeft
             ? countdown
             : refreshed,
-        effect: null,
+        starts: false,
       };
     }
     case "due":
       if (countdown.kind !== "counting" || countdown.localStartAt !== event.localStartAt)
-        return { countdown, effect: null };
+        return { countdown, starts: false };
       return {
         countdown: { kind: "idle" },
-        effect: countdown.purpose === "start" ? "start" : null,
+        starts: countdown.purpose === "start",
       };
     case "cancel":
-      return { countdown: { kind: "idle" }, effect: null };
+      return { countdown: { kind: "idle" }, starts: false };
   }
+}
+
+export function nextCountdown(
+  countdown: Countdown,
+  event: CountdownEvent,
+): { readonly countdown: Countdown; readonly effects: readonly CountdownEffect[] } {
+  const { countdown: next, starts } = step(countdown, event);
+  const effects: CountdownEffect[] = [];
+  if (next.kind === "idle") effects.push({ kind: "disarm" });
+  // A new Start on this client's clock, first placed or moved by a newer clock offset.
+  else if (
+    next.kind === "counting" &&
+    (countdown.kind !== "counting" || countdown.localStartAt !== next.localStartAt)
+  )
+    effects.push({ kind: "arm", localStartAt: next.localStartAt });
+  if (starts) effects.push({ kind: "start" });
+  return { countdown: next, effects };
 }
