@@ -19,7 +19,8 @@ const BY_STATUS: Readonly<Record<number, string>> = {
 
 const UNREACHABLE = "The server could not be reached. Check your connection and try again.";
 const SERVER_FAILURE = "Something went wrong on our side. Try again in a moment.";
-const UNKNOWN = "Something went wrong. Try again.";
+/** What any failure the app cannot word better says. */
+export const UNKNOWN_FAILURE = "Something went wrong. Try again.";
 
 const serverCode = (value: unknown) =>
   typeof value === "object" && value !== null && "code" in value && typeof value.code === "string"
@@ -49,12 +50,12 @@ export function describeApiError(
   byCode: Readonly<Record<string, string>> = {},
 ): string {
   const failure = failureOf(error);
-  if (failure === null) return UNKNOWN;
+  if (failure === null) return UNKNOWN_FAILURE;
   const code = serverCode(failure.value);
   const known = code === null ? undefined : (byCode[code] ?? BY_CODE[code]);
   if (known !== undefined) return known;
   // Eden reports a request that never got a response as a 503 carrying what fetch threw.
   if (failure.status === 0 || failure.value instanceof Error) return UNREACHABLE;
   if (failure.status >= 500) return SERVER_FAILURE;
-  return BY_STATUS[failure.status] ?? UNKNOWN;
+  return BY_STATUS[failure.status] ?? UNKNOWN_FAILURE;
 }

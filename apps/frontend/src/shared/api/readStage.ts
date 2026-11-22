@@ -1,3 +1,5 @@
+import { UNKNOWN_FAILURE } from "./describeApiError.ts";
+
 /** What a page needs to know of one of its reads, as TanStack Query reports it. */
 export interface ReadStatus {
   isPending: boolean;
@@ -36,8 +38,9 @@ export type ReadyData<State> = State extends { kind: "ready"; data: infer T } ? 
 
 /**
  * Where a gate stands, from the stage of its reads and their data, which is undefined until all of it
- * is read: null is data, such as the session of a Guest. A gate with no data or no failure to show yet
- * stays pending rather than drawing an empty page.
+ * is read: null is data, such as the session of a Guest. A gate with no data yet stays pending rather
+ * than drawing an empty page; a failure with nothing to say is told in general words, so that it can
+ * still be tried again.
  */
 export function readGate<T>(
   stage: ReadStage,
@@ -45,7 +48,7 @@ export function readGate<T>(
   failure: string | null,
   retry: () => void,
 ): ReadGateState<T> {
-  if (stage === "failed" && failure !== null) return { kind: "failed", failure, retry };
+  if (stage === "failed") return { kind: "failed", failure: failure ?? UNKNOWN_FAILURE, retry };
   if (stage === "ready" && data !== undefined) return { kind: "ready", data };
   return { kind: "loading" };
 }
