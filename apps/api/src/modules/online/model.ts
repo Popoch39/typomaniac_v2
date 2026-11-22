@@ -44,6 +44,10 @@ const challenger = t.Object({
 export const ChallengeRefusal = t.Union([
   t.Literal("NOT_FRIENDS"),
   t.Literal("FRIEND_OFFLINE"),
+  // The Friend is seated in an unfinished Duel, or their Pairing awaits acceptance.
+  t.Literal("FRIEND_BUSY"),
+  // The challenger is seated in an unfinished Duel.
+  t.Literal("IN_DUEL"),
   t.Literal("CHALLENGE_PENDING"),
   t.Literal("RATE_LIMITED"),
 ]);
@@ -112,7 +116,8 @@ export const Socket = {
       }),
       // To a challenged Player's tab: another of their tabs answered first.
       aboutChallenge("challengeAnsweredElsewhere"),
-      // To both Players: withdrawn by the challenger, or either went offline or ended the Friendship.
+      // To both Players: withdrawn by the challenger, or either went offline, entered a Duel or a
+      // Pairing, or ended the Friendship.
       aboutChallenge("challengeCancelled"),
       // To both Players: nobody answered in time.
       aboutChallenge("challengeExpired"),

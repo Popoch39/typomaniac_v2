@@ -2,6 +2,7 @@ export {
   enterQueue,
   leaveQueue,
   QUEUE_ENTRY_EXPIRY_MS,
+  readPendingPairing,
   readQueueEntry,
   readWaitingPlayers,
   refreshQueueEntry,

@@ -87,7 +87,7 @@ export const Socket = {
       t.Object({ type: t.Literal("requeued"), queuedAt: t.Number(), serverAt: t.Number() }),
       t.Object({
         type: t.Literal("removed"),
-        reason: t.Union([t.Literal("replaced"), t.Literal("notAccepted")]),
+        reason: t.Union([t.Literal("replaced"), t.Literal("notAccepted"), t.Literal("challenged")]),
       }),
       t.Object({ type: t.Literal("paired"), duelId: t.String() }),
     ]),
