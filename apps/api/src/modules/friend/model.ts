@@ -1,5 +1,6 @@
 import { t } from "elysia";
 import { RateLimited } from "../rate-limit/index.ts";
+import { LEADERBOARD_PAGE_SIZE, PODIUM_SIZE } from "../standing/service.ts";
 
 const tier = t.Union([
   t.Literal("bronze"),
@@ -32,6 +33,13 @@ const ornament = t.Nullable(
 const playerIdParams = t.Object({ playerId: t.String() });
 
 const RequestNotFound = t.Object({ code: t.Literal("REQUEST_NOT_FOUND") });
+
+const relation = t.Union([
+  t.Literal("friend"),
+  t.Literal("requestSent"),
+  t.Literal("requestReceived"),
+  t.Literal("none"),
+]);
 
 const listedPlayer = t.Object({
   id: t.String(),
@@ -67,16 +75,35 @@ export const SearchGet = {
         t.Object({
           ...listedPlayer.properties,
           // What links the requester to this Player.
-          relation: t.Union([
-            t.Literal("friend"),
-            t.Literal("requestSent"),
-            t.Literal("requestReceived"),
-            t.Literal("none"),
-          ]),
+          relation,
         }),
       ),
     }),
     422: t.Object({ code: t.Literal("SEARCH_INVALID") }),
+    429: RateLimited,
+  },
+};
+
+// Everyone one read of the Leaderboard lists besides the reader: the Podium, a page, and the two
+// Players around the reader.
+const MAX_LOOKED_UP = PODIUM_SIZE + LEADERBOARD_PAGE_SIZE + 2;
+
+const relationsInvalid = () => ({ code: "RELATIONS_INVALID" });
+
+// Looked up by Nickname, as the public pages, the Leaderboard and a Duel name a Player, never by id.
+export const RelationsGet = {
+  Query: t.Object({
+    nicknames: t.Array(
+      t.String({ maxLength: 20, pattern: "^[A-Za-z0-9_-]+$", error: relationsInvalid }),
+      { minItems: 1, maxItems: MAX_LOOKED_UP, error: relationsInvalid },
+    ),
+  }),
+  Response: {
+    // In the order asked, without the requester, banned Players and Nicknames nobody holds.
+    200: t.Object({
+      players: t.Array(t.Object({ id: t.String(), nickname: t.String(), relation })),
+    }),
+    422: t.Object({ code: t.Literal("RELATIONS_INVALID") }),
     429: RateLimited,
   },
 };
