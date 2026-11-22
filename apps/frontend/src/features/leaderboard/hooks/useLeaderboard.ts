@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { type ReadyData, readGate, readStage } from "../../../shared/api/readStage.ts";
-import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
+import { useSession } from "../../auth/hooks/useSession.ts";
 import { leaderboardQueryOptions } from "../api/leaderboardQueryOptions.ts";
 import { pageToReplace } from "../page/pageToReplace.ts";
 
@@ -18,7 +18,7 @@ export type LeaderboardPlayer = Leaderboard["podium"][number];
  */
 export function useLeaderboard() {
   const { page } = useSearch({ from: "/_shell/leaderboard" });
-  const me = useQuery(meQueryOptions());
+  const { session } = useSession();
   const read = useQuery({ ...leaderboardQueryOptions(page), placeholderData: keepPreviousData });
   const { data, isPlaceholderData, error } = read;
   return {
@@ -28,7 +28,7 @@ export function useLeaderboard() {
       error === null ? null : describeApiError(error),
       () => void read.refetch(),
     ),
-    isGuest: me.data === null,
+    isGuest: session.kind === "guest",
     replacingPage:
       data === undefined
         ? null

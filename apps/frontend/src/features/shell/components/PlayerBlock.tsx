@@ -18,7 +18,7 @@ export function PlayerBlock() {
       guest={<GuestIdentity />}
       failed={(failure, retry) => <PlayerBlockFailed failure={failure} retry={retry} />}
     >
-      {(player) => <PlayerIdentity player={player} />}
+      {(session) => <PlayerIdentity player={session.player} />}
     </SignedInPlayerGate>
   );
 }

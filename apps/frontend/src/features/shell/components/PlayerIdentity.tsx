@@ -1,5 +1,5 @@
 import { useSignOut } from "../../auth/hooks/useSignOut.ts";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import { PlayerBlockLayout } from "./PlayerBlockLayout.tsx";
 import { PlayerChip } from "./PlayerChip.tsx";
 import { SidebarSignOutButton } from "./SidebarSignOutButton.tsx";

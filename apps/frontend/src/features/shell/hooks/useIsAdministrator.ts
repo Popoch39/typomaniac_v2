@@ -1,5 +1,6 @@
-import { useSignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import { useSession } from "../../auth/hooks/useSession.ts";
+import { isAdministrator } from "../../auth/session/sessionOf.ts";
 
 export function useIsAdministrator() {
-  return useSignedInPlayer().player?.isAdministrator === true;
+  return isAdministrator(useSession().session);
 }
