@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { FindDuelIcon } from "../../../shared/components/FindDuelIcon.tsx";
 import { useFindNextDuel } from "../hooks/useFindNextDuel.ts";
+import { DuelAddFriend } from "./DuelAddFriend.tsx";
 import { DuelEndKeys } from "./DuelEndKeys.tsx";
 import { DuelReportOpponent } from "./DuelReportOpponent.tsx";
 
@@ -17,6 +18,7 @@ export function DuelRankedEndActions() {
       <Keycap asChild variant="neutral" size="lg">
         <Link to="/ranked">Back to Ranked</Link>
       </Keycap>
+      <DuelAddFriend />
       <DuelReportOpponent />
     </DuelEndKeys>
   );
