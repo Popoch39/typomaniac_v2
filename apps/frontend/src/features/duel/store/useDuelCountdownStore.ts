@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import { clientTime } from "../../game/clock/clientTime.ts";
+import { type Countdown, type CountdownEvent, nextCountdown } from "../clock/countdown.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 
 type DuelCountdownState = {
-  /** Whole seconds left before the Start, shown during the Countdown. */
-  readonly secondsLeft: number | null;
+  readonly countdown: Countdown;
   /** Runs `start` at the announced Start, given in server time, once the clock offset is known. */
   readonly schedule: (startAt: number, start: () => void) => void;
+  /** Counts down to the announced Start of the next Round, starting nothing at its end. */
+  readonly display: (startAt: number) => void;
   readonly cancel: () => void;
 };
 
@@ -16,6 +18,7 @@ const COUNTDOWN_REFRESH_MS = 100;
 let startTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let stopFollowingClock: (() => void) | null = null;
+let startRound: () => void = () => undefined;
 
 function stopTimers() {
   if (startTimer !== null) clearTimeout(startTimer);
@@ -24,38 +27,52 @@ function stopTimers() {
   refreshTimer = null;
 }
 
-export const useDuelCountdownStore = create<DuelCountdownState>()((set) => {
-  const cancel = () => {
-    stopTimers();
-    stopFollowingClock?.();
-    stopFollowingClock = null;
-    set({ secondsLeft: null });
+export const useDuelCountdownStore = create<DuelCountdownState>()((set, get) => {
+  const dispatch = (event: CountdownEvent) => {
+    const previous = get().countdown;
+    const { countdown, effect } = nextCountdown(previous, event);
+    set({ countdown });
+    if (countdown.kind === "idle") {
+      stopTimers();
+      stopFollowingClock?.();
+      stopFollowingClock = null;
+    } else if (
+      countdown.kind === "counting" &&
+      (previous.kind !== "counting" || previous.localStartAt !== countdown.localStartAt)
+    ) {
+      stopTimers();
+      const { localStartAt } = countdown;
+      refreshTimer = setInterval(
+        () => dispatch({ kind: "tick", at: clientTime() }),
+        COUNTDOWN_REFRESH_MS,
+      );
+      startTimer = setTimeout(
+        () => dispatch({ kind: "due", localStartAt }),
+        localStartAt - clientTime(),
+      );
+    }
+    if (effect === "start") startRound();
+  };
+
+  const begin = (startAt: number, purpose: "start" | "display", start: () => void) => {
+    dispatch({ kind: "cancel" });
+    startRound = start;
+    dispatch({
+      kind: "schedule",
+      startAt,
+      purpose,
+      clockOffset: useDuelClockStore.getState().clockOffset,
+      at: clientTime(),
+    });
+    stopFollowingClock = useDuelClockStore.subscribe(({ clockOffset }, { clockOffset: before }) => {
+      if (clockOffset !== before) dispatch({ kind: "clockOffset", clockOffset, at: clientTime() });
+    });
   };
 
   return {
-    secondsLeft: null,
-    schedule: (startAt, start) => {
-      cancel();
-      const runFrom = (clockOffset: number | null) => {
-        if (clockOffset === null) return;
-        stopTimers();
-        // The announced instant, on this client's clock.
-        const localStartAt = startAt - clockOffset;
-        const refreshSecondsLeft = () =>
-          set({ secondsLeft: Math.max(0, Math.ceil((localStartAt - clientTime()) / 1000)) });
-        refreshSecondsLeft();
-        refreshTimer = setInterval(refreshSecondsLeft, COUNTDOWN_REFRESH_MS);
-        startTimer = setTimeout(() => {
-          cancel();
-          start();
-        }, localStartAt - clientTime());
-      };
-      runFrom(useDuelClockStore.getState().clockOffset);
-      // Waits for the clock offset when it comes last, and follows a newer estimate of it.
-      stopFollowingClock = useDuelClockStore.subscribe(({ clockOffset }, previous) => {
-        if (clockOffset !== previous.clockOffset) runFrom(clockOffset);
-      });
-    },
-    cancel,
+    countdown: { kind: "idle" },
+    schedule: (startAt, start) => begin(startAt, "start", start),
+    display: (startAt) => begin(startAt, "display", () => undefined),
+    cancel: () => dispatch({ kind: "cancel" }),
   };
 });

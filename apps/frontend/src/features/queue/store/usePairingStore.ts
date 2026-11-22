@@ -19,6 +19,7 @@ type PairingState = {
     pairingId: string,
     players: NonNullable<PairingState["players"]>,
     window: AcceptWindow,
+    accepted: boolean,
   ) => void;
   readonly accept: () => void;
   readonly close: () => void;
@@ -44,14 +45,18 @@ const initialState = {
 
 export const usePairingStore = create<PairingState>()((set, get) => ({
   ...initialState,
-  propose: (pairingId, players, window) => {
+  propose: (pairingId, players, window, accepted) => {
     stopCountdownTimer();
     const refresh = () => set({ secondsLeft: acceptSecondsLeft(window, eventTime()) });
     set({
       pairingId,
       players,
-      isAccepted: false,
-      acceptSeconds: acceptSecondsLeft(window, window.receivedAt),
+      isAccepted: accepted,
+      // Proposed again after a reconnect: the countdown keeps draining from where it started.
+      acceptSeconds:
+        get().pairingId === pairingId
+          ? get().acceptSeconds
+          : acceptSecondsLeft(window, window.receivedAt),
     });
     refresh();
     countdownTimer = setInterval(refresh, COUNTDOWN_REFRESH_MS);

@@ -2,23 +2,18 @@ import type { ClientMessage, ServerMessage } from "@repo/duel-engine";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
+import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { duelQueryOptions } from "../api/duelQueryOptions.ts";
 import { parseServerMessage } from "../message/parseServerMessage.ts";
 
 type DuelSocketHandlers = {
   readonly receive: (message: ServerMessage) => void;
-  /** Told, in words for the user, why this Participant could not take a seat in the Duel. */
-  readonly refuse: (refusal: string) => void;
   /**
-   * The socket dropped and is about to be reopened, unless this answers `false` because the
-   * Participant no longer needs it.
+   * Told each move of the link: a refusal says, in words for the user, why this Participant could
+   * not take a seat in the Duel. The Participant closes the socket as it backs off once they no
+   * longer need it.
    */
-  readonly reconnect: () => boolean;
-  /**
-   * The socket closed after the Participant was seated, and is not reopened, with the reason the
-   * server closed it with.
-   */
-  readonly disconnect: (reason: string) => void;
+  readonly link: (link: SocketLink) => void;
 };
 
 const REFUSALS = { NICKNAME_REQUIRED: "Choose a Nickname to join this Duel." };
@@ -55,8 +50,14 @@ export function openDuelSocket(duelId: string, { receive, ...handlers }: DuelSoc
   });
 }
 
+/** Whether `message` was sent: nothing is sent while the link is not open. */
 export function sendToDuel(message: ClientMessage) {
-  socket.send(JSON.stringify(message));
+  return socket.send(JSON.stringify(message));
+}
+
+/** Drops the socket as a lost connection would, so that it is reopened. */
+export function dropDuelSocket() {
+  socket.drop();
 }
 
 export function closeDuelSocket() {

@@ -16,25 +16,20 @@ export function ProfilePage() {
           <SignInPrompt explanation="Profiles are for signed-in Players. Sign in to see yours." />
         }
       >
-        {(player) => (
+        {(session) => (
           <ProfileGate
-            player={player}
+            session={session}
             pending={
               <LoadingState
-                message={player === null ? "Checking your session…" : "Reading your Profile…"}
+                message={
+                  session.kind === "checking" ? "Checking your session…" : "Reading your Profile…"
+                }
               >
                 <ProfileSkeleton />
               </LoadingState>
             }
           >
-            {(standing, signedIn, progress, isProgressUpdating) => (
-              <PlayerProfile
-                player={signedIn}
-                standing={standing}
-                progress={progress}
-                isProgressUpdating={isProgressUpdating}
-              />
-            )}
+            {(profile) => <PlayerProfile profile={profile} />}
           </ProfileGate>
         )}
       </SignedInPlayerChain>

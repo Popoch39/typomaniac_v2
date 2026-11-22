@@ -1,4 +1,4 @@
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 
 /** A signed-in Player wearing the Ornament of their Gold Standing, for the dev pages. */
 export const playerFixture: SignedInPlayer = {

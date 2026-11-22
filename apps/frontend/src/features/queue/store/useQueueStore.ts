@@ -1,5 +1,6 @@
 import type { QueueServerMessage } from "@repo/matchmaking-engine";
 import { create } from "zustand";
+import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { eventTime } from "../../game/clock/eventTime.ts";
 import { type QueueEntry, waitingSeconds } from "../clock/waitingSeconds.ts";
 import { closeQueueSocket, openQueueSocket } from "../socket/queueSocket.ts";
@@ -71,8 +72,10 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     }
     stopWaitingTimer();
     if (message.type === "proposed") {
-      const { pairingId, players, acceptWithinMs } = message;
-      usePairingStore.getState().propose(pairingId, players, { acceptWithinMs, receivedAt });
+      const { pairingId, players, acceptWithinMs, accepted } = message;
+      usePairingStore
+        .getState()
+        .propose(pairingId, players, { acceptWithinMs, receivedAt }, accepted);
       set({ phase: "proposed" });
       return;
     }
@@ -88,9 +91,8 @@ export const useQueueStore = create<QueueState>()((set, get) => {
   };
 
   const reconnect = () => {
-    if (!isInQueue()) return false;
+    if (!isInQueue()) return closeQueueSocket();
     set({ isReconnecting: true });
-    return true;
   };
 
   const disconnect = () => {
@@ -98,6 +100,12 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     stopWaitingTimer();
     usePairingStore.getState().close();
     set({ phase: "disconnected", isReconnecting: false });
+  };
+
+  const followLink = (link: SocketLink) => {
+    if (link.kind === "refused") set({ phase: "refused", refusal: link.refusal });
+    else if (link.kind === "backoff") reconnect();
+    else if (link.kind === "down") disconnect();
   };
 
   const leave = () => {
@@ -112,12 +120,7 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     enter: () => {
       leave();
       set({ phase: "connecting" });
-      openQueueSocket({
-        receive,
-        refuse: (refusal) => set({ phase: "refused", refusal }),
-        reconnect,
-        disconnect,
-      });
+      openQueueSocket({ receive, link: followLink });
     },
     leave,
   };
