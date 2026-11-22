@@ -10,7 +10,7 @@ interface GameReplayToggleProps {
 
 /** Opens the replay of one Game of a reviewed Duel, closing any other. */
 export function GameReplayToggle({ duelId, game }: GameReplayToggleProps) {
-  const { isOpen, toggle } = useGameReplayToggle(duelId, game.round);
+  const { isOpen, toggle } = useGameReplayToggle(duelId, game);
 
   return (
     <div className="flex flex-col gap-3 pb-1">
