@@ -79,3 +79,57 @@ test("each change to the Player's Friends and Friend requests is read back with 
     expect(parsePlayerMessage(JSON.stringify({ type }))).toBeNull();
   }
 });
+
+const challenger = {
+  id: "ada",
+  nickname: "Ada",
+  avatarUrl: null,
+  rank: { tier: "gold", division: 2, lp: 40 },
+  ornament: { tier: "gold", division: null },
+} as const;
+
+test("each Challenge message is read back as it was sent", () => {
+  const messages = [
+    { type: "challengeSent", challengeId: "c1", playerId: "bob", answerWithinMs: 60_000 },
+    { type: "challengeRefused", playerId: "bob", code: "FRIEND_OFFLINE" },
+    { type: "challengeReceived", challengeId: "c1", challenger, answerWithinMs: 59_000 },
+    {
+      type: "challengeReceived",
+      challengeId: "c2",
+      challenger: {
+        ...challenger,
+        avatarUrl: "https://a.example/ada.png",
+        rank: null,
+        ornament: null,
+      },
+      answerWithinMs: 0,
+    },
+    { type: "challengeAccepted", challengeId: "c1", duelId: "d1" },
+    { type: "challengeDeclined", challengeId: "c1", playerId: "bob" },
+    { type: "challengeAnsweredElsewhere", challengeId: "c1" },
+    { type: "challengeCancelled", challengeId: "c1" },
+    { type: "challengeExpired", challengeId: "c1" },
+  ] as const;
+  for (const message of messages)
+    expect(parsePlayerMessage(JSON.stringify(message))).toEqual(message);
+});
+
+test("a Challenge message missing what it carries, or refused for an unknown reason, is not read", () => {
+  const unread = [
+    { type: "challengeSent", challengeId: "c1", playerId: "bob" },
+    { type: "challengeRefused", playerId: "bob", code: "BUSY_TYPING" },
+    { type: "challengeReceived", challengeId: "c1", answerWithinMs: 1000 },
+    {
+      type: "challengeReceived",
+      challengeId: "c1",
+      challenger: { ...challenger, rank: { tier: "gold", lp: 40 } },
+      answerWithinMs: 1000,
+    },
+    { type: "challengeReceived", challengeId: "c1", challenger, answerWithinMs: -1 },
+    { type: "challengeAccepted", challengeId: "c1" },
+    { type: "challengeDeclined", challengeId: "c1" },
+    { type: "challengeCancelled" },
+    { type: "challengeExpired", challengeId: 1 },
+  ];
+  for (const message of unread) expect(parsePlayerMessage(JSON.stringify(message))).toBeNull();
+});

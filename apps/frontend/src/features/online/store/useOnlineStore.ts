@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useChallengeStore } from "../../challenge/store/useChallengeStore.ts";
 import { refreshFriendReads } from "../../friends/api/friendsQueryOptions.ts";
 import { useFriendStateStore } from "../../friends/store/useFriendStateStore.ts";
 import type { PlayerServerMessage } from "../message/parsePlayerMessage.ts";
@@ -16,7 +17,9 @@ type OnlineState = {
 // The Friends and Friend requests read again when the socket says they changed, and when it tells
 // the Friends' states on opening, since a reconnection may have missed a change.
 const changesFriendReads = (message: PlayerServerMessage) =>
-  message.type !== "onlineCount" && message.type !== "friendState";
+  message.type !== "onlineCount" &&
+  message.type !== "friendState" &&
+  !message.type.startsWith("challenge");
 
 export const useOnlineStore = create<OnlineState>()((set, get) => ({
   playerId: null,
@@ -27,22 +30,31 @@ export const useOnlineStore = create<OnlineState>()((set, get) => ({
     set({ playerId, count: null });
     const friendStates = useFriendStateStore.getState();
     friendStates.reset();
+    const challenges = useChallengeStore.getState();
+    challenges.reset();
     if (playerId === null) return;
     openPlayerSocket({
       receive: (message) => {
         if (message.type === "onlineCount") return set({ count: message.count });
         friendStates.receive(message);
+        challenges.receive(message);
         if (changesFriendReads(message)) void refreshFriendReads();
       },
       refuse: () => {
         set({ count: null });
         friendStates.giveUp();
+        challenges.reset();
       },
       // The count stays shown while the socket is reopened, so that a restart does not blank it.
-      reconnect: () => get().playerId === playerId,
+      reconnect: () => {
+        const isFollowed = get().playerId === playerId;
+        if (isFollowed) challenges.drop();
+        return isFollowed;
+      },
       disconnect: () => {
         set({ count: null });
         friendStates.giveUp();
+        challenges.reset();
       },
     });
   },
