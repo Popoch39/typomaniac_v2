@@ -8,6 +8,8 @@ import {
 } from "../presence/onlinePresence.ts";
 import { closePlayerSocket, openPlayerSocket, retryPlayerSocket } from "../socket/playerSocket.ts";
 
+// `count` and `isDown` mirror `presence`, computed once in `dispatch`: components narrow on
+// `presence`, and the store's tests read them through `getState()`.
 type OnlineState = {
   readonly presence: OnlinePresence;
   /** How many Players are Online, as the Player socket last told, or `null` while unknown. */

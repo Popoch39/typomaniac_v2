@@ -7,13 +7,14 @@ import { useOnlinePlayers } from "../hooks/useOnlinePlayers.ts";
  * count is unknown.
  */
 export function OnlinePlayers() {
-  const { count, isDown } = useOnlinePlayers();
+  const { kind, count } = useOnlinePlayers();
+  const isDown = kind === "down";
 
   return (
     <span
       className={cn(
         "grid type-mono-sm whitespace-nowrap text-ink-muted",
-        count === null && !isDown && "invisible",
+        kind !== "live" && !isDown && "invisible",
       )}
     >
       <span

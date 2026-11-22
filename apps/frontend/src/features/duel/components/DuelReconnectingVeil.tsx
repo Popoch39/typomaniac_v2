@@ -4,9 +4,7 @@ import { useDuelReconnecting } from "../hooks/useDuelReconnecting.ts";
 // Laid over the Target words, so that they move nothing, and shows why typing is frozen. Hidden from
 // assistive technology: the Reconnecting line already announces it.
 export function DuelReconnectingVeil() {
-  const isReconnecting = useDuelReconnecting();
-
-  if (!isReconnecting) return null;
+  if (!useDuelReconnecting()) return null;
   return (
     <div
       aria-hidden
