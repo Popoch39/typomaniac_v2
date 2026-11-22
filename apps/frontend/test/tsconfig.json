@@ -1,13 +1,12 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "composite": true,
-    "rootDir": "..",
-    "outDir": "../dist/test",
-    "lib": ["es2022"],
+    "lib": ["es2023", "DOM"],
     "types": ["bun"],
     "allowImportingTsExtensions": true,
-    "emitDeclarationOnly": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
     "verbatimModuleSyntax": true
   },
   "include": [
@@ -30,7 +29,14 @@
     "../src/features/duel/report",
     "../src/features/duel/round",
     "../src/features/duel/scene",
-    "../src/features/duel/store/useTierPromotionStore.ts",
+    "../src/features/duel/store",
+    "../src/features/duel/socket",
+    "../src/features/duel/api",
+    "../src/features/ranked/api",
+    "../src/shared/api/queryClient.ts",
+    "../src/shared/api/apiClient.ts",
+    "../src/shared/store",
+    "../src/features/game/store",
     "../src/features/admin/replay",
     "../src/features/admin/review",
     "../src/features/auth/refusal",
