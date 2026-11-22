@@ -5,6 +5,13 @@ const forbidden = t.Object({ code: t.Literal("FORBIDDEN") });
 
 const reviewReason = t.Union([t.Literal("suspicion"), t.Literal("master"), t.Literal("podium")]);
 
+const reviewDecision = t.Union([
+  t.Literal("cleared"),
+  t.Literal("voided_duels"),
+  t.Literal("suspension"),
+  t.Literal("ban"),
+]);
+
 // An open Review as the administrator's queue lists it.
 const openReview = t.Object({
   id: t.String(),
@@ -100,6 +107,14 @@ export const ReviewsIdGet = {
       reason: reviewReason,
       // Epoch milliseconds.
       openedAt: t.Number(),
+      // Null while the Review is open.
+      settlement: t.Nullable(
+        t.Object({
+          decision: reviewDecision,
+          // Epoch milliseconds.
+          settledAt: t.Number(),
+        }),
+      ),
       player: t.Object({ id: t.String(), nickname: t.Nullable(t.String()), banned: t.Boolean() }),
       suspicion: t.Nullable(t.Number()),
       // The whole Standing, the MMR included: the administrator is not a Player looking at it.

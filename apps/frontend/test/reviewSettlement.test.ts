@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { reviewLifecycleOf } from "../src/features/admin/review/reviewLifecycle.ts";
 import { settledLine } from "../src/features/admin/review/settledLine.ts";
 import { settlementOf } from "../src/features/admin/review/settlementOf.ts";
 import { voidableDuels } from "../src/features/admin/review/voidableDuels.ts";
@@ -30,4 +31,13 @@ test("a settled Review says how it ended", () => {
   expect(settledLine("voided_duels")).toBe("Settled: the chosen Duels are voided.");
   expect(settledLine("suspension")).toBe("Settled: the Player is suspended.");
   expect(settledLine("ban")).toBe("Settled: the Player is banned.");
+});
+
+test("a Review read without a settlement is open, and one read with a settlement is settled with its decision and instant", () => {
+  expect(reviewLifecycleOf(null)).toEqual({ kind: "open" });
+  expect(reviewLifecycleOf({ decision: "ban", settledAt: 7000 })).toEqual({
+    kind: "settled",
+    decision: "ban",
+    settledAt: 7000,
+  });
 });
