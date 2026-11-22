@@ -143,6 +143,41 @@ test("an Event older than the instant the Live stats are read at does not move i
   expect(store.getState().readAt).toBeGreaterThanOrEqual(readAt);
 });
 
+test("a running words Game left mid-way stops ticking and is ready again", async () => {
+  store.getState().setConfig({ mode: "words", wordCount: 10 });
+  typeActiveWord();
+  expect(store.getState().game.status).toBe("running");
+
+  store.getState().leave();
+  const leftAt = store.getState().readAt;
+  const lastEvent = store.getState().lastEvent;
+  await Bun.sleep(1100);
+
+  expect(store.getState().game.status).toBe("ready");
+  expect(store.getState().readAt).toBe(leftAt);
+  expect(store.getState().lastEvent).toBe(lastEvent);
+});
+
+test("a running words Game has its Live stats read further on between two Ticks", async () => {
+  store.getState().setConfig({ mode: "words", wordCount: 10 });
+  typeActiveWord();
+  const typedAt = store.getState().readAt;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBeGreaterThan(typedAt + 100);
+});
+
+test("a ready Game does not tick", async () => {
+  store.getState().setConfig({ mode: "words", wordCount: 10 });
+  const readyAt = store.getState().readAt;
+
+  await Bun.sleep(250);
+
+  expect(store.getState().readAt).toBe(readyAt);
+  expect(store.getState().lastEvent).toBeNull();
+});
+
 test("restarting keeps the Game's config", () => {
   store.getState().setConfig({ mode: "words", wordCount: 25 });
 

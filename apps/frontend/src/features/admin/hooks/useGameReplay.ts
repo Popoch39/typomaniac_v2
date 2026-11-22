@@ -1,5 +1,5 @@
 import { keyPressBars } from "../replay/keyPressBars.ts";
-import { isPlaying, playbackPosition, REPLAY_SPEEDS } from "../replay/replayPlayback.ts";
+import { playbackPosition, REPLAY_SPEEDS } from "../replay/replayPlayback.ts";
 import { frameAt, replayTimeline } from "../replay/replayTimeline.ts";
 import { replayedWords } from "../replay/replayedWords.ts";
 import { useReplayStore } from "../store/useReplayStore.ts";
@@ -23,13 +23,13 @@ export function useGameReplay({ words, journal, result }: ReviewedGame) {
   const togglePause = useReplayStore((state) => state.togglePause);
   const restart = useReplayStore((state) => state.restart);
   const slow = useReplayStore((state) => state.slow);
-  const now = useFrameTime(playback.playingSince !== null);
+  const isPlaying = playback.kind === "playing";
+  const now = useFrameTime(isPlaying);
   const { duration } = timeline;
-  const position = playbackPosition(playback, now, duration);
-  const playing = isPlaying(playback, now, duration);
+  const position = playbackPosition(playback, now);
 
   return {
-    isPlaying: playing,
+    isPlaying,
     clock: `${seconds(position)} / ${seconds(duration)}`,
     words: replayedWords(frameAt(timeline, position), SHOWN_WORDS),
     keyPresses: keyPressBars(timeline, position, KEY_PRESS_WINDOW_MS).map((bar) => ({
@@ -44,10 +44,10 @@ export function useGameReplay({ words, journal, result }: ReviewedGame) {
     speeds: REPLAY_SPEEDS.map((speed) => ({
       speed,
       label: `${speed}×`,
-      isChosen: playback.speed === speed,
-      choose: () => slow(speed, duration),
+      isChosen: playback.kind !== "closed" && playback.speed === speed,
+      choose: () => slow(speed),
     })),
-    togglePause: () => togglePause(duration),
+    togglePause,
     restart,
   };
 }
