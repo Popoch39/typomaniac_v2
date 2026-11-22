@@ -396,7 +396,9 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     const avatarUrl = fields[`avatar${seat}`] ?? null;
     const ornament = JSON.parse(fields[`ornament${seat}`] ?? "null") as Ornament;
     const connected = fields[`connected${seat}`] === "1";
-    return [{ seat, name, avatarUrl, ornament, connected }];
+    // A seat holds a Player id only when a Player sits on it.
+    const guest = fields[`player${seat}`] === undefined;
+    return [{ seat, name, avatarUrl, ornament, guest, connected }];
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);

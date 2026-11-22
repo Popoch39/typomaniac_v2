@@ -45,6 +45,7 @@ const isParticipant: Check = (value) =>
     // `null` for a Guest, but never left out.
     avatarUrl: (avatarUrl) => avatarUrl !== undefined && isNullOr(isString)(avatarUrl),
     ornament: (ornament) => ornament !== undefined && isNullOr(isOrnament)(ornament),
+    guest: isBoolean,
     connected: isBoolean,
   });
 
