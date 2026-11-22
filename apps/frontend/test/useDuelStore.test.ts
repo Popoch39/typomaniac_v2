@@ -159,4 +159,8 @@ test("Keystrokes applied while reconnecting do not change the Game, which resume
   const replayed = journal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, words));
   expect(useGameStore.getState().game.inputs).toEqual(replayed.inputs);
   expect(useGameStore.getState().game.startedAt).toBe(replayed.startedAt);
+  // The resumed Game's clock runs again: its Live stats are read further on.
+  const resumedAt = useGameStore.getState().readAt;
+  await Bun.sleep(250);
+  expect(useGameStore.getState().readAt).toBeGreaterThan(resumedAt + 100);
 });
