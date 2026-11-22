@@ -79,9 +79,10 @@ export const createApp = (
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
       .use(createAdministrationRoutes(db, protection))
-      .use(createFriendRoutes(db, protection, rateLimiter))
+      .use(createFriendRoutes(db, protection, rateLimiter, redis))
       .use(
         createOnlineRoutes(
+          db,
           protection,
           rateLimiter,
           redis,

@@ -1,6 +1,8 @@
 import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
+import type { Redis } from "../../redis/client.ts";
 import type { Protection } from "../auth/index.ts";
+import { pushToPlayer } from "../online/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import * as FriendModel from "./model.ts";
 import {
@@ -13,8 +15,21 @@ import {
   sendFriendRequest,
 } from "./service.ts";
 
-export const createFriendRoutes = (db: Db, protection: Protection, rateLimiter: RateLimiter) =>
-  new Elysia({ prefix: "/api/friends" })
+type PairMessage = "friendRequestAccepted" | "friendRequestRemoved" | "friendRemoved";
+
+export const createFriendRoutes = (
+  db: Db,
+  protection: Protection,
+  rateLimiter: RateLimiter,
+  redis: Redis,
+) => {
+  // Tells every tab of both Players, each naming the other, so that their pages follow the change.
+  const pushToBoth = (type: PairMessage, playerId: string, otherId: string) =>
+    Promise.all([
+      pushToPlayer(redis, playerId, { type, playerId: otherId }),
+      pushToPlayer(redis, otherId, { type, playerId }),
+    ]);
+  return new Elysia({ prefix: "/api/friends" })
     .use(protection)
     .get(
       "/",
@@ -75,7 +90,20 @@ export const createFriendRoutes = (db: Db, protection: Protection, rateLimiter: 
             return status(409, { code: "FRIEND_LIMIT" });
           case "pendingLimit":
             return status(409, { code: "PENDING_LIMIT" });
-          default:
+          case "becameFriends":
+            await pushToBoth("friendRequestAccepted", player.id, body.playerId);
+            return { result };
+          case "sent":
+            await Promise.all([
+              pushToPlayer(redis, body.playerId, {
+                type: "friendRequestReceived",
+                playerId: player.id,
+              }),
+              pushToPlayer(redis, player.id, {
+                type: "friendRequestSent",
+                playerId: body.playerId,
+              }),
+            ]);
             return { result };
         }
       },
@@ -97,6 +125,7 @@ export const createFriendRoutes = (db: Db, protection: Protection, rateLimiter: 
         });
         if (accepted === "notFound") return status(404, { code: "REQUEST_NOT_FOUND" });
         if (accepted === "friendLimit") return status(409, { code: "FRIEND_LIMIT" });
+        await pushToBoth("friendRequestAccepted", player.id, params.playerId);
         return status(204, undefined);
       },
     )
@@ -110,9 +139,10 @@ export const createFriendRoutes = (db: Db, protection: Protection, rateLimiter: 
       async ({ player, params, set, status }) => {
         const refused = await rateLimiter.check("friendChange", player.id, set);
         if (refused) return refused;
-        return (await deleteFriendRequest(db, { senderId: params.playerId, receiverId: player.id }))
-          ? status(204, undefined)
-          : status(404, { code: "REQUEST_NOT_FOUND" });
+        if (!(await deleteFriendRequest(db, { senderId: params.playerId, receiverId: player.id })))
+          return status(404, { code: "REQUEST_NOT_FOUND" });
+        await pushToBoth("friendRequestRemoved", player.id, params.playerId);
+        return status(204, undefined);
       },
     )
     .delete(
@@ -125,9 +155,10 @@ export const createFriendRoutes = (db: Db, protection: Protection, rateLimiter: 
       async ({ player, params, set, status }) => {
         const refused = await rateLimiter.check("friendChange", player.id, set);
         if (refused) return refused;
-        return (await deleteFriendRequest(db, { senderId: player.id, receiverId: params.playerId }))
-          ? status(204, undefined)
-          : status(404, { code: "REQUEST_NOT_FOUND" });
+        if (!(await deleteFriendRequest(db, { senderId: player.id, receiverId: params.playerId })))
+          return status(404, { code: "REQUEST_NOT_FOUND" });
+        await pushToBoth("friendRequestRemoved", player.id, params.playerId);
+        return status(204, undefined);
       },
     )
     .delete(
@@ -140,8 +171,10 @@ export const createFriendRoutes = (db: Db, protection: Protection, rateLimiter: 
       async ({ player, params, set, status }) => {
         const refused = await rateLimiter.check("friendChange", player.id, set);
         if (refused) return refused;
-        return (await removeFriend(db, player.id, params.playerId))
-          ? status(204, undefined)
-          : status(404, { code: "FRIEND_NOT_FOUND" });
+        if (!(await removeFriend(db, player.id, params.playerId)))
+          return status(404, { code: "FRIEND_NOT_FOUND" });
+        await pushToBoth("friendRemoved", player.id, params.playerId);
+        return status(204, undefined);
       },
     );
+};

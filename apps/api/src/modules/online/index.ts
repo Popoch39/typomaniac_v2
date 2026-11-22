@@ -1,16 +1,18 @@
 import type { Logger } from "@repo/logger";
 import { Elysia } from "elysia";
 import { websocket } from "elysia/websocket";
+import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import type { Protection } from "../auth/index.ts";
 import { logSocketFailure } from "../http/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
-import { createPlayerChannels, type PlayerServerMessage } from "./channel.ts";
+import { createPlayerChannels } from "./channel.ts";
+import { createFriendWatch } from "./friendWatch.ts";
 import * as OnlineModel from "./model.ts";
 import { createOnlinePresence } from "./presence.ts";
-import { ONLINE_WINDOW_MS } from "./service.ts";
+import { ONLINE_WINDOW_MS, type PlayerServerMessage } from "./service.ts";
 
 export type OnlineOptions = {
   /** How long a Player stays Online after their sockets stopped being refreshed. */
@@ -20,6 +22,7 @@ export type OnlineOptions = {
 };
 
 export const createOnlineRoutes = (
+  db: Db,
   protection: Protection,
   rateLimiter: RateLimiter,
   redis: Redis,
@@ -27,13 +30,25 @@ export const createOnlineRoutes = (
   lifecycle: Lifecycle,
   { windowMs = ONLINE_WINDOW_MS, refreshMs = windowMs / 3 }: OnlineOptions = {},
 ) => {
-  const presence = createOnlinePresence(redis, logger, { windowMs, intervalMs: refreshMs });
+  const friendWatch = createFriendWatch(db, redis, logger, { windowMs });
+  const presence = createOnlinePresence(redis, logger, {
+    windowMs,
+    intervalMs: refreshMs,
+    changed: friendWatch.announce,
+  });
   const channels = createPlayerChannels(redis);
   type Holding = {
     readonly playerId: string;
     readonly send: (message: PlayerServerMessage) => void;
     readonly tellCount: (count: number) => void;
     readonly overCap: (now: number) => boolean;
+    /** Whether the Player has a Nickname, without which they have no Friend. */
+    readonly befriendable: boolean;
+    /** What the Player's channel hands this socket. */
+    readonly delivery: {
+      readonly playerId: string;
+      readonly send: (message: PlayerServerMessage) => void;
+    };
   };
   // What each open socket holds, set on open and read on close.
   const holdings = new Map<string, Holding>();
@@ -71,16 +86,20 @@ export const createOnlineRoutes = (
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
           const send = (message: PlayerServerMessage) => ws.send(message);
+          const playerId = ws.player.id;
           const holding: Holding = {
-            playerId: ws.player.id,
+            playerId,
             send,
             tellCount: (count) => send({ type: "onlineCount", count }),
             overCap: rateLimiter.socketMessageWindow(),
+            befriendable: ws.player.nickname !== null,
+            delivery: { playerId, send: (message) => friendWatch.deliver(holding, message) },
           };
           holdings.set(ws.id, holding);
           logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
-          await channels.hold(holding);
+          await channels.hold(holding.delivery);
           await presence.hold(holding);
+          if (holding.befriendable) await friendWatch.hold(holding);
         },
         async close(ws, code) {
           lifecycle.release(ws.id);
@@ -92,7 +111,11 @@ export const createOnlineRoutes = (
           const holding = holdings.get(ws.id);
           if (!holding) return;
           holdings.delete(ws.id);
-          await Promise.all([channels.release(holding), presence.release(holding)]);
+          await Promise.all([
+            channels.release(holding.delivery),
+            presence.release(holding),
+            friendWatch.release(holding),
+          ]);
         },
         error: logSocketFailure(logger, "Player socket failed"),
       })
