@@ -9,10 +9,12 @@ import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
 import type { FairPlayConfig } from "./modules/fair-play/config.ts";
 import { createFairPlayRoutes } from "./modules/fair-play/index.ts";
+import { createFriendRoutes } from "./modules/friend/index.ts";
 import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
 import { createOnlineRoutes, type OnlineOptions } from "./modules/online/index.ts";
+import { cancelChallengesBetween, pushToPlayer } from "./modules/online/service.ts";
 import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
 import { createProgressRoutes } from "./modules/progress/index.ts";
@@ -35,7 +37,7 @@ export type AppOptions = {
   readonly rateLimit?: RateLimitOptions;
   /** The entry reads it from the configuration; a test that shows no Sanction may leave it out. */
   readonly fairPlay?: FairPlayConfig;
-  /** Lets a test shorten how long a ping keeps a Player Online. */
+  /** Lets a test shorten how long a Player stays Online after their sockets. */
   readonly online?: OnlineOptions;
 };
 
@@ -77,8 +79,20 @@ export const createApp = (
       .use(createProgressRoutes(db, protection))
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
-      .use(createAdministrationRoutes(db, protection))
-      .use(createOnlineRoutes(protection, redis, onlineOptions))
+      .use(createAdministrationRoutes(db, protection, redis))
+      .use(
+        createFriendRoutes(db, protection, rateLimiter, {
+          push: (playerId, message) => pushToPlayer(redis, playerId, message),
+          cancelChallengesBetween: (playerId, otherId) =>
+            cancelChallengesBetween(redis, playerId, otherId),
+        }),
+      )
+      .use(
+        createOnlineRoutes(db, protection, rateLimiter, redis, loggerOf("online"), lifecycle, {
+          duelExpiryMs: duelOptions?.expiryMs,
+          ...onlineOptions,
+        }),
+      )
       .use(
         createDuelRoutes(
           db,

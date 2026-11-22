@@ -26,6 +26,18 @@ _Avoid_: connected, active, present
 A **Player**'s picture, taken from their GitHub or Discord account when they sign up.
 _Avoid_: profile picture, pfp, image
 
+**Friend**:
+A **Player** linked to another by a **Friend request** they accepted; the link is mutual, and either of them can undo it. Only Friends can invite each other to a Custom Duel directly.
+_Avoid_: buddy, contact, follower, connection
+
+**Friend request**:
+A Player's offer to become another Player's **Friend**; it waits until that Player accepts or declines it.
+_Avoid_: friend invite, invitation (reserved for a Custom Duel's invite link), add request
+
+**Challenge**:
+A Player's offer to an **Online** **Friend** to play a Custom Duel together right away; it lapses if they do not answer it in time. The verb is _challenge_: Alice challenges Bob.
+_Avoid_: invitation (reserved for a Custom Duel's invite link), duel request, friendly match, defy
+
 ### Duel
 
 **Duel**:
@@ -274,9 +286,9 @@ A ranked Duel whose effect on both Standings is withdrawn where the cheating pai
 _Avoid_: cancelled duel, annulled duel, reverted duel, refund
 
 **Suspension**:
-A Sanction that keeps a Player out of the Queue for a set time; they can still sign in and play Practice and Custom Duels.
+A Sanction that keeps a Player out of the Queue for a set time; they can still sign in, play Practice and Custom Duels, and keep their Friends, challenge and be challenged.
 _Avoid_: timeout, temporary ban, cooldown
 
 **Ban**:
-A permanent Sanction: the Player can no longer sign in, and the GitHub and Discord accounts and the e-mail they signed in with can never be used to sign in again.
+A permanent Sanction: the Player can no longer sign in, and the GitHub and Discord accounts and the e-mail they signed in with can never be used to sign in again. Their Friends and Friend requests are deleted and their waiting Challenges cancelled; lifting the Ban brings none of them back.
 _Avoid_: permanent suspension, block, exclusion

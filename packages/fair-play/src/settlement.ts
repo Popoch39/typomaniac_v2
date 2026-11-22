@@ -1,7 +1,7 @@
 import { type Db, duel, duelParticipant, review, sanction } from "@repo/db";
 import { suspensionLength } from "@repo/fair-play-engine";
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
-import { banPlayerIn, suspendPlayerIn, voidDuelIn } from "./sanction.ts";
+import { banPlayerIn, type SeveredRelations, suspendPlayerIn, voidDuelIn } from "./sanction.ts";
 
 /** How the administrator ends a Review: clearing the Player, or one of the Sanctions. */
 export type ReviewSettlement =
@@ -10,7 +10,15 @@ export type ReviewSettlement =
   | { readonly decision: "suspension" }
   | { readonly decision: "ban" };
 
-export type SettleReviewResult = "settled" | "not-found" | "already-settled" | "duel-not-found";
+/**
+ * A settled Review, with the Player its Ban banned and what the Ban deleted around them, for telling
+ * the other sides; `banned` is null for any other decision, or a Player banned already.
+ */
+export type SettledReview = {
+  readonly banned: ({ readonly playerId: string } & SeveredRelations) | null;
+};
+
+export type SettleReviewResult = SettledReview | "not-found" | "already-settled" | "duel-not-found";
 
 /**
  * Settles an open Review at `at`, in one transaction: the Sanction decided is applied with cause
@@ -34,6 +42,7 @@ export const settleReview = (
     if (found.settledAt) return "already-settled";
     const { playerId } = found;
     const cause = "review";
+    let banned: SettledReview["banned"] = null;
     if (settlement.decision === "voided_duels") {
       const duelIds = [...new Set(settlement.duelIds)];
       const [ofPlayer] = await tx
@@ -62,10 +71,13 @@ export const settleReview = (
         );
       const lengthMs = suspensionLength(earlier?.suspensions ?? 0);
       await suspendPlayerIn(tx, { playerId, cause, at, lengthMs });
-    } else if (settlement.decision === "ban") await banPlayerIn(tx, { playerId, cause, at });
+    } else if (settlement.decision === "ban") {
+      const { severed } = await banPlayerIn(tx, { playerId, cause, at });
+      if (severed !== null) banned = { playerId, ...severed };
+    }
     await tx
       .update(review)
       .set({ settledAt: at, decision: settlement.decision })
       .where(eq(review.id, reviewId));
-    return "settled";
+    return { banned };
   });

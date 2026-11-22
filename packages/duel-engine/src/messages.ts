@@ -19,6 +19,8 @@ export type Participant = {
   readonly avatarUrl: string | null;
   /** The Ornament the Player wore as the seat was taken, `null` for a Guest or a Player who wears none. */
   readonly ornament: Ornament;
+  /** Whether a Guest sits on the seat: someone with no Nickname, whom no Player can befriend. */
+  readonly guest: boolean;
   readonly connected: boolean;
 };
 

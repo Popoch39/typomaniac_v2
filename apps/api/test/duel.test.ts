@@ -75,7 +75,14 @@ test("a Player with a Nickname creates a Duel and takes its first seat, alone an
     startAt: null,
     words: null,
     participants: [
-      { seat: 0, name: nickname, avatarUrl: null, ornament: unrankedPlate, connected: true },
+      {
+        seat: 0,
+        name: nickname,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        guest: false,
+        connected: true,
+      },
     ],
     ranks: null,
     journals: [[], []],
@@ -101,8 +108,22 @@ test("a second Player joins by the link and both see each other's name", async (
     type: "state",
     seat: 1,
     participants: [
-      { seat: 0, name: creatorName, avatarUrl: null, ornament: unrankedPlate, connected: true },
-      { seat: 1, name: opponentName, avatarUrl: null, ornament: unrankedPlate, connected: true },
+      {
+        seat: 0,
+        name: creatorName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        guest: false,
+        connected: true,
+      },
+      {
+        seat: 1,
+        name: opponentName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        guest: false,
+        connected: true,
+      },
     ],
   });
   expect(presence).toEqual({
@@ -112,6 +133,7 @@ test("a second Player joins by the link and both see each other's name", async (
       name: opponentName,
       avatarUrl: null,
       ornament: unrankedPlate,
+      guest: false,
       connected: true,
     },
   });
@@ -161,7 +183,14 @@ test("a Player opening a Duel twice gets their own seat back, never its other se
     type: "state",
     seat: 0,
     participants: [
-      { seat: 0, name: nickname, avatarUrl: null, ornament: unrankedPlate, connected: true },
+      {
+        seat: 0,
+        name: nickname,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        guest: false,
+        connected: true,
+      },
     ],
   });
 });
@@ -195,9 +224,40 @@ test("a Guest creates a Duel under a generated display name, which the Player wh
     seat: 1,
     participants: [
       { seat: 0, name: guestName, avatarUrl: null, connected: true },
-      { seat: 1, name: playerName, avatarUrl: null, ornament: unrankedPlate, connected: true },
+      {
+        seat: 1,
+        name: playerName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        guest: false,
+        connected: true,
+      },
     ],
   });
+});
+
+test("each Participant says whether a Guest sits on the seat, whatever their name", async () => {
+  const created = await createDuel();
+  const guestCookie = guestCookieOf(created);
+  const { id } = (await created.json()) as { id: string };
+  const playerCookie = await signInPlayerWithNickname(uniqueNickname());
+
+  const guest = await openSocket(duelSocketUrl(id), guestCookie);
+  await guest.next();
+  const player = await openSocket(duelSocketUrl(id), playerCookie);
+  const playerState = await player.next();
+  const presence = await guest.next();
+  guest.close();
+  player.close();
+
+  expect(playerState).toMatchObject({
+    type: "state",
+    participants: [
+      { seat: 0, guest: true },
+      { seat: 1, guest: false },
+    ],
+  });
+  expect(presence).toMatchObject({ type: "presence", participant: { seat: 1, guest: false } });
 });
 
 test("each Participant carries their Avatar, none for a Guest", async () => {
@@ -225,7 +285,14 @@ test("each Participant carries their Avatar, none for a Guest", async () => {
   });
   expect(presence).toEqual({
     type: "presence",
-    participant: { seat: 1, name: playerName, avatarUrl, ornament: unrankedPlate, connected: true },
+    participant: {
+      seat: 1,
+      name: playerName,
+      avatarUrl,
+      ornament: unrankedPlate,
+      guest: false,
+      connected: true,
+    },
   });
 });
 
@@ -354,6 +421,7 @@ test("a Participant whose old socket still holds their seat takes it back from a
         name: creatorName,
         avatarUrl: null,
         ornament: unrankedPlate,
+        guest: false,
         connected: true,
       },
     });
@@ -470,6 +538,7 @@ test("a Player who closed their socket is shown away, then takes their own seat 
       name: creatorName,
       avatarUrl: null,
       ornament: unrankedPlate,
+      guest: false,
       connected: false,
     },
   });
@@ -501,6 +570,7 @@ test("two Players on two API instances sharing Redis see each other arrive", asy
         name: opponentName,
         avatarUrl: null,
         ornament: unrankedPlate,
+        guest: false,
         connected: true,
       },
     });
@@ -563,6 +633,7 @@ test("the state is the first message a socket receives, even when the Opponent's
         name: opponentName,
         avatarUrl: null,
         ornament: unrankedPlate,
+        guest: false,
         connected: true,
       },
     });
@@ -588,7 +659,14 @@ test("a Player reads who sits in a Duel, and is told when it does not exist", as
   expect(found.status).toBe(200);
   expect(await found.json()).toEqual({
     participants: [
-      { seat: 0, name: creatorName, avatarUrl: null, ornament: unrankedPlate, connected: true },
+      {
+        seat: 0,
+        name: creatorName,
+        avatarUrl: null,
+        ornament: unrankedPlate,
+        guest: false,
+        connected: true,
+      },
     ],
   });
   expect(missing.status).toBe(404);
@@ -876,6 +954,7 @@ test("a Participant who comes back on another API instance resumes the same Game
         name: creatorName,
         avatarUrl: null,
         ornament: unrankedPlate,
+        guest: false,
         connected: false,
       },
     });
@@ -900,6 +979,7 @@ test("a Participant who comes back on another API instance resumes the same Game
         name: creatorName,
         avatarUrl: null,
         ornament: unrankedPlate,
+        guest: false,
         connected: true,
       },
     });

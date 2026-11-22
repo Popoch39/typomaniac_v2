@@ -26,6 +26,7 @@ import { readWornOrnaments } from "../ornament/service.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
+  announceDuelPlayers,
   announceStart,
   appendEvents,
   claimSeat,
@@ -179,6 +180,9 @@ export const createDuelRoutes = (
           const claimed = await claimSeat(redis, params.id, { ...identity, ornament });
           if (claimed === "unknown") return status(404, { code: "DUEL_NOT_FOUND" });
           if (claimed === "full") return status(409, { code: "DUEL_FULL" });
+          // A seat taken back changes nothing of the Player's state.
+          if (claimed.isNew && identity.playerId !== null)
+            await announceDuelPlayers(redis, [identity.playerId]);
         },
         // Hands a new Guest their cookie with the handshake, the only response a socket gets.
         upgrade: ({ set }) => set.headers,

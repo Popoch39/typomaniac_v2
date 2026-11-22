@@ -4,6 +4,8 @@ import {
   type Db,
   duel,
   duelParticipant,
+  friendRequest,
+  friendship,
   sanction,
   session,
   type Transaction,
@@ -12,7 +14,7 @@ import {
   voidedDuelCorrection,
 } from "@repo/db";
 import { REPAIR_WINDOW_MS } from "@repo/fair-play-engine";
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
 import { correctStandings, storedRank } from "./standing.ts";
 
 /** What brought a Sanction: a Violation, sanctioned automatically, or a Review settled by a person. */
@@ -225,23 +227,30 @@ const withdrawRecentWins = async (
 
 export type BanResult = "banned" | "already-banned";
 
+/** What a Ban deleted around the Player, named by the other Player of each, for telling them. */
+export type SeveredRelations = {
+  readonly friendIds: readonly string[];
+  /** The other Player of each pending Friend request, sent or received. */
+  readonly requestPlayerIds: readonly string[];
+};
+
 /**
  * Bans a Player from `at`, for good, in one transaction: the Ban is saved, the Player is marked as
  * banned, their GitHub and Discord accounts and their e-mail are refused at sign-in from then on,
- * every session of theirs is deleted, so that their next request is that of a Guest, and every
- * ranked Duel they won in the repair window before it is voided under it (ADR 0015). A Player
- * already banned is left as they are.
+ * every session of theirs is deleted, so that their next request is that of a Guest, their Friends
+ * and Friend requests are deleted, and every ranked Duel they won in the repair window before it is
+ * voided under it (ADR 0015). A Player already banned is left as they are.
  */
 export const banPlayer = (db: Db, ban: Ban): Promise<BanResult> =>
-  db.transaction((tx) => banPlayerIn(tx, ban));
+  db.transaction(async (tx) => (await banPlayerIn(tx, ban)).result);
 
 type Ban = { playerId: string; cause: SanctionCause; at: Date };
 
-/** `banPlayer`, inside the caller's transaction. */
+/** `banPlayer`, inside the caller's transaction, with what the Ban deleted when it was saved. */
 export const banPlayerIn = async (
   tx: Transaction,
   { playerId, cause, at }: Ban,
-): Promise<BanResult> => {
+): Promise<{ result: BanResult; severed: SeveredRelations | null }> => {
   // Locked first, so that two bans of one Player wait on each other and the second sees the first.
   const [found] = await tx
     .select({ bannedAt: user.bannedAt })
@@ -249,9 +258,9 @@ export const banPlayerIn = async (
     .where(eq(user.id, playerId))
     .for("update");
   if (!found) throw new Error(`Could not ban Player ${playerId}: no such Player`);
-  if (found.bannedAt) return "already-banned";
-  await saveBan(tx, { playerId, cause, at }, repairWindowBefore(at));
-  return "banned";
+  if (found.bannedAt) return { result: "already-banned", severed: null };
+  const { severed } = await saveBan(tx, { playerId, cause, at }, repairWindowBefore(at));
+  return { result: "banned", severed };
 };
 
 /**
@@ -273,11 +282,14 @@ export const banForViolation = async (
     )
     .orderBy(desc(sanction.startedAt))
     .limit(1);
-  return holding?.id ?? (await saveBan(tx, { playerId, cause: "violation", at }, withdrawSince));
+  return (
+    holding?.id ??
+    (await saveBan(tx, { playerId, cause: "violation", at }, withdrawSince)).sanctionId
+  );
 };
 
 // Saves a Ban and applies it, as `banPlayerIn` describes but voiding the ranked Duels the Player won
-// from `withdrawSince`, and returns its id. The caller has locked the Player and checked they are not
+// from `withdrawSince`, and returns its id and what it deleted around the Player. The caller has locked the Player and checked they are not
 // banned.
 const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban, withdrawSince: Date) => {
   const [found] = await tx.select({ email: user.email }).from(user).where(eq(user.id, playerId));
@@ -299,6 +311,21 @@ const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban, withdrawSi
       { sanctionId: saved.id, email: found.email.toLowerCase() },
     ]);
   await tx.delete(session).where(eq(session.userId, playerId));
+  // For good: lifting the Ban on appeal brings back none of them.
+  const friendships = await tx
+    .delete(friendship)
+    .where(or(eq(friendship.lowerPlayerId, playerId), eq(friendship.higherPlayerId, playerId)))
+    .returning({ lower: friendship.lowerPlayerId, higher: friendship.higherPlayerId });
+  const requests = await tx
+    .delete(friendRequest)
+    .where(or(eq(friendRequest.senderId, playerId), eq(friendRequest.receiverId, playerId)))
+    .returning({ senderId: friendRequest.senderId, receiverId: friendRequest.receiverId });
   await withdrawRecentWins(tx, { playerId, since: withdrawSince, until: at, sanctionId: saved.id });
-  return saved.id;
+  const severed: SeveredRelations = {
+    friendIds: friendships.map(({ lower, higher }) => (lower === playerId ? higher : lower)),
+    requestPlayerIds: requests.map(({ senderId, receiverId }) =>
+      senderId === playerId ? receiverId : senderId,
+    ),
+  };
+  return { sanctionId: saved.id, severed };
 };

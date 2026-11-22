@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { DangerStatusLine } from "../../../shared/components/DangerStatusLine.tsx";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
 import { useCreateDuel } from "../hooks/useCreateDuel.ts";
+import { DuelAddFriend } from "./DuelAddFriend.tsx";
 import { DuelEndKeys } from "./DuelEndKeys.tsx";
 
 export function DuelCustomEndActions() {
@@ -16,6 +17,7 @@ export function DuelCustomEndActions() {
         <Keycap asChild variant="neutral" size="lg">
           <Link to="/">Back home</Link>
         </Keycap>
+        <DuelAddFriend />
       </DuelEndKeys>
       <DangerStatusLine message={failure} />
     </div>
