@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
-import { loadingOnly, readStage, retryFailed } from "../../../shared/api/readStage.ts";
+import {
+  loadingOnly,
+  type ReadyData,
+  readGate,
+  readStage,
+  retryFailed,
+} from "../../../shared/api/readStage.ts";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { ornamentQueryOptions } from "../../ornament/api/ornamentQueryOptions.ts";
 import { progressQueryOptions } from "../../progress/api/progressQueryOptions.ts";
@@ -8,7 +14,9 @@ import { publicPlayerQueryOptions } from "../../player/api/publicPlayerQueryOpti
 import { useProgressFilterStore } from "../../progress/store/useProgressFilterStore.ts";
 import { useStanding } from "../../ranked/hooks/useStanding.ts";
 
-export type ProfileProgress = NonNullable<ReturnType<typeof useProfileReads>["progress"]>;
+export type ProfileProgress = NonNullable<
+  ReadyData<ReturnType<typeof useProfileReads>>["progress"]
+>;
 
 /**
  * The reads the Profile lays out, sent together so that the page is drawn once they are all back, and
@@ -28,15 +36,21 @@ export function useProfileReads(player: SignedInPlayer | null) {
   const nicknameReads = nickname === null ? [] : [progress, publicPlayer];
   const error = progress.error ?? publicPlayer.error;
 
-  return {
-    standing,
-    progress:
-      progress.data === undefined || publicPlayer.data === undefined
-        ? null
-        : { ...progress.data, peakTier: publicPlayer.data.peakTier },
-    isProgressUpdating: progress.isPlaceholderData,
-    stage: readStage(nickname === null ? [read] : [read, loadingOnly(ornament), ...nicknameReads]),
-    failure: failure ?? (error === null ? null : describeApiError(error)),
-    retry: () => retryFailed(nickname === null ? [read] : [read, ornament, ...nicknameReads]),
-  };
+  return readGate(
+    readStage(nickname === null ? [read] : [read, loadingOnly(ornament), ...nicknameReads]),
+    player === null || standing === null
+      ? undefined
+      : {
+          player,
+          standing,
+          // Null for a Player without a Nickname, whose Progress is not read.
+          progress:
+            progress.data === undefined || publicPlayer.data === undefined
+              ? null
+              : { ...progress.data, peakTier: publicPlayer.data.peakTier },
+          isProgressUpdating: progress.isPlaceholderData,
+        },
+    failure ?? (error === null ? null : describeApiError(error)),
+    () => retryFailed(nickname === null ? [read] : [read, ornament, ...nicknameReads]),
+  );
 }
