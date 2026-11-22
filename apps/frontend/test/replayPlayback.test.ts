@@ -1,13 +1,17 @@
 import { expect, test } from "bun:test";
 import {
   CLOSED_PLAYBACK,
-  next,
+  nextReplayPlayback,
   playbackEndsIn,
   playbackPosition,
   type ReplayPlayback,
 } from "../src/features/admin/replay/replayPlayback.ts";
 
 const DURATION = 30_000;
+
+// The playback a transition moves to, its effects read by their own test.
+const next = (...[playback, event]: Parameters<typeof nextReplayPlayback>) =>
+  nextReplayPlayback(playback, event).playback;
 
 const opened = (at: number) =>
   next(CLOSED_PLAYBACK, { kind: "open", replayed: "duel/1", duration: DURATION, at });
@@ -91,4 +95,23 @@ test("a closed replay ignores the controls", () => {
   expect(next(CLOSED_PLAYBACK, { kind: "togglePause", at: 0 })).toBe(CLOSED_PLAYBACK);
   expect(next(CLOSED_PLAYBACK, { kind: "restart", at: 0 })).toBe(CLOSED_PLAYBACK);
   expect(next(CLOSED_PLAYBACK, { kind: "reachEnd" })).toBe(CLOSED_PLAYBACK);
+});
+
+test("a replay that plays arms its end at the end of its journal, and one that stops playing disarms it", () => {
+  const open = { kind: "open", replayed: "duel/1", duration: DURATION, at: 1000 } as const;
+  const playing = nextReplayPlayback(CLOSED_PLAYBACK, open);
+  expect(playing.effects).toEqual([{ kind: "endIn", ms: DURATION }]);
+
+  const paused = nextReplayPlayback(playing.playback, { kind: "togglePause", at: 11_000 });
+  expect(paused.effects).toEqual([{ kind: "cancelEnd" }]);
+
+  const slowed = nextReplayPlayback(
+    nextReplayPlayback(paused.playback, { kind: "togglePause", at: 20_000 }).playback,
+    { kind: "slow", speed: 0.5, at: 20_000 },
+  );
+  expect(slowed.effects).toEqual([{ kind: "endIn", ms: 40_000 }]);
+
+  expect(nextReplayPlayback(slowed.playback, { kind: "close" }).effects).toEqual([
+    { kind: "cancelEnd" },
+  ]);
 });

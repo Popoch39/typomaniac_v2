@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { clientTime } from "../../game/clock/clientTime.ts";
-import { type Countdown, type CountdownEvent, nextCountdown } from "../clock/countdown.ts";
+import {
+  type Countdown,
+  type CountdownEffect,
+  type CountdownEvent,
+  nextCountdown,
+} from "../clock/countdown.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 
 type DuelCountdownState = {
@@ -29,29 +34,34 @@ function stopTimers() {
 
 export const useDuelCountdownStore = create<DuelCountdownState>()((set, get) => {
   const dispatch = (event: CountdownEvent) => {
-    const previous = get().countdown;
-    const { countdown, effect } = nextCountdown(previous, event);
+    const { countdown, effects } = nextCountdown(get().countdown, event);
     set({ countdown });
-    if (countdown.kind === "idle") {
-      stopTimers();
-      stopFollowingClock?.();
-      stopFollowingClock = null;
-    } else if (
-      countdown.kind === "counting" &&
-      (previous.kind !== "counting" || previous.localStartAt !== countdown.localStartAt)
-    ) {
-      stopTimers();
-      const { localStartAt } = countdown;
-      refreshTimer = setInterval(
-        () => dispatch({ kind: "tick", at: clientTime() }),
-        COUNTDOWN_REFRESH_MS,
-      );
-      startTimer = setTimeout(
-        () => dispatch({ kind: "due", localStartAt }),
-        localStartAt - clientTime(),
-      );
+    for (const effect of effects) perform(effect);
+  };
+
+  const perform = (effect: CountdownEffect) => {
+    switch (effect.kind) {
+      case "arm": {
+        stopTimers();
+        const { localStartAt } = effect;
+        refreshTimer = setInterval(
+          () => dispatch({ kind: "tick", at: clientTime() }),
+          COUNTDOWN_REFRESH_MS,
+        );
+        startTimer = setTimeout(
+          () => dispatch({ kind: "due", localStartAt }),
+          localStartAt - clientTime(),
+        );
+        return;
+      }
+      case "disarm":
+        stopTimers();
+        stopFollowingClock?.();
+        stopFollowingClock = null;
+        return;
+      case "start":
+        startRound();
     }
-    if (effect === "start") startRound();
   };
 
   const begin = (startAt: number, purpose: "start" | "display", start: () => void) => {
