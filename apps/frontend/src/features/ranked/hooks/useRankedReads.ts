@@ -1,4 +1,4 @@
-import { readStage, retryFailed } from "../../../shared/api/readStage.ts";
+import { readGate, readStage, retryFailed } from "../../../shared/api/readStage.ts";
 import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
 import { useVoidedDuels } from "../../fair-play/hooks/useVoidedDuels.ts";
 import { useStanding } from "./useStanding.ts";
@@ -11,12 +11,17 @@ import { useStanding } from "./useStanding.ts";
 export function useRankedReads(player: SignedInPlayer | null) {
   const standing = useStanding(player);
   const fairPlay = useVoidedDuels(player);
-  return {
-    standing: standing.standing,
-    voidedDuels: fairPlay.voidedDuels,
-    suspension: fairPlay.suspension,
-    stage: readStage([standing.read, fairPlay.read]),
-    failure: standing.failure ?? fairPlay.failure,
-    retry: () => retryFailed([standing.read, fairPlay.read]),
-  };
+  return readGate(
+    readStage([standing.read, fairPlay.read]),
+    player === null || standing.standing === null || fairPlay.voidedDuels === null
+      ? undefined
+      : {
+          player,
+          standing: standing.standing,
+          voidedDuels: fairPlay.voidedDuels,
+          suspension: fairPlay.suspension,
+        },
+    standing.failure ?? fairPlay.failure,
+    () => retryFailed([standing.read, fairPlay.read]),
+  );
 }

@@ -11,12 +11,10 @@ interface FriendsGateProps {
 
 // Holds the page back until its Friends and requests are both read, so that no panel is pushed in later.
 export function FriendsGate({ pending, children }: FriendsGateProps) {
-  const { friends, requests, stage, failure, retry } = useFriendsReads();
+  const gate = useFriendsReads();
   return (
-    <ReadGate stage={stage} pending={pending} title="Friends" failure={failure} retry={retry}>
-      {friends !== undefined &&
-        requests !== undefined &&
-        children(friends, requests.received, requests.sent)}
+    <ReadGate state={gate} pending={pending} title="Friends">
+      {({ friends, requests }) => children(friends, requests.received, requests.sent)}
     </ReadGate>
   );
 }

@@ -25,6 +25,31 @@ export function readStage(reads: readonly ReadStatus[]): ReadStage {
   return "ready";
 }
 
+/** What a read gate shows: its content only ever receives the data once all of it is read. */
+export type ReadGateState<T> =
+  | { kind: "loading" }
+  | { kind: "failed"; failure: string; retry: () => void }
+  | { kind: "ready"; data: T };
+
+/** The data a gate hands to its content once it is ready. */
+export type ReadyData<State> = State extends { kind: "ready"; data: infer T } ? T : never;
+
+/**
+ * Where a gate stands, from the stage of its reads and their data, which is undefined until all of it
+ * is read: null is data, such as the session of a Guest. A gate with no data or no failure to show yet
+ * stays pending rather than drawing an empty page.
+ */
+export function readGate<T>(
+  stage: ReadStage,
+  data: T | undefined,
+  failure: string | null,
+  retry: () => void,
+): ReadGateState<T> {
+  if (stage === "failed" && failure !== null) return { kind: "failed", failure, retry };
+  if (stage === "ready" && data !== undefined) return { kind: "ready", data };
+  return { kind: "loading" };
+}
+
 /**
  * A read the page waits on but whose failure another part of it shows: it keeps the page loading,
  * a retry included, and never fails it.
