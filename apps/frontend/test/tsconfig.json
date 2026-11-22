@@ -65,6 +65,7 @@
     "../src/shared/lib/lpBarCells.ts",
     "../src/shared/lib/reconnectDelay.ts",
     "../src/shared/lib/reconnectingSocket.ts",
+    "../src/shared/link",
     "../src/shared/store/useOpponentCaretStore.ts"
   ],
   "references": [
