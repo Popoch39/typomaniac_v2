@@ -1,8 +1,6 @@
 import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
-import type { Redis } from "../../redis/client.ts";
 import type { Protection } from "../auth/index.ts";
-import { cancelChallengesBetween, pushToPlayer } from "../online/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import * as FriendModel from "./model.ts";
 import {
@@ -18,17 +16,34 @@ import {
 
 type PairMessage = "friendRequestAccepted" | "friendRequestRemoved" | "friendRemoved";
 
+/** What the Friend routes tell a Player's tabs, each message naming the other Player. */
+export type FriendMessage = {
+  readonly type: PairMessage | "friendRequestReceived" | "friendRequestSent";
+  readonly playerId: string;
+};
+
+/**
+ * How the Friend routes reach the Players' tabs and their Challenges. Given at composition, since
+ * the `online` module, which holds both, reads the Friends from this one.
+ */
+export type FriendSockets = {
+  /** Sends the message to every tab of the Player. */
+  readonly push: (playerId: string, message: FriendMessage) => Promise<void>;
+  /** Cancels any Challenge waiting between the two Players. */
+  readonly cancelChallengesBetween: (playerId: string, otherId: string) => Promise<void>;
+};
+
 export const createFriendRoutes = (
   db: Db,
   protection: Protection,
   rateLimiter: RateLimiter,
-  redis: Redis,
+  sockets: FriendSockets,
 ) => {
   // Tells every tab of both Players, each naming the other, so that their pages follow the change.
   const pushToBoth = (type: PairMessage, playerId: string, otherId: string) =>
     Promise.all([
-      pushToPlayer(redis, playerId, { type, playerId: otherId }),
-      pushToPlayer(redis, otherId, { type, playerId }),
+      sockets.push(playerId, { type, playerId: otherId }),
+      sockets.push(otherId, { type, playerId }),
     ]);
   return new Elysia({ prefix: "/api/friends" })
     .use(protection)
@@ -109,14 +124,8 @@ export const createFriendRoutes = (
             return { result };
           case "sent":
             await Promise.all([
-              pushToPlayer(redis, body.playerId, {
-                type: "friendRequestReceived",
-                playerId: player.id,
-              }),
-              pushToPlayer(redis, player.id, {
-                type: "friendRequestSent",
-                playerId: body.playerId,
-              }),
+              sockets.push(body.playerId, { type: "friendRequestReceived", playerId: player.id }),
+              sockets.push(player.id, { type: "friendRequestSent", playerId: body.playerId }),
             ]);
             return { result };
         }
@@ -189,7 +198,7 @@ export const createFriendRoutes = (
           return status(404, { code: "FRIEND_NOT_FOUND" });
         await Promise.all([
           pushToBoth("friendRemoved", player.id, params.playerId),
-          cancelChallengesBetween(redis, player.id, params.playerId),
+          sockets.cancelChallengesBetween(player.id, params.playerId),
         ]);
         return status(204, undefined);
       },

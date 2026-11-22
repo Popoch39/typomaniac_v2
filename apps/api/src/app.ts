@@ -14,6 +14,7 @@ import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
 import { createOnlineRoutes, type OnlineOptions } from "./modules/online/index.ts";
+import { cancelChallengesBetween, pushToPlayer } from "./modules/online/service.ts";
 import { createOrnamentRoutes } from "./modules/ornament/index.ts";
 import { createPlayerRoutes } from "./modules/player/index.ts";
 import { createProgressRoutes } from "./modules/progress/index.ts";
@@ -79,7 +80,13 @@ export const createApp = (
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
       .use(createAdministrationRoutes(db, protection))
-      .use(createFriendRoutes(db, protection, rateLimiter, redis))
+      .use(
+        createFriendRoutes(db, protection, rateLimiter, {
+          push: (playerId, message) => pushToPlayer(redis, playerId, message),
+          cancelChallengesBetween: (playerId, otherId) =>
+            cancelChallengesBetween(redis, playerId, otherId),
+        }),
+      )
       .use(
         createOnlineRoutes(db, protection, rateLimiter, redis, loggerOf("online"), lifecycle, {
           duelExpiryMs: duelOptions?.expiryMs,
