@@ -20,6 +20,7 @@ export {
   pairingChannel,
   proposePairing,
   QUEUE_ENTRY_EXPIRY_MS,
+  readEntryPairingId,
   readPairing,
   readQueueEntry,
   refreshQueueEntry,

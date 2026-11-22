@@ -71,8 +71,10 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     }
     stopWaitingTimer();
     if (message.type === "proposed") {
-      const { pairingId, players, acceptWithinMs } = message;
-      usePairingStore.getState().propose(pairingId, players, { acceptWithinMs, receivedAt });
+      const { pairingId, players, acceptWithinMs, accepted } = message;
+      usePairingStore
+        .getState()
+        .propose(pairingId, players, { acceptWithinMs, receivedAt }, accepted);
       set({ phase: "proposed" });
       return;
     }
