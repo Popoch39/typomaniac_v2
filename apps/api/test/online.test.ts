@@ -121,6 +121,25 @@ test("a Player who closed all their tabs leaves the count after the window, and 
   staying.close();
 });
 
+// Each socket is closed by the client as soon as it opens, while the server is still awaiting Redis
+// in its open. The close only sometimes lands there, so several Players race it, each on their own.
+test("Players whose socket closes while it is still opening leave the count after the window", async () => {
+  const instance = startInstance(await createRedis(), { online: { windowMs: 150 } });
+  const closeOnOpen = async () => {
+    const { cookie } = await signInPlayer(auth);
+    const socket = new WebSocket(instance.url, { headers: { cookie } });
+    socket.addEventListener("open", () => socket.close(), { once: true });
+    await new Promise((resolve) => socket.addEventListener("close", resolve, { once: true }));
+  };
+  await Promise.all(Array.from({ length: 5 }, closeOnOpen));
+
+  await Bun.sleep(400);
+  const staying = await instance.open((await signInPlayer(auth)).cookie);
+
+  expect(await staying.next()).toEqual({ type: "onlineCount", count: 1 });
+  staying.close();
+});
+
 test("Players whose sockets sit on two instances are counted together, and each instance pushes the count", async () => {
   const redis = await createRedis();
   const one = startInstance(redis);
