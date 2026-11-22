@@ -1,8 +1,15 @@
 import type { Redis } from "../../redis/client.ts";
-import { type PlayerServerMessage, playerChannel, pushToPlayer } from "./service.ts";
+import {
+  type PlayerPush,
+  type PlayerServerMessage,
+  playerChannel,
+  pushToPlayer,
+} from "./service.ts";
 
 type Delivery = {
   readonly playerId: string;
+  /** The socket's id, which a push may leave out. */
+  readonly connection: string;
   readonly send: (message: PlayerServerMessage) => void;
 };
 
@@ -23,8 +30,9 @@ export const createPlayerChannels = (redis: Redis) => {
       if (deliveries) return void deliveries.add(delivery);
       local.set(playerId, new Set([delivery]));
       const listener = (raw: string) => {
-        const message = JSON.parse(raw) as PlayerServerMessage;
-        for (const held of local.get(playerId) ?? []) held.send(message);
+        const { message, except } = JSON.parse(raw) as PlayerPush;
+        for (const held of local.get(playerId) ?? [])
+          if (held.connection !== except) held.send(message);
       };
       listeners.set(playerId, listener);
       await redis.subscriber.subscribe(channelOf(playerId), listener);
@@ -39,8 +47,8 @@ export const createPlayerChannels = (redis: Redis) => {
       // Only this listener: another instance on the same connection may still follow the channel.
       if (listener) await redis.subscriber.unsubscribe(channelOf(playerId), listener);
     },
-    /** Sends the message to every open socket of the Player, on any instance. */
-    push: (playerId: string, message: PlayerServerMessage) =>
-      pushToPlayer(redis, playerId, message),
+    /** Sends the message to every open socket of the Player, on any instance, but `except`. */
+    push: (playerId: string, message: PlayerServerMessage, except: string | null = null) =>
+      pushToPlayer(redis, playerId, message, except),
   };
 };

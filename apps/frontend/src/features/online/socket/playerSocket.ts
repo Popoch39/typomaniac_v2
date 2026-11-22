@@ -1,6 +1,14 @@
 import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
 import { type PlayerServerMessage, parsePlayerMessage } from "../message/parsePlayerMessage.ts";
 
+/** What a tab sends on the Player socket, each about a Challenge. */
+export type PlayerClientMessage =
+  | { readonly type: "challenge"; readonly playerId: string }
+  | {
+      readonly type: "cancelChallenge" | "acceptChallenge" | "declineChallenge";
+      readonly challengeId: string;
+    };
+
 type PlayerSocketHandlers = {
   readonly receive: (message: PlayerServerMessage) => void;
   /** The socket could not be opened. */
@@ -36,6 +44,11 @@ export function openPlayerSocket({ receive, refuse, ...handlers }: PlayerSocketH
     findRefusal,
     refuse: () => refuse(),
   });
+}
+
+/** Sends the message if the socket is open; a message sent while it reconnects is lost. */
+export function sendToPlayerSocket(message: PlayerClientMessage) {
+  socket.send(JSON.stringify(message));
 }
 
 export function closePlayerSocket() {

@@ -43,6 +43,10 @@ const listed = (rows: ListedRow[]) =>
 const selectListed = (db: Db) =>
   db.select(listedColumns).from(user).leftJoin(standing, eq(standing.playerId, user.id));
 
+/** The Player as a Friend sees them, `null` when they may not appear publicly. */
+export const readListedPlayer = async (db: Db, playerId: string) =>
+  listed(await selectListed(db).where(and(eq(user.id, playerId), isListable)))[0] ?? null;
+
 /** The Player's received and sent Friend requests, newest first, with the other Player of each. */
 export const readFriendRequests = async (db: Db, playerId: string) => {
   const [received, sent] = await Promise.all([

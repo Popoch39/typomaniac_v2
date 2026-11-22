@@ -59,6 +59,7 @@ Client intégré de Bun (`RedisClient`), sans dépendance. Il porte les Duels en
 - `openRedis(url, namespace)` rend `{ client, subscriber, name, close }` : toute clé et tout canal se nomment par `name(...)`, jamais en dur, pour rester sous le namespace. `subscriber` est une connexion à part, car un client abonné n'accepte plus d'autre commande.
 - Redis est injecté comme la base : `createApp(db, auth, redis, logger)`.
 - Les Players Online (`src/modules/online/`) : un sorted set (clé `online`, score = instant du dernier ping) que `POST /api/online` met à jour et compte en un `EVAL`, sur une fenêtre de `ONLINE_WINDOW_MS` (option `online.windowMs` en test).
+- Les Challenges (`src/modules/online/challenge.ts`, règles de stockage dans `online/service.ts`) vivent dans Redis seulement : un hash par Challenge, l'id du Challenge en attente de chaque challenger, ceux reçus par chaque Player et un sorted set des échéances, que chaque instance balaie (`CHALLENGE_SWEEP_INTERVAL_MS`) ; ouverture et clôture en un `EVAL` chacune, pour qu'une seule réponse gagne. Expiration `CHALLENGE_EXPIRY_MS` (option `online.challengeExpiryMs` en test). Ils passent par le socket Player, dont le gestionnaire `message` ne rend rien : Elysia renverrait la valeur au client.
 - Dans les tests : `const testRedis = await createTestRedis()` (`test/helpers/redis.ts`) ouvre Redis sous un namespace propre au fichier ; `afterAll` appelle `testRedis.drop()`, qui efface ses clés et ferme les connexions.
 
 ## Logs

@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { SidebarInset, SidebarProvider } from "../../../shared/components/ui/sidebar.tsx";
 import { TooltipProvider } from "../../../shared/components/ui/tooltip.tsx";
+import { ChallengeLayer } from "../../challenge/components/ChallengeLayer.tsx";
 import { useSidebarOpen } from "../hooks/useSidebarOpen.ts";
 import { ShellSidebar } from "./ShellSidebar.tsx";
 
@@ -24,6 +25,7 @@ export function ShellLayout() {
           <Outlet />
         </SidebarInset>
       </SidebarProvider>
+      <ChallengeLayer />
     </TooltipProvider>
   );
 }
