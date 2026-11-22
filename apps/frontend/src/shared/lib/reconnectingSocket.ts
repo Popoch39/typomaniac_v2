@@ -1,73 +1,111 @@
-import { reconnectDelay } from "./reconnectDelay.ts";
+import {
+  IDLE_LINK,
+  next,
+  type ReconnectDelay,
+  type SocketLink,
+  type SocketLinkEvent,
+} from "../link/socketLink.ts";
+import { CloseCode, reconnectDelay } from "./reconnectDelay.ts";
 
 export type ReconnectingSocketHandlers = {
   /** Each message the socket reads, as sent. */
   readonly receive: (data: string) => void;
   /** Finds why the first opening was refused: a browser never shows why an upgrade failed. */
   readonly findRefusal: () => Promise<string>;
-  /** Told, in words for the user, why the socket could not be opened. */
-  readonly refuse: (refusal: string) => void;
   /**
-   * The socket dropped and is about to be reopened, unless this answers `false` because its owner
-   * no longer needs it.
+   * Told each move of the link, until the owner closes the socket. An owner that no longer needs
+   * the socket as it backs off closes it, so that it is not reopened.
    */
-  readonly reconnect: () => boolean;
-  /** The socket closed after its first message, and is not reopened, with the reason it closed with. */
-  readonly disconnect: (reason: string) => void;
+  readonly link: (link: SocketLink) => void;
 };
 
 /**
  * One socket at a time, reopened after a drop or a server restart (`reconnectDelay`) as long as
- * its owner needs it. A socket that closes before its first message was refused instead.
+ * its owner needs it, or after `delayOf` for each try when given. A socket that closes before its
+ * first message was refused instead.
  */
-export function createReconnectingSocket() {
+export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDelay) {
+  let link = IDLE_LINK;
   let socket: WebSocket | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  // The try the pending retry makes, so that `retryNow` can make it at once.
+  let retry: (() => void) | null = null;
+  // Drops the socket as it stands, `null` once it closed.
+  let dropSocket: (() => void) | null = null;
 
-  // `attempt` counts the tries to reopen the socket since it last read a message, 0 for a first opening.
-  function connect(url: string, handlers: ReconnectingSocketHandlers, attempt: number) {
-    const { receive, findRefusal, refuse, reconnect, disconnect } = handlers;
+  function connect(url: string, handlers: ReconnectingSocketHandlers) {
     const opened = new WebSocket(url);
     socket = opened;
-    let received = false;
-    opened.addEventListener("message", (event) => {
-      received = true;
-      receive(String(event.data));
-    });
-    opened.addEventListener("close", async ({ code, reason }) => {
-      if (socket !== opened) return;
-      if (received || attempt > 0) {
-        // A reopening is a fresh opening: the server sends its first message again.
-        const nextAttempt = received ? 1 : attempt + 1;
-        const delay = reconnectDelay(code, nextAttempt);
-        if (delay === null || !reconnect()) return disconnect(reason);
-        retryTimer = setTimeout(() => {
-          retryTimer = null;
-          connect(url, handlers, nextAttempt);
-        }, delay);
-        return;
+
+    // The effects the link's new kind calls for come before the owner is told, so that an owner
+    // closing the socket from its handler cancels them.
+    const move = (event: SocketLinkEvent) => {
+      const previous = link;
+      link = next(link, event, delayOf);
+      if (link === previous) return;
+      if (link.kind === "backoff") {
+        retry = () => {
+          cancelRetry();
+          connect(url, handlers);
+        };
+        retryTimer = setTimeout(retry, link.delay);
       }
-      const refusal = await findRefusal();
-      if (socket === opened) refuse(refusal);
+      handlers.link(link);
+    };
+
+    opened.addEventListener("message", (event) => {
+      if (socket !== opened) return;
+      move({ kind: "receive" });
+      handlers.receive(String(event.data));
     });
+    const closed = async ({ code, reason }: { readonly code: number; readonly reason: string }) => {
+      if (socket !== opened) return;
+      dropSocket = null;
+      move({ kind: "close", code, reason });
+      if (link.kind !== "refusing") return;
+      const refusal = await handlers.findRefusal();
+      if (socket === opened) move({ kind: "refuse", refusal });
+    };
+    opened.addEventListener("close", closed);
+    dropSocket = () => {
+      // Its own close event would come later, and reopen it a second time.
+      opened.removeEventListener("close", closed);
+      opened.close();
+      void closed({ code: CloseCode.abnormal, reason: "" });
+    };
+    move({ kind: "connect" });
+  }
+
+  function cancelRetry() {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+    retry = null;
   }
 
   function close() {
-    if (retryTimer !== null) clearTimeout(retryTimer);
-    retryTimer = null;
+    cancelRetry();
+    dropSocket = null;
     socket?.close();
     socket = null;
+    link = next(link, { kind: "stop" }, delayOf);
   }
 
   return {
     /** Opens the socket at `url` in place of any other. */
     open: (url: string, handlers: ReconnectingSocketHandlers) => {
       close();
-      connect(url, handlers, 0);
+      connect(url, handlers);
     },
+    /** Whether `data` was sent: nothing is sent unless the link is open. */
     send: (data: string) => {
-      if (socket?.readyState === WebSocket.OPEN) socket.send(data);
+      if (link.kind !== "open" || socket?.readyState !== WebSocket.OPEN) return false;
+      socket.send(data);
+      return true;
     },
+    /** Makes the pending try to reopen the socket at once, if one is waiting. */
+    retryNow: () => retry?.(),
+    /** Drops the socket as a lost connection would, so that it is reopened as long as its owner needs it. */
+    drop: () => dropSocket?.(),
     close,
   };
 }

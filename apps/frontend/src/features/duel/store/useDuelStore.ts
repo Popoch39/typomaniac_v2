@@ -12,6 +12,7 @@ import type { Rank } from "@repo/ranked-engine";
 import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
 import { create } from "zustand";
 import { queryClient } from "../../../shared/api/queryClient.ts";
+import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretStore.ts";
 import { eventTime, shiftEventTime } from "../../game/clock/eventTime.ts";
 import { useBrowserHintsStore } from "../../game/store/useBrowserHintsStore.ts";
@@ -20,7 +21,12 @@ import { standingQueryKey } from "../../ranked/api/standingQueryOptions.ts";
 import { opponentCaretPosition } from "../caret/opponentCaretPosition.ts";
 import { eventClockShift } from "../clock/eventClockShift.ts";
 import type { DuelPhase } from "../phase/duelPhase.ts";
-import { closeDuelSocket, openDuelSocket, sendToDuel } from "../socket/duelSocket.ts";
+import {
+  closeDuelSocket,
+  dropDuelSocket,
+  openDuelSocket,
+  sendToDuel,
+} from "../socket/duelSocket.ts";
 import { useDuelClockStore } from "./useDuelClockStore.ts";
 import { useDuelCountdownStore } from "./useDuelCountdownStore.ts";
 import { useTierPromotionStore } from "./useTierPromotionStore.ts";
@@ -160,8 +166,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   // Counts down to the Start of the next Round while the Round that just ended is shown. Nothing
   // starts from here: the Countdown message brings the Target words, and schedules the Start.
-  const showNextStart = (startAt: number) =>
-    useDuelCountdownStore.getState().schedule(startAt, () => undefined);
+  const showNextStart = (startAt: number) => useDuelCountdownStore.getState().display(startAt);
 
   const receive = (message: ServerMessage) => {
     if (message.type === "state") {
@@ -191,7 +196,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
             ? null
             : opponentJournal.reduce(applyEvent, createGame(DUEL_GAME_CONFIG, message.words)),
       });
-      useDuelClockStore.getState().synchronise();
+      useDuelClockStore.getState().synchronise({ send: sendToDuel, drop: dropDuelSocket });
       if (afterRound && message.startAt !== null) showNextStart(message.startAt);
     } else if (message.type === "presence") {
       set((state) => ({ participants: withParticipant(state.participants, message.participant) }));
@@ -231,6 +236,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const { results, multipliers, outcomes } = message;
       set({
         phase: "roundEnd",
+        isReconnecting: false,
         rounds: [...rounds, { results, multipliers, outcomes }],
         opponentGame: null,
       });
@@ -243,7 +249,12 @@ export const useDuelStore = create<DuelState>()((set, get) => {
       const { seat } = get();
       // Opened with the end, so that the LP bar it holds mounts held.
       if (ranked !== null && seat !== null) useTierPromotionStore.getState().end(ranked[seat]);
-      set({ phase: "finished", rounds: message.rounds, end: { outcomes, ranked } });
+      set({
+        phase: "finished",
+        isReconnecting: false,
+        rounds: message.rounds,
+        end: { outcomes, ranked },
+      });
       // The Standing moved: the Ranked page and the profile read the new one.
       if (ranked !== null) void queryClient.invalidateQueries({ queryKey: standingQueryKey });
     }
@@ -251,6 +262,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   // Whatever runs on the socket stops with it: the fresh join that follows starts it again.
   const stopFollowingSocket = () => {
+    useDuelClockStore.getState().stop();
     useDuelCountdownStore.getState().cancel();
     stopResumingGame();
     stopForwardingEvents();
@@ -258,16 +270,24 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   const reconnect = () => {
     // The server closes nothing a finished Duel still needs.
-    if (get().phase === "finished") return false;
+    if (get().phase === "finished") return closeDuelSocket();
     stopFollowingSocket();
+    // Keys typed now would never reach the server, which rebuilds the Game from its journal on
+    // resume; buffering them would move them up to their receipt bound (ADR 0009).
+    useGameStore.getState().freeze();
     set({ isReconnecting: true });
-    return true;
   };
 
   const disconnect = (closeReason: string) => {
     if (get().phase === "finished") return;
     stopFollowingSocket();
     set({ phase: "disconnected", closeReason, isReconnecting: false });
+  };
+
+  const followLink = (link: SocketLink) => {
+    if (link.kind === "refused") set({ phase: "refused", refusal: link.refusal });
+    else if (link.kind === "backoff") reconnect();
+    else if (link.kind === "down") disconnect(link.reason);
   };
 
   const leave = () => {
@@ -285,12 +305,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
   const join = (duelId: string) => {
     leave();
     set({ duelId });
-    openDuelSocket(duelId, {
-      receive,
-      refuse: (refusal) => set({ phase: "refused", refusal }),
-      reconnect,
-      disconnect,
-    });
+    openDuelSocket(duelId, { receive, link: followLink });
   };
 
   return {

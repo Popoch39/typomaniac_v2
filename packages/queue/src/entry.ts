@@ -87,6 +87,10 @@ export const readQueueEntry = async (redis: Redis, playerId: string) => {
   return { mmr: Number(mmr), queuedAt: Number(queuedAt) };
 };
 
+/** The Pairing the Player's entry names, `null` when they are not queued or await none. */
+export const readEntryPairingId = (redis: Redis, playerId: string) =>
+  redis.client.hget(entryKey(redis, playerId), "pairing");
+
 // One step, so the snapshot is the Queue at a single instant. An entry that expired is forgotten
 // here, and a Player with a Pairing awaiting acceptance is not waiting to be paired.
 const WAITING = `

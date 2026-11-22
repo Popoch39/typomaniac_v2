@@ -1,3 +1,4 @@
+import { ChooseNicknameNotice } from "../../auth/components/ChooseNicknameNotice.tsx";
 import { SignInPrompt } from "../../auth/components/SignInPrompt.tsx";
 import { SignedInPlayerChain } from "../../auth/components/SignedInPlayerChain.tsx";
 import { LoadingState } from "../../../shared/components/LoadingState.tsx";
@@ -23,15 +24,13 @@ export function FriendsPage() {
           <SignInPrompt explanation="Friends are for signed-in Players. Sign in to add yours." />
         }
       >
-        {(player) => {
-          if (player === null) return pending("Checking your session…");
+        {(session) => {
+          if (session.kind === "checking") return pending("Checking your session…");
           // Friends see each other's Nickname: a Player without one cannot have any yet.
-          if (player.nickname === null)
+          if (session.kind === "player")
             return (
               <Panel title="Friends" className="max-w-md">
-                <p className="m-0 text-ink-muted">
-                  Choose a Nickname on your Profile to add Friends.
-                </p>
+                <ChooseNicknameNotice purpose="add Friends" />
               </Panel>
             );
           return (

@@ -1,5 +1,5 @@
 import type { OrnamentChoice } from "@repo/ranked-engine";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import type { OrnamentOption } from "../picker/ornamentOptions.ts";
 import { OrnamentPickerOption } from "./OrnamentPickerOption.tsx";
 

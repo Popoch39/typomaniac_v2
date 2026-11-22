@@ -22,12 +22,14 @@ export function RankedPage() {
       >
         {/* The page waits for the Standing as a whole, so that the Rank card is never pushed in next to
             a Queue already drawn. */}
-        {(player) => (
+        {(session) => (
           <StandingGate
-            player={player}
+            session={session}
             pending={
               <LoadingState
-                message={player === null ? "Checking your session…" : "Reading your Standing…"}
+                message={
+                  session.kind === "checking" ? "Checking your session…" : "Reading your Standing…"
+                }
               >
                 <RankedSkeleton />
               </LoadingState>
@@ -39,7 +41,7 @@ export function RankedPage() {
                 {voidedDuels.length > 0 && <VoidedDuelNotice voidedDuels={voidedDuels} />}
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] gap-7 pb-2.5">
                   <RankCard standing={standing} />
-                  <RankedQueue player={signedIn} />
+                  <RankedQueue session={signedIn} />
                 </div>
                 <TierLadder rank={standing.rank} />
               </>

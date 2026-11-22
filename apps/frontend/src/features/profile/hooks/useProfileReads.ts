@@ -1,42 +1,60 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
-import { loadingOnly, readStage, retryFailed } from "../../../shared/api/readStage.ts";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import {
+  loadingOnly,
+  type ReadyData,
+  readGate,
+  readStage,
+  retryFailed,
+} from "../../../shared/api/readStage.ts";
+import type { ChainedSession } from "../../auth/session/sessionOf.ts";
 import { ornamentQueryOptions } from "../../ornament/api/ornamentQueryOptions.ts";
 import { progressQueryOptions } from "../../progress/api/progressQueryOptions.ts";
 import { publicPlayerQueryOptions } from "../../player/api/publicPlayerQueryOptions.ts";
 import { useProgressFilterStore } from "../../progress/store/useProgressFilterStore.ts";
 import { useStanding } from "../../ranked/hooks/useStanding.ts";
 
-export type ProfileProgress = NonNullable<ReturnType<typeof useProfileReads>["progress"]>;
+/** The Profile as drawn: a named Player's also holds their Progress. */
+export type Profile = ReadyData<ReturnType<typeof useProfileReads>>;
+
+export type ProfileProgress = Extract<Profile, { kind: "named" }>["progress"];
 
 /**
  * The reads the Profile lays out, sent together so that the page is drawn once they are all back, and
- * tried again together. Waits without reading while `player` is null, the session not being known yet.
- * The Ornament, the Progress and the public Player, whose Peak Tier the Progress shows, are only read
- * with a Nickname: the Ornament's route requires one and the other two find the Player by it. The
+ * tried again together. Waits without reading while the session is checked. The Ornament, the
+ * Progress and the public Player, whose Peak Tier the Progress shows, are only read for a named
+ * Player: the Ornament's route requires a Nickname and the other two find the Player by it. The
  * Ornament's failure is the picker's to say. Another period or kind of Duels keeps the Progress already
  * read until its own is back.
  */
-export function useProfileReads(player: SignedInPlayer | null) {
-  const { standing, read, failure } = useStanding(player);
+export function useProfileReads(session: ChainedSession) {
+  const { standing, read, failure } = useStanding(
+    session.kind === "checking" ? null : session.player,
+  );
   const filter = useProgressFilterStore((s) => s.filter);
-  const nickname = player?.nickname ?? null;
-  const ornament = useQuery(ornamentQueryOptions(nickname === null ? null : (player?.id ?? null)));
-  const progress = useQuery(progressQueryOptions(nickname, filter));
-  const publicPlayer = useQuery(publicPlayerQueryOptions(nickname));
-  const nicknameReads = nickname === null ? [] : [progress, publicPlayer];
+  const named = session.kind === "named" ? session.player : null;
+  const ornament = useQuery(ornamentQueryOptions(named?.id ?? null));
+  const progress = useQuery(progressQueryOptions(named?.nickname ?? null, filter));
+  const publicPlayer = useQuery(publicPlayerQueryOptions(named?.nickname ?? null));
+  const namedReads = named === null ? [] : [progress, publicPlayer];
   const error = progress.error ?? publicPlayer.error;
 
-  return {
-    standing,
-    progress:
-      progress.data === undefined || publicPlayer.data === undefined
-        ? null
-        : { ...progress.data, peakTier: publicPlayer.data.peakTier },
-    isProgressUpdating: progress.isPlaceholderData,
-    stage: readStage(nickname === null ? [read] : [read, loadingOnly(ornament), ...nicknameReads]),
-    failure: failure ?? (error === null ? null : describeApiError(error)),
-    retry: () => retryFailed(nickname === null ? [read] : [read, ornament, ...nicknameReads]),
-  };
+  return readGate(
+    readStage(named === null ? [read] : [read, loadingOnly(ornament), ...namedReads]),
+    profileOf(),
+    failure ?? (error === null ? null : describeApiError(error)),
+    () => retryFailed(named === null ? [read] : [read, ornament, ...namedReads]),
+  );
+
+  function profileOf() {
+    if (session.kind === "checking" || standing === null) return undefined;
+    if (session.kind === "player") return { ...session, standing };
+    if (progress.data === undefined || publicPlayer.data === undefined) return undefined;
+    return {
+      ...session,
+      standing,
+      progress: { ...progress.data, peakTier: publicPlayer.data.peakTier },
+      isProgressUpdating: progress.isPlaceholderData,
+    };
+  }
 }
