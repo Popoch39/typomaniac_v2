@@ -20,11 +20,14 @@ export const createOnlinePresence = (
     windowMs,
     intervalMs,
     changed,
+    refreshed,
   }: {
     readonly windowMs: number;
     readonly intervalMs: number;
     /** Told the Players who came Online or left, as a refresh found them. */
     readonly changed: (playerIds: readonly string[]) => Promise<void>;
+    /** Told the Players of this instance's sockets, at each refresh. */
+    readonly refreshed: (playerIds: readonly string[]) => Promise<void>;
   },
 ) => {
   const held = new Set<Holder>();
@@ -50,8 +53,8 @@ export const createOnlinePresence = (
   };
   const refreshAll = async () => {
     const playerIds = new Set([...held].map(({ playerId }) => playerId));
-    const refreshed = await refreshOnline(redis, playerIds, { now: Date.now(), windowMs });
-    await Promise.all([announce(refreshed.count), changed(refreshed.changed)]);
+    const found = await refreshOnline(redis, playerIds, { now: Date.now(), windowMs });
+    await Promise.all([announce(found.count), changed(found.changed), refreshed([...playerIds])]);
   };
   const stop = () => {
     if (refreshing !== null) clearInterval(refreshing);

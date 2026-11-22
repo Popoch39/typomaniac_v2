@@ -280,3 +280,58 @@ test("the appeal address is read from the configuration, which the API cannot st
   });
   expect(() => requireFairPlayConfig({})).toThrow("FAIR_PLAY_APPEAL_ADDRESS is not set");
 });
+
+const call = (method: string, path: string, cookie: string, body?: unknown) =>
+  fetch(`${origin}${path}`, {
+    method,
+    headers: { cookie, ...(body === undefined ? {} : { "content-type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+type PlayerMessage = { type: string; challengeId?: string };
+type PlayerClientMessage = { type: "challenge"; playerId: string };
+
+// A Player tab that hands over the next message of a type, skipping the others.
+const openPlayerTab = async (cookie: string) => {
+  const socket = await openSocketOf<PlayerMessage, PlayerClientMessage>(
+    `${origin.replace(/^http/, "ws")}/api/online/socket`,
+    cookie,
+  );
+  const nextOf = async (type: string) => {
+    for (;;) {
+      const message = await socket.next();
+      if (message.type === type) return message;
+    }
+  };
+  return { ...socket, nextOf };
+};
+
+test("a suspended Player still sends a Friend request, challenges a Friend and is challenged", async () => {
+  const suspended = await signInSuspended(new Date());
+  const friend = await signInPlayerWithNickname(auth, origin);
+
+  const sent = await call("POST", "/api/friends/requests", suspended.cookie, {
+    playerId: friend.player.id,
+  });
+  expect(sent.status).toBe(200);
+  expect(await sent.json()).toEqual({ result: "sent" });
+  const accepted = await call(
+    "POST",
+    `/api/friends/requests/${suspended.player.id}/accept`,
+    friend.cookie,
+  );
+  expect(accepted.status).toBe(204);
+  const [suspendedTab, friendTab] = [
+    await openPlayerTab(suspended.cookie),
+    await openPlayerTab(friend.cookie),
+  ];
+
+  suspendedTab.send({ type: "challenge", playerId: friend.player.id });
+  const challenging = await suspendedTab.nextOf("challengeSent");
+  expect((await friendTab.nextOf("challengeReceived")).challengeId).toBe(challenging.challengeId);
+  friendTab.send({ type: "challenge", playerId: suspended.player.id });
+  const challenged = await friendTab.nextOf("challengeSent");
+  expect((await suspendedTab.nextOf("challengeReceived")).challengeId).toBe(challenged.challengeId);
+  suspendedTab.close();
+  friendTab.close();
+});

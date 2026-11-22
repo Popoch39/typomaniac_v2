@@ -104,6 +104,16 @@ export const createFriendWatch = (
       tell(watcher, message);
       if (message.type === "friendRequestAccepted") tellStatesLogged([message.playerId]);
     },
+    /** The Players whose state this instance's sockets follow. */
+    watchedIds: () => [...watchersOf.keys()],
+    /** Tells the sockets of this instance that follow these Players that they are no longer Friends. */
+    forget: (playerIds: readonly string[]) => {
+      for (const playerId of playerIds)
+        for (const watcher of watchersOf.get(playerId) ?? []) {
+          unwatch(watcher, playerId);
+          tell(watcher, { type: "friendRemoved", playerId });
+        }
+    },
     /** Tells the Friends of these Players, on every instance, the state each of them is in now. */
     announce: async (playerIds: readonly string[]) => {
       if (playerIds.length > 0) await redis.client.publish(channel, JSON.stringify(playerIds));

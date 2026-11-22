@@ -4,6 +4,8 @@ import {
   type Db,
   duel,
   duelParticipant,
+  friendRequest,
+  friendship,
   sanction,
   session,
   type Transaction,
@@ -12,7 +14,7 @@ import {
   voidedDuelCorrection,
 } from "@repo/db";
 import { REPAIR_WINDOW_MS } from "@repo/fair-play-engine";
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
 import { correctStandings, storedRank } from "./standing.ts";
 
 /** What brought a Sanction: a Violation, sanctioned automatically, or a Review settled by a person. */
@@ -228,9 +230,9 @@ export type BanResult = "banned" | "already-banned";
 /**
  * Bans a Player from `at`, for good, in one transaction: the Ban is saved, the Player is marked as
  * banned, their GitHub and Discord accounts and their e-mail are refused at sign-in from then on,
- * every session of theirs is deleted, so that their next request is that of a Guest, and every
- * ranked Duel they won in the repair window before it is voided under it (ADR 0015). A Player
- * already banned is left as they are.
+ * every session of theirs is deleted, so that their next request is that of a Guest, their Friends
+ * and Friend requests are deleted, and every ranked Duel they won in the repair window before it is
+ * voided under it (ADR 0015). A Player already banned is left as they are.
  */
 export const banPlayer = (db: Db, ban: Ban): Promise<BanResult> =>
   db.transaction((tx) => banPlayerIn(tx, ban));
@@ -299,6 +301,13 @@ const saveBan = async (tx: Transaction, { playerId, cause, at }: Ban, withdrawSi
       { sanctionId: saved.id, email: found.email.toLowerCase() },
     ]);
   await tx.delete(session).where(eq(session.userId, playerId));
+  // For good: lifting the Ban on appeal brings back none of them.
+  await tx
+    .delete(friendship)
+    .where(or(eq(friendship.lowerPlayerId, playerId), eq(friendship.higherPlayerId, playerId)));
+  await tx
+    .delete(friendRequest)
+    .where(or(eq(friendRequest.senderId, playerId), eq(friendRequest.receiverId, playerId)));
   await withdrawRecentWins(tx, { playerId, since: withdrawSince, until: at, sanctionId: saved.id });
   return saved.id;
 };

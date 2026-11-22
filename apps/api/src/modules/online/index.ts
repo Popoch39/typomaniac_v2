@@ -8,6 +8,7 @@ import { logSocketFailure } from "../http/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import { DUEL_EXPIRY_MS } from "../duel/service.ts";
+import { readBannedPlayerIds } from "../player/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { createChallenges } from "./challenge.ts";
 import { createPlayerChannels } from "./channel.ts";
@@ -47,12 +48,31 @@ export const createOnlineRoutes = (
     windowMs,
     duelExpiryMs,
   });
+  // A Ban is also saved by the fair-play worker, which reaches no socket: each instance finds, at
+  // each refresh, the banned Players among those its sockets hold or follow.
+  const expelBanned = async (heldIds: readonly string[]) => {
+    const banned = await readBannedPlayerIds(db, [
+      ...new Set([...heldIds, ...friendWatch.watchedIds()]),
+    ]);
+    if (banned.size === 0) return;
+    friendWatch.forget([...banned]);
+    for (const [id, holding] of holdings) {
+      if (!banned.has(holding.playerId) || closing.has(id)) continue;
+      closing.add(id);
+      logger.info("Player socket of {playerId} closed: the Player is banned", {
+        playerId: holding.playerId,
+      });
+      holding.close(CloseCode.policyViolation, "banned");
+    }
+    await challenges.cancelAllOf([...banned]);
+  };
   const presence = createOnlinePresence(redis, logger, {
     windowMs,
     intervalMs: refreshMs,
     changed: async (playerIds) => {
       await Promise.all([friendWatch.announce(playerIds), challenges.whenChanged(playerIds)]);
     },
+    refreshed: expelBanned,
   });
   const channels = createPlayerChannels(redis);
   type Holding = {
@@ -60,6 +80,7 @@ export const createOnlineRoutes = (
     readonly send: (message: PlayerServerMessage) => void;
     readonly tellCount: (count: number) => void;
     readonly overCap: (now: number) => boolean;
+    readonly close: (code: number, reason: string) => void;
     /** Whether the Player has a Nickname, without which they have no Friend. */
     readonly befriendable: boolean;
     /** What the Player's channel hands this socket. */
@@ -137,6 +158,7 @@ export const createOnlineRoutes = (
             send,
             tellCount: (count) => send({ type: "onlineCount", count }),
             overCap: rateLimiter.socketMessageWindow(),
+            close: (code, reason) => ws.close(code, reason),
             befriendable: ws.player.nickname !== null,
             delivery: {
               playerId,
