@@ -6,7 +6,7 @@ import { acceptPairing, readPairing, refreshQueueEntry } from "@repo/queue";
 import { eq } from "drizzle-orm";
 import { account, type Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
-import { draftRankedDuel } from "../duel/service.ts";
+import { announceDuelPlayers, draftRankedDuel } from "../duel/service.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
 import { readPublicPlayers } from "../player/service.ts";
 import { readStanding } from "../standing/service.ts";
@@ -30,7 +30,7 @@ export type { DuelCreation, EntryHolder, PairingChange } from "@repo/queue";
 /**
  * Records that the Player accepts the Pairing at `now`, as `acceptPairing` answers. The ranked Duel
  * the second acceptance creates is drafted ahead of that step, and shows each Player by Nickname,
- * Avatar, Ornament and Rank as they stand now.
+ * Avatar, Ornament and Rank as they stand now. Both Players are seated in it from that step on.
  */
 export const acceptPairingAsPlayer = async (
   db: Db,
@@ -61,13 +61,15 @@ export const acceptPairingAsPlayer = async (
   );
   if (!first || !second) return "gone";
   // Both Players learn the outcome from the Pairing channel, whichever instance holds them.
-  return acceptPairing(redis, pairingId, playerId, {
+  const accepted = await acceptPairing(redis, pairingId, playerId, {
     now,
     creation: draftRankedDuel(redis, [first, second], {
       expiryMs: duelExpiryMs,
       connectMs: duelConnectMs,
     }),
   });
+  if (accepted === "paired") await announceDuelPlayers(redis, pairing.playerIds);
+  return accepted;
 };
 
 /**

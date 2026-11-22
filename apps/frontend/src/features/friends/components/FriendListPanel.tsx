@@ -1,5 +1,6 @@
 import { Panel } from "../../../shared/components/Panel.tsx";
 import type { ListedPlayer } from "../api/friendsQueryOptions.ts";
+import { useOrderedFriends } from "../hooks/useOrderedFriends.ts";
 import { FriendRow } from "./FriendRow.tsx";
 import { FriendsPlayerList } from "./FriendsPlayerList.tsx";
 
@@ -8,13 +9,14 @@ interface FriendListPanelProps {
 }
 
 export function FriendListPanel({ friends }: FriendListPanelProps) {
+  const ordered = useOrderedFriends(friends);
   return (
     <Panel title="Friends" tag={String(friends.length)}>
       <FriendsPlayerList
         empty="No Friends yet. Find a Player by their Nickname to send them a Friend request."
         isEmpty={friends.length === 0}
       >
-        {friends.map((friend) => (
+        {ordered.map((friend) => (
           <FriendRow key={friend.id} friend={friend} />
         ))}
       </FriendsPlayerList>

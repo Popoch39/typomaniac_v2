@@ -1,8 +1,5 @@
-import type { UnwrapSchema } from "elysia";
 import type { Redis } from "../../redis/client.ts";
-import type * as OnlineModel from "./model.ts";
-
-export type PlayerServerMessage = UnwrapSchema<(typeof OnlineModel.Socket.Response)[200]>;
+import { type PlayerServerMessage, playerChannel, pushToPlayer } from "./service.ts";
 
 type Delivery = {
   readonly playerId: string;
@@ -16,7 +13,7 @@ type Delivery = {
 export const createPlayerChannels = (redis: Redis) => {
   const local = new Map<string, Set<Delivery>>();
   const listeners = new Map<string, (raw: string) => void>();
-  const channelOf = (playerId: string) => redis.name("online", "player", playerId);
+  const channelOf = (playerId: string) => playerChannel(redis, playerId);
 
   return {
     /** Resolves once this instance hears what is pushed to the Player, so that the socket misses none. */
@@ -43,8 +40,7 @@ export const createPlayerChannels = (redis: Redis) => {
       if (listener) await redis.subscriber.unsubscribe(channelOf(playerId), listener);
     },
     /** Sends the message to every open socket of the Player, on any instance. */
-    push: async (playerId: string, message: PlayerServerMessage) => {
-      await redis.client.publish(channelOf(playerId), JSON.stringify(message));
-    },
+    push: (playerId: string, message: PlayerServerMessage) =>
+      pushToPlayer(redis, playerId, message),
   };
 };

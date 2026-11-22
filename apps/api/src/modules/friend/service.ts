@@ -117,6 +117,15 @@ const countPendingSent = async (tx: Transaction, playerId: string) => {
   return row?.pending ?? 0;
 };
 
+/** The ids of the Player's Friends, whether or not they may appear publicly. */
+export const readFriendIds = async (db: Db, playerId: string) =>
+  (
+    await db
+      .select({ lower: friendship.lowerPlayerId, higher: friendship.higherPlayerId })
+      .from(friendship)
+      .where(or(eq(friendship.lowerPlayerId, playerId), eq(friendship.higherPlayerId, playerId)))
+  ).map(({ lower, higher }) => (lower === playerId ? higher : lower));
+
 /** The Player's Friends, by Nickname. */
 export const readFriends = async (db: Db, playerId: string) =>
   listed(
