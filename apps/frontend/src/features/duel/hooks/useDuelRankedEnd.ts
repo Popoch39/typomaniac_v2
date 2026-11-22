@@ -9,7 +9,9 @@ import { useTierPromotionStore } from "../store/useTierPromotionStore.ts";
  */
 export function useDuelRankedEnd() {
   const isRanked = useDuelStore((state) => state.ranks !== null);
-  const end = useDuelStore((state) => state.end);
+  const end = useDuelStore((state) =>
+    state.lifecycle.kind === "finished" ? state.lifecycle.end : null,
+  );
   const seat = useDuelStore((state) => state.seat);
   const isLpSweepHeld = useTierPromotionStore((state) => state.isLpSweepHeld);
   const ranked = end?.ranked ?? null;

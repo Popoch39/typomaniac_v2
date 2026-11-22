@@ -29,7 +29,7 @@ export function DevDuelStates() {
           <DuelRefusalPanel message={duelRefusalFixture} />
         </DevStateColumn>
         <DevStateColumn label="Disconnected">
-          <DuelDisconnected />
+          <DuelDisconnected closeReason="" />
         </DevStateColumn>
         <DevStateColumn label="Reconnecting">
           <div className="w-fit">

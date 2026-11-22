@@ -8,8 +8,12 @@ import {
 import { applyEvent, createGame, type GameEvent, getResult } from "@repo/typing-engine";
 
 // What the server does with each connection it accepts, in order: send these messages, then close
-// it with a code, or keep it open.
-type Script = { readonly messages: readonly ServerMessage[]; readonly closeWith: number | null };
+// it with a code and a reason, or keep it open.
+type Script = {
+  readonly messages: readonly ServerMessage[];
+  readonly closeWith: number | null;
+  readonly reason?: string;
+};
 const scripts: Script[] = [];
 // The Events of seat 0 the server received, as its journal holds them.
 const received: GameEvent[] = [];
@@ -24,9 +28,9 @@ const server = Bun.serve({
     open(ws) {
       // A server restart: the socket is reopened.
       dropSeated = () => ws.close(1012);
-      const { messages, closeWith } = scripts.shift() ?? { messages: [], closeWith: null };
+      const { messages, closeWith, reason } = scripts.shift() ?? { messages: [], closeWith: null };
       for (const message of messages) ws.send(JSON.stringify(message));
-      if (closeWith !== null) ws.close(closeWith);
+      if (closeWith !== null) ws.close(closeWith, reason);
     },
     message(ws, data) {
       const message = JSON.parse(String(data)) as ClientMessage;
@@ -163,4 +167,23 @@ test("Keystrokes applied while reconnecting do not change the Game, which resume
   const resumedAt = useGameStore.getState().readAt;
   await Bun.sleep(250);
   expect(useGameStore.getState().readAt).toBeGreaterThan(resumedAt + 100);
+});
+
+test("a refused Participant is told why", async () => {
+  scripts.push({ messages: [], closeWith: 1000 });
+
+  store.getState().join("duel-refused");
+  await until(({ phase }) => phase === "refused");
+
+  const { lifecycle } = store.getState();
+  expect(lifecycle.kind === "refused" && lifecycle.refusal).not.toBe("");
+});
+
+test("a Participant whose socket the server closed for good keeps the reason it gave", async () => {
+  scripts.push({ messages: [midRound], closeWith: 4000, reason: "duelClosed" });
+
+  store.getState().join("duel-disconnected");
+  await until(({ phase }) => phase === "disconnected");
+
+  expect(store.getState().lifecycle).toEqual({ kind: "disconnected", closeReason: "duelClosed" });
 });
