@@ -8,7 +8,7 @@ import {
   standing,
   user,
 } from "../../db/client.ts";
-import { rankFromStored } from "../standing/service.ts";
+import { rankFromStored, readLeaderboard } from "../standing/service.ts";
 
 const listedColumns = {
   id: user.id,
@@ -329,6 +329,18 @@ export const readRelationsByNickname = async (
         : [],
     ),
   );
+};
+
+/**
+ * The requester's relation to each Player of the Leaderboard page they read: the page after the
+ * Podium and, when they are off it, the Players around them, in the order of the table.
+ */
+export const readLeaderboardRelations = async (db: Db, playerId: string, page: number) => {
+  const { players, around } = await readLeaderboard(db, playerId, page);
+  const nicknames = [...players, ...(around ?? [])].flatMap(({ nickname }) =>
+    nickname === null ? [] : [nickname],
+  );
+  return nicknames.length === 0 ? [] : readRelationsByNickname(db, playerId, nicknames);
 };
 
 /** The Players a Nickname prefix finds for the requester, each with its relation to them. */

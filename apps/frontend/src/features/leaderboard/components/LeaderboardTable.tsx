@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCaption } from "../../../shared/components/ui/table.tsx";
-import { useAddFriendTargets } from "../../friends/hooks/useAddFriendTargets.ts";
+import type { AddFriendTarget } from "../../friends/relation/addFriendTarget.ts";
 import type { LeaderboardPlayer } from "../hooks/useLeaderboard.ts";
 import { pagePositions } from "../page/pagePositions.ts";
 import { AroundYouRows } from "./AroundYouRows.tsx";
@@ -11,15 +11,13 @@ interface LeaderboardTableProps {
   own: LeaderboardPlayer | null;
   /** The reader between their neighbours, when neither on the Podium nor on this page. */
   around: LeaderboardPlayer[] | null;
+  /** The Add Friend key of each row, read with the page. */
+  addFriendOf: (nickname: string | null) => AddFriendTarget;
 }
 
 // On a narrow screen the table scrolls sideways inside its box rather than squeezing its columns.
-// The relations are read once the rows are known; their keys fill a column already laid out.
-export function LeaderboardTable({ players, own, around }: LeaderboardTableProps) {
+export function LeaderboardTable({ players, own, around, addFriendOf }: LeaderboardTableProps) {
   const positions = pagePositions(players);
-  const { targetOf } = useAddFriendTargets(
-    [...players, ...(around ?? [])].map(({ nickname }) => nickname),
-  );
 
   return (
     <div className="w-full overflow-hidden rounded-[20px] border-3 border-key-outline bg-surface-card">
@@ -32,11 +30,11 @@ export function LeaderboardTable({ players, own, around }: LeaderboardTableProps
               key={player.position}
               player={player}
               isOwn={player.position === own?.position}
-              addFriend={targetOf(player.nickname)}
+              addFriend={addFriendOf(player.nickname)}
             />
           ))}
         </TableBody>
-        {around !== null && <AroundYouRows around={around} own={own} addFriendOf={targetOf} />}
+        {around !== null && <AroundYouRows around={around} own={own} addFriendOf={addFriendOf} />}
       </Table>
     </div>
   );

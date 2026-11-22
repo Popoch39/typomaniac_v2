@@ -1,6 +1,6 @@
 import type { Logger } from "@repo/logger";
 import type { Redis } from "../../redis/client.ts";
-import { refreshOnline } from "./service.ts";
+import { onlineWindowNow, refreshOnline } from "./service.ts";
 
 type Holder = {
   readonly playerId: string;
@@ -53,7 +53,7 @@ export const createOnlinePresence = (
   };
   const refreshAll = async () => {
     const playerIds = new Set([...held].map(({ playerId }) => playerId));
-    const found = await refreshOnline(redis, playerIds, { now: Date.now(), windowMs });
+    const found = await refreshOnline(redis, playerIds, onlineWindowNow(windowMs));
     await Promise.all([announce(found.count), changed(found.changed), refreshed([...playerIds])]);
   };
   const stop = () => {
@@ -74,10 +74,11 @@ export const createOnlinePresence = (
           ),
         intervalMs,
       );
-      const { count, changed: found } = await refreshOnline(redis, [holder.playerId], {
-        now: Date.now(),
-        windowMs,
-      });
+      const { count, changed: found } = await refreshOnline(
+        redis,
+        [holder.playerId],
+        onlineWindowNow(windowMs),
+      );
       if (held.has(holder)) tell(holder, count);
       await Promise.all([announce(count), changed(found)]);
     },

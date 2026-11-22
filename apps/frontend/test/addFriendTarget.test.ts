@@ -45,6 +45,17 @@ test("while the relations are being read, the key's place waits", () => {
   });
 });
 
+test("a failed read of the relations shows why in the key's place, rather than waiting for good", () => {
+  expect(
+    addFriendTarget({
+      viewer,
+      nickname: "Bob",
+      relations: undefined,
+      failure: "The server could not be reached.",
+    }),
+  ).toEqual({ kind: "failed", failure: "The server could not be reached." });
+});
+
 test("no key on oneself, a Guest Opponent, a Player the lookup left out, nor for a Guest viewer", () => {
   for (const [who, nickname] of [
     [viewer, "ALICE"],

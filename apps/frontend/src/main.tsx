@@ -3,7 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { setChallengeDuelNavigation } from "./features/challenge/store/useChallengeStore.ts";
-import { followSignedInPlayer } from "./features/online/store/followSignedInPlayer.ts";
+import { followSignedInPlayer } from "./features/online/session/followSignedInPlayer.ts";
 import "./index.css";
 import { router } from "./router.ts";
 import { queryClient } from "./shared/api/queryClient.ts";

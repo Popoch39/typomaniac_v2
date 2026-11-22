@@ -13,8 +13,8 @@ const worth931 = { ...result, wpm: 98, accuracy: 97.47 };
 const worth857 = { ...result, wpm: 92, accuracy: 96.52 };
 
 const participants = [
-  { seat: 0, name: "kaelen", avatarUrl: null, ornament: null, connected: true },
-  { seat: 1, name: "vexwyrm", avatarUrl: null, ornament: null, connected: true },
+  { seat: 0, name: "kaelen", avatarUrl: null, ornament: null, guest: false, connected: true },
+  { seat: 1, name: "vexwyrm", avatarUrl: null, ornament: null, guest: false, connected: true },
 ] as const;
 
 const captionFrom = (round: FinishedRound, seat: 0 | 1) =>

@@ -53,10 +53,18 @@ const messages: ServerMessage[] = [
         name: "ada",
         avatarUrl: "https://cdn.example.com/ada.png",
         ornament: { tier: "gold", division: 2 },
+        guest: false,
         connected: true,
       },
       // A Guest has no Avatar picture and no Ornament.
-      { seat: 1, name: "Guest 4821", avatarUrl: null, ornament: null, connected: false },
+      {
+        seat: 1,
+        name: "Guest 4821",
+        avatarUrl: null,
+        ornament: null,
+        guest: true,
+        connected: false,
+      },
     ],
     // A ranked Duel: each Player's Rank, or none while Unranked.
     ranks: [{ tier: "gold", division: 2, lp: 40 }, null],
@@ -80,6 +88,7 @@ const messages: ServerMessage[] = [
       avatarUrl: "https://cdn.example.com/ada.png",
       // The Unranked plate and a Master Ornament have no Division.
       ornament: { tier: "unranked", division: null },
+      guest: false,
       connected: false,
     },
   },

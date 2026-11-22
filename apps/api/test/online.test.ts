@@ -1,42 +1,31 @@
 import { afterAll, expect, test } from "bun:test";
-import { getLogger } from "@repo/logger";
-import { createApp, type AppOptions } from "../src/app.ts";
+import type { AppOptions } from "../src/app.ts";
 import { createLifecycle } from "../src/modules/lifecycle/service.ts";
 import type { Redis } from "../src/redis/client.ts";
 import { createTestAuth, signInPlayer } from "./helpers/auth.ts";
 import { createTestDb } from "./helpers/db.ts";
-import { createTestRedis } from "./helpers/redis.ts";
-import { openSocketOf, requestUpgrade } from "./helpers/socket.ts";
+import { createInstances, openPlayerSocket } from "./helpers/instance.ts";
+import { requestUpgrade } from "./helpers/socket.ts";
 
 const testDb = await createTestDb();
 const auth = createTestAuth(testDb.db);
-const cleanups: (() => Promise<void>)[] = [];
+const instances = createInstances(testDb.db, auth);
+const { createRedis } = instances;
 afterAll(async () => {
-  for (const cleanup of cleanups.reverse()) await cleanup();
+  await instances.cleanup();
   await testDb.drop();
 });
 
 type PlayerServerMessage = { type: "onlineCount"; count: number };
 
-// Each test counts in its own Redis namespace, so the Players of another test are not Online here.
-const createRedis = async () => {
-  const testRedis = await createTestRedis();
-  cleanups.push(testRedis.drop);
-  return testRedis.redis;
-};
-
-// Listening on an ephemeral port: the in-process request seam cannot upgrade a connection.
+// Each test counts in its own Redis namespace, from `createRedis`, so the Players of another test
+// are not Online here.
 const startInstance = (redis: Redis, options: AppOptions = {}) => {
-  const app = createApp(testDb.db, auth, redis, getLogger("api"), options).listen(0);
-  cleanups.push(async () => {
-    await app.stop(true);
-  });
-  const origin = `http://localhost:${app.server?.port}`;
-  const url = `${origin.replace(/^http/, "ws")}/api/online/socket`;
+  const instance = instances.startInstance(redis, options);
   return {
-    origin,
-    url,
-    open: (cookie: string) => openSocketOf<PlayerServerMessage, unknown>(url, cookie),
+    origin: instance.origin,
+    url: instance.playerSocketUrl,
+    open: (cookie: string) => openPlayerSocket<PlayerServerMessage>(instance, cookie),
   };
 };
 

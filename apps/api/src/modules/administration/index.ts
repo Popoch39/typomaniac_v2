@@ -1,11 +1,13 @@
 import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
+import type { Redis } from "../../redis/client.ts";
 import type { Protection } from "../auth/index.ts";
 import { revokeSanction, settleReview } from "../fair-play/service.ts";
+import { tellBan } from "../online/service.ts";
 import * as AdministrationModel from "./model.ts";
 import { readOpenReviews, readPlayerSanctions, readReview } from "./service.ts";
 
-export const createAdministrationRoutes = (db: Db, protection: Protection) =>
+export const createAdministrationRoutes = (db: Db, protection: Protection, redis: Redis) =>
   new Elysia({ prefix: "/api/admin" })
     .use(protection)
     .get(
@@ -40,6 +42,9 @@ export const createAdministrationRoutes = (db: Db, protection: Protection) =>
         if (settled === "not-found") return status(404, { code: "REVIEW_NOT_FOUND" });
         if (settled === "duel-not-found") return status(404, { code: "DUEL_NOT_FOUND" });
         if (settled === "already-settled") return status(409, { code: "REVIEW_ALREADY_SETTLED" });
+        // The fair-play worker's Bans reach the other side at the next refresh of the presence;
+        // this one is told at once.
+        if (settled.banned !== null) await tellBan(redis, settled.banned);
         return status(204, undefined);
       },
     )

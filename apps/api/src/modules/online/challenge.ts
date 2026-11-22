@@ -13,6 +13,7 @@ import type { RateLimiter } from "../rate-limit/index.ts";
 import {
   type Challenge,
   cancelChallenges,
+  cancelAllChallengesOf,
   closeChallenge,
   forgetDueChallenge,
   openChallenge,
@@ -21,6 +22,7 @@ import {
   readChallenge,
   readChallengesOf,
   readDueChallenges,
+  onlineWindowNow,
   readPlayerStates,
 } from "./service.ts";
 
@@ -62,7 +64,7 @@ export const createChallenges = (
   let following: Promise<unknown> | null = null;
 
   const isOnline = async (playerId: string) =>
-    (await readPlayerStates(redis, [playerId], { now: Date.now(), windowMs })).get(playerId) !==
+    (await readPlayerStates(redis, [playerId], onlineWindowNow(windowMs))).get(playerId) !==
     "offline";
 
   // A Player in a Pairing awaiting acceptance is about to enter a ranked Duel.
@@ -103,11 +105,7 @@ export const createChallenges = (
   };
 
   const cancelAllOf = async (playerIds: readonly string[]) => {
-    await Promise.all(
-      playerIds.map(async (playerId) =>
-        cancelChallenges(redis, await readChallengesOf(redis, playerId)),
-      ),
-    );
+    await Promise.all(playerIds.map((playerId) => cancelAllChallengesOf(redis, playerId)));
   };
 
   // A closed Challenge was closed by exactly one caller, who alone tells both sides.
@@ -225,7 +223,7 @@ export const createChallenges = (
     },
     /** Cancels the Challenges of those of these Players who went offline. */
     whenChanged: async (playerIds: readonly string[]) => {
-      const states = await readPlayerStates(redis, playerIds, { now: Date.now(), windowMs });
+      const states = await readPlayerStates(redis, playerIds, onlineWindowNow(windowMs));
       await cancelAllOf(
         [...states].flatMap(([playerId, state]) => (state === "offline" ? [playerId] : [])),
       );

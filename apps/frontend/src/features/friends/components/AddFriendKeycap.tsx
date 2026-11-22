@@ -1,7 +1,7 @@
-import { cn } from "../../../shared/lib/utils.ts";
 import { useAddFriendKey } from "../hooks/useAddFriendKey.ts";
 import { ADD_FRIEND_LABELS, type Relation } from "../relation/addFriendKey.ts";
 import { FriendActionKey } from "./FriendActionKey.tsx";
+import { FriendKeyFailure } from "./FriendKeyFailure.tsx";
 
 interface AddFriendKeycapProps {
   player: { id: string; relation: Relation };
@@ -23,16 +23,7 @@ export function AddFriendKeycap({ player, size, failureAlign = "center" }: AddFr
         variant="action"
         size={size}
       />
-      {/* Under the key, out of the flow, so that a failure moves nothing around it. */}
-      <p
-        role="alert"
-        className={cn(
-          "absolute top-full z-10 m-0 mt-2 whitespace-nowrap text-danger",
-          failureAlign === "center" ? "left-1/2 -translate-x-1/2" : "right-0",
-        )}
-      >
-        {failure}
-      </p>
+      <FriendKeyFailure failure={failure} align={failureAlign} />
     </div>
   );
 }

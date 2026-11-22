@@ -3,7 +3,7 @@ import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import { duelPlayersChannel } from "../duel/service.ts";
 import { readFriendIds } from "../friend/service.ts";
-import { type PlayerServerMessage, readPlayerStates } from "./service.ts";
+import { onlineWindowNow, type PlayerServerMessage, readPlayerStates } from "./service.ts";
 
 type Watcher = {
   readonly playerId: string;
@@ -50,7 +50,7 @@ export const createFriendWatch = (
   };
   const tellStates = async (playerIds: readonly string[]) => {
     const watched = playerIds.filter((playerId) => watchersOf.has(playerId));
-    const states = await readPlayerStates(redis, watched, { now: Date.now(), windowMs });
+    const states = await readPlayerStates(redis, watched, onlineWindowNow(windowMs));
     for (const [playerId, state] of states)
       for (const watcher of watchersOf.get(playerId) ?? [])
         tell(watcher, { type: "friendState", playerId, state });
@@ -72,7 +72,7 @@ export const createFriendWatch = (
       await following;
       const friendIds = await readFriendIds(db, watcher.playerId);
       for (const friendId of friendIds) watch(watcher, friendId);
-      const states = await readPlayerStates(redis, friendIds, { now: Date.now(), windowMs });
+      const states = await readPlayerStates(redis, friendIds, onlineWindowNow(windowMs));
       const waiting = queued.get(watcher) ?? [];
       queued.delete(watcher);
       // Closed meanwhile.

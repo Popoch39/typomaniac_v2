@@ -29,6 +29,7 @@ const participant = t.Object({
       division: t.Nullable(t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(4)])),
     }),
   ),
+  guest: t.Boolean(),
   connected: t.Boolean(),
 });
 

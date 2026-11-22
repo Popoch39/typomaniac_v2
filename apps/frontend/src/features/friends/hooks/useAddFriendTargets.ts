@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
 import { relationsQueryOptions } from "../api/relationsQueryOptions.ts";
 import { addFriendTarget, relationLookupOf } from "../relation/addFriendTarget.ts";
@@ -15,7 +16,12 @@ export function useAddFriendTargets(nicknames: readonly (string | null)[]) {
   const relations = useQuery(relationsQueryOptions(lookup));
   return {
     targetOf: (nickname: string | null) =>
-      addFriendTarget({ viewer, nickname, relations: relations.data }),
+      addFriendTarget({
+        viewer,
+        nickname,
+        relations: relations.data,
+        failure: relations.error === null ? null : describeApiError(relations.error),
+      }),
     /** Whether a key may show at all, so that its place is kept until the lookup answers. */
     hasLookup: lookup !== null,
     me,

@@ -1,7 +1,7 @@
 import { hashKey } from "@tanstack/react-query";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
-import { useOnlineStore } from "./useOnlineStore.ts";
+import { useOnlineStore } from "../store/useOnlineStore.ts";
 
 /**
  * Keeps the Player socket open for as long as a Player is signed in, on every page, Duels included:

@@ -51,6 +51,9 @@ export const refreshOnline = async (
   return { count, changed: [...joined, ...left] };
 };
 
+/** The window as it stands now, for refreshing or reading who is Online. */
+export const onlineWindowNow = (windowMs: number) => ({ now: Date.now(), windowMs });
+
 /**
  * The state each Player shows their Friends at `now`: Online while refreshed within the window, and
  * In a Duel while also seated in an unfinished Duel.
@@ -275,6 +278,38 @@ export const cancelChallenges = async (redis: Redis, challenges: readonly Challe
       ]);
     }),
   );
+};
+
+/** Cancels every Challenge the Player sent or received. */
+export const cancelAllChallengesOf = async (redis: Redis, playerId: string) => {
+  await cancelChallenges(redis, await readChallengesOf(redis, playerId));
+};
+
+/**
+ * Tells the other side of a Ban at once: the banned Player's Challenges are cancelled, their former
+ * Friends and the other Player of each deleted Friend request are told on every tab.
+ */
+export const tellBan = async (
+  redis: Redis,
+  {
+    playerId,
+    friendIds,
+    requestPlayerIds,
+  }: {
+    readonly playerId: string;
+    readonly friendIds: readonly string[];
+    readonly requestPlayerIds: readonly string[];
+  },
+) => {
+  await Promise.all([
+    cancelAllChallengesOf(redis, playerId),
+    ...friendIds.map((friendId) =>
+      pushToPlayer(redis, friendId, { type: "friendRemoved", playerId }),
+    ),
+    ...requestPlayerIds.map((otherId) =>
+      pushToPlayer(redis, otherId, { type: "friendRequestRemoved", playerId }),
+    ),
+  ]);
 };
 
 /** Cancels any Challenge waiting between the two Players, whichever challenged. */
