@@ -4,7 +4,10 @@ import { LoadingPixels } from "../../../shared/components/LoadingPixels.tsx";
 import { LeaveIcon } from "./LeaveIcon.tsx";
 
 export function QueueWaiting() {
-  const { status, waitingTime, leave } = useQueueWaiting();
+  const waiting = useQueueWaiting();
+
+  if (waiting === null) return null;
+  const { status, waitingTime, leave } = waiting;
 
   return (
     <div className="flex flex-1 flex-col justify-between gap-6">

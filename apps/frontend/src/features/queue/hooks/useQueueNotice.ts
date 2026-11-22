@@ -9,10 +9,12 @@ const DISCONNECTED =
 /** What the Player must be told about why they are not queued here, if anything. */
 export function useQueueNotice() {
   const phase = useQueueStore((state) => state.phase);
-  const refusal = useQueueStore((state) => state.refusal);
-  if (phase === "replaced") return { role: "status", message: REPLACED } as const;
-  if (phase === "notAccepted") return { role: "status", message: NOT_ACCEPTED } as const;
-  if (phase === "disconnected") return { role: "alert", message: DISCONNECTED } as const;
-  if (phase === "refused" && refusal !== null) return { role: "alert", message: refusal } as const;
+  if (phase.kind === "removed")
+    return {
+      role: "status",
+      message: phase.reason === "replaced" ? REPLACED : NOT_ACCEPTED,
+    } as const;
+  if (phase.kind === "disconnected") return { role: "alert", message: DISCONNECTED } as const;
+  if (phase.kind === "refused") return { role: "alert", message: phase.refusal } as const;
   return null;
 }
