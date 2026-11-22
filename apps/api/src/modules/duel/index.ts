@@ -110,7 +110,12 @@ export const createDuelRoutes = (
   // release a seat the open has not finished taking.
   const phases = createSocketPhases();
 
-  const leaveSeat = async (duelId: string, { participant, connection, delivery }: Seating) => {
+  // `connection` is the one the seat is let go of from: the socket's own once it held the seat.
+  const leaveSeat = async (
+    duelId: string,
+    { participant, delivery }: Seating,
+    connection: string | null,
+  ) => {
     await relay.leave(duelId, delivery);
     // Replaced by a reconnection: the Participant is not away.
     if (!(await releaseSeat(redis, duelId, participant.seat, connection))) return;
@@ -283,17 +288,19 @@ export const createDuelRoutes = (
               ranked: duel.kind === "ranked",
               keys: journals[self.seat].reduce(pairKeys, NO_KEYS_PAIRED),
             };
-            // Closed while opening: the seat the upgrade claimed is let go of as a close would. It is
-            // held first, since the claim marks it connected before any connection holds it.
+            // Closed while opening: the seat the upgrade claimed is let go of as a close would, from
+            // the connection that held it before this socket until this socket holds it, so that a
+            // reconnection that took the seat meanwhile keeps it.
+            let holding = duel.connections[self.seat] ?? null;
             const closed = () => !phases.isOpening(ws.id);
             const abandon = async () => {
               seated.delete(ws.id);
-              await holdSeat(redis, ws.params.id, self.seat, connection);
-              await leaveSeat(ws.params.id, entry);
+              await leaveSeat(ws.params.id, entry, holding);
             };
             if (closed()) return abandon();
             seated.set(ws.id, entry);
             await holdSeat(redis, ws.params.id, self.seat, connection);
+            holding = connection;
             if (closed()) return abandon();
             await relay.join(ws.params.id, delivery);
             if (closed()) return abandon();
@@ -443,7 +450,7 @@ export const createDuelRoutes = (
           try {
             if (!seating) return;
             seated.delete(ws.id);
-            await leaveSeat(ws.params.id, seating);
+            await leaveSeat(ws.params.id, seating, seating.connection);
           } finally {
             phases.advance(ws.id, { kind: "released" });
           }
