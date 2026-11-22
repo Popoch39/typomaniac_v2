@@ -24,7 +24,7 @@ import type { Lifecycle } from "../lifecycle/service.ts";
 import { createSocketPhases } from "../lifecycle/socketPhase.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
-import { isAnnounced, startOf } from "./lifecycle.ts";
+import { isAnnounced, startOf } from "./phase.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
