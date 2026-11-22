@@ -1,7 +1,8 @@
 import {
   IDLE_LINK,
-  next,
+  nextSocketLink,
   type ReconnectDelay,
+  type ReconnectPolicy,
   type SocketLink,
   type SocketLinkEvent,
 } from "../link/socketLink.ts";
@@ -10,8 +11,11 @@ import { CloseCode, reconnectDelay } from "./reconnectDelay.ts";
 export type ReconnectingSocketHandlers = {
   /** Each message the socket reads, as sent. */
   readonly receive: (data: string) => void;
-  /** Finds why the first opening was refused: a browser never shows why an upgrade failed. */
-  readonly findRefusal: () => Promise<string>;
+  /**
+   * Finds why the first opening was refused: a browser never shows why an upgrade failed. Without
+   * it, a first opening that closes is retried like a drop, the owner having no refusal to tell.
+   */
+  readonly findRefusal?: () => Promise<string>;
   /**
    * Told each move of the link, until the owner closes the socket. An owner that no longer needs
    * the socket as it backs off closes it, so that it is not reopened.
@@ -22,10 +26,12 @@ export type ReconnectingSocketHandlers = {
 /**
  * One socket at a time, reopened after a drop or a server restart (`reconnectDelay`) as long as
  * its owner needs it, or after `delayOf` for each try when given. A socket that closes before its
- * first message was refused instead.
+ * first message was refused instead, when its owner can find why.
  */
 export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDelay) {
   let link = IDLE_LINK;
+  // How the socket answers a closing, which depends on whether its owner can find a refusal.
+  let policy: ReconnectPolicy = { delayOf, refusesFirstOpening: true };
   let socket: WebSocket | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   // The try the pending retry makes, so that `retryNow` can make it at once.
@@ -36,12 +42,14 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
   function connect(url: string, handlers: ReconnectingSocketHandlers) {
     const opened = new WebSocket(url);
     socket = opened;
+    const { findRefusal } = handlers;
+    policy = { delayOf, refusesFirstOpening: findRefusal !== undefined };
 
     // The effects the link's new kind calls for come before the owner is told, so that an owner
     // closing the socket from its handler cancels them.
     const move = (event: SocketLinkEvent) => {
       const previous = link;
-      link = next(link, event, delayOf);
+      link = nextSocketLink(link, event, policy);
       if (link === previous) return;
       if (link.kind === "backoff") {
         retry = () => {
@@ -62,8 +70,8 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
       if (socket !== opened) return;
       dropSocket = null;
       move({ kind: "close", code, reason });
-      if (link.kind !== "refusing") return;
-      const refusal = await handlers.findRefusal();
+      if (link.kind !== "refusing" || findRefusal === undefined) return;
+      const refusal = await findRefusal();
       if (socket === opened) move({ kind: "refuse", refusal });
     };
     opened.addEventListener("close", closed);
@@ -87,7 +95,7 @@ export function createReconnectingSocket(delayOf: ReconnectDelay = reconnectDela
     dropSocket = null;
     socket?.close();
     socket = null;
-    link = next(link, { kind: "stop" }, delayOf);
+    link = nextSocketLink(link, { kind: "stop" }, policy);
   }
 
   return {

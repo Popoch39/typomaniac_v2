@@ -9,11 +9,10 @@ type PlayerSocketHandlers = {
   readonly link: (link: SocketLink) => void;
 };
 
-// Nothing is shown of a refusal: the Online count is ambient, and no action of the Player's failed.
-const findRefusal = () => Promise.resolve("");
-
 // Owned by the Online store because components may not run effects; a tab holds one Player socket.
-// It is retried for as long as the Player is signed in, so that a Challenge can reach the tab (ADR 0017).
+// It is retried for as long as the Player is signed in, so that a Challenge can reach the tab (ADR 0017),
+// a first opening included: nothing is shown of a refusal, since the Online count is ambient and no
+// action of the Player's failed, and the server tells none.
 const socket = createReconnectingSocket(endlessReconnectDelay);
 
 /** Opens the Player socket at `url` in place of any other, and hands over each message it reads. */
@@ -23,7 +22,6 @@ export function openPlayerSocket(url: string, { receive, link }: PlayerSocketHan
       const message = parsePlayerMessage(data);
       if (message !== null) receive(message);
     },
-    findRefusal,
     link,
   });
 }
