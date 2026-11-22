@@ -40,6 +40,14 @@ test/
 - `Dockerfile` se build depuis la racine (`docker build -f apps/api/Dockerfile .`). Il copie le `package.json` de chaque workspace pour que `bun install --frozen-lockfile` accepte le `bun.lock` racine : tout nouveau workspace dans `apps/` ou `packages/` doit y être ajouté, sinon le build Docker casse. Les packages que l'API importe (`@repo/typing-engine`, `@repo/duel-engine`, `@repo/ranked-engine`, `@repo/matchmaking-engine`, `@repo/fair-play-engine`, `@repo/fair-play`, `@repo/redis`, `@repo/db`, `@repo/logger`, `@repo/queue`) sont compilés depuis leurs sources : leur dossier entier doit aussi être copié avant `bun build`, sinon l'import ne se résout pas. `apps/matchmaker/Dockerfile` et `apps/fair-play-worker/Dockerfile` suivent la même règle.
 - Les tests appellent `app.handle()` sans ouvrir de port, avec `bun test`. Chaque route est testée sur son cas nominal et sur son cas de rejet. Exception : une route WebSocket ne s'upgrade pas par `app.handle()`, ses tests font `.listen(0)` et passent par de vrais clients HTTP et WebSocket (`test/helpers/socket.ts`).
 
+## Cycles de vie
+
+Voir `docs/adr/0018-lifecycles-are-discriminated-unions-with-a-pure-transition-function.md`.
+
+- Aucun booléen, champ nullable, timestamp ou présence de clé Redis ne code une phase dans un service. Un cycle de vie à plus de deux états est une union discriminée sur `kind` (`type` reste aux messages du WebSocket), et ses transitions vivent dans une seule fonction pure et testée (`next(state, event)`, ou `nextStep(duel, now)` pour le sweep). Le service n'exécute que les effets qu'elle choisit (envois, écritures Redis, minuteurs).
+- Une phase stockée (hash Redis, colonnes) est décodée une seule fois en union à la lecture ; les gardes lisent `kind`, jamais la présence d'un champ.
+- Un socket serveur (Duel, Queue, Online) porte une phase explicite `opening | seated | closing | closed`, posée de façon synchrone au début de `open` et vérifiée après chaque `await` : si le socket s'est fermé entre-temps, `open` relâche ce qu'il a pris (siège, abonnement, présence) au lieu de continuer.
+
 ## Base de données
 
 PostgreSQL (driver `Bun.SQL`, `drizzle-orm/bun-sql`) + Drizzle stable `0.45` / drizzle-kit `0.31`, voir `docs/adr/0002-postgres-drizzle-migrations-at-startup.md`.
