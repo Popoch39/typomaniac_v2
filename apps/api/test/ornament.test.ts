@@ -61,9 +61,20 @@ const saveRankedDuelEndingAt = async (playerId: string, ladderIndexAfter: number
     startedAt: new Date(),
     endedAt: new Date(),
   });
-  await testDb.db
-    .insert(duelParticipant)
-    .values({ duelId, seat: 0, playerId, outcome: "win", duelsPlayedBefore: 10, ladderIndexAfter });
+  await testDb.db.insert(duelParticipant).values({
+    duelId,
+    seat: 0,
+    playerId,
+    outcome: "win",
+    mmrBefore: 1300,
+    mmrAfter: 1316,
+    duelsPlayedBefore: 10,
+    duelsPlayedAfter: 11,
+    ladderIndexAfter,
+    lpAfter: 0,
+    lpDelta: 0,
+    rankChange: "placed",
+  });
 };
 
 const GOLD_FOUR = 8;
