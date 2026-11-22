@@ -20,3 +20,14 @@ export function reconnectDelay(code: number, attempt: number) {
   if (!RETRIED_CODES.has(code) || attempt > MAX_ATTEMPTS) return null;
   return FIRST_DELAY_MS * 2 ** (attempt - 1);
 }
+
+const MAX_DELAY_MS = 30_000;
+
+/**
+ * Like `reconnectDelay`, with no last try and the delay capped at 30 s, for a socket that must
+ * come back however long the server was down.
+ */
+export function endlessReconnectDelay(code: number, attempt: number) {
+  if (!RETRIED_CODES.has(code)) return null;
+  return Math.min(FIRST_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
+}

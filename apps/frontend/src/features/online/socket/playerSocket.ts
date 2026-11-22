@@ -1,41 +1,36 @@
+import { endlessReconnectDelay } from "../../../shared/lib/reconnectDelay.ts";
 import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
+import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { type PlayerServerMessage, parsePlayerMessage } from "../message/parsePlayerMessage.ts";
 
 type PlayerSocketHandlers = {
   readonly receive: (message: PlayerServerMessage) => void;
-  /** The socket could not be opened. */
-  readonly refuse: () => void;
-  /**
-   * The socket dropped and is about to be reopened, unless this answers `false` because the
-   * Player no longer needs it.
-   */
-  readonly reconnect: () => boolean;
-  /** The socket closed and is not reopened. */
-  readonly disconnect: () => void;
-};
-
-const socketUrl = () => {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/api/online/socket`;
+  /** Told each move of the link, until the Player socket is closed. */
+  readonly link: (link: SocketLink) => void;
 };
 
 // Nothing is shown of a refusal: the Online count is ambient, and no action of the Player's failed.
 const findRefusal = () => Promise.resolve("");
 
 // Owned by the Online store because components may not run effects; a tab holds one Player socket.
-const socket = createReconnectingSocket();
+// It is retried for as long as the Player is signed in, so that a Challenge can reach the tab (ADR 0017).
+const socket = createReconnectingSocket(endlessReconnectDelay);
 
-/** Opens the Player socket in place of any other, and hands over each message it reads. */
-export function openPlayerSocket({ receive, refuse, ...handlers }: PlayerSocketHandlers) {
-  socket.open(socketUrl(), {
-    ...handlers,
+/** Opens the Player socket at `url` in place of any other, and hands over each message it reads. */
+export function openPlayerSocket(url: string, { receive, link }: PlayerSocketHandlers) {
+  socket.open(url, {
     receive: (data) => {
       const message = parsePlayerMessage(data);
       if (message !== null) receive(message);
     },
     findRefusal,
-    refuse: () => refuse(),
+    link,
   });
+}
+
+/** Tries to reopen a dropped Player socket now rather than after its delay. */
+export function retryPlayerSocket() {
+  socket.retryNow();
 }
 
 export function closePlayerSocket() {

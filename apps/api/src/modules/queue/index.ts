@@ -23,6 +23,7 @@ import {
   type EntryHolder,
   leaveQueue,
   QUEUE_ENTRY_EXPIRY_MS,
+  readEntryPairingId,
   readQueueEntry,
   readRankedOpensAt,
   refreshQueueEntry,
@@ -143,7 +144,11 @@ export const createQueueRoutes = (
           if (!present.has(ws.id)) return leaveQueue(redis, presence);
           // A second tab or a reconnection: the socket that held the place until now is evicted.
           await evictions.takeOver(presence);
-          send({ type: "queued", queuedAt, serverAt: Date.now() });
+          // A reconnection during a Pairing: the Player must still be able to accept it, or to see
+          // that they already did, instead of being shown a waiting Queue.
+          const pairingId = await readEntryPairingId(redis, presence.playerId);
+          if (pairingId === null) send({ type: "queued", queuedAt, serverAt: Date.now() });
+          else pairings.repropose(presence, pairingId);
         },
         async message(ws, { pairingId }) {
           await acceptPairingAsPlayer(
