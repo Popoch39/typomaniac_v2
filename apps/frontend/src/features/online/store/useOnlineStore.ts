@@ -1,9 +1,15 @@
 import { create } from "zustand";
+import {
+  GUEST_PRESENCE,
+  type OnlinePresence,
+  type OnlinePresenceEvent,
+  nextOnlinePresence,
+  onlineCountOf,
+} from "../presence/onlinePresence.ts";
 import { closePlayerSocket, openPlayerSocket, retryPlayerSocket } from "../socket/playerSocket.ts";
 
 type OnlineState = {
-  /** The signed-in Player whose socket is open, `null` for a Guest or before the Player is known. */
-  readonly playerId: string | null;
+  readonly presence: OnlinePresence;
   /** How many Players are Online, as the Player socket last told, or `null` while unknown. */
   readonly count: number | null;
   /** The Player socket dropped and could not be reopened yet: `count` is stale until it is. */
@@ -14,24 +20,27 @@ type OnlineState = {
   readonly retry: () => void;
 };
 
-export const useOnlineStore = create<OnlineState>()((set, get) => ({
-  playerId: null,
-  count: null,
-  isDown: false,
-  follow: (playerId, socketUrl) => {
-    if (playerId === get().playerId) return;
-    closePlayerSocket();
-    set({ playerId, count: null, isDown: false });
-    if (playerId === null) return;
-    openPlayerSocket(socketUrl, {
-      receive: ({ count }) => set({ count, isDown: false }),
-      link: (link) => {
-        if (link.kind === "refused") set({ count: null });
-        // The count stays shown through the first reopening, so that a server restart does not blank it.
-        else if (link.kind === "backoff" && link.attempt > 1) set({ isDown: true });
-        else if (link.kind === "down") set({ count: null, isDown: false });
-      },
-    });
-  },
-  retry: () => retryPlayerSocket(),
-}));
+export const useOnlineStore = create<OnlineState>()((set, get) => {
+  const dispatch = (event: OnlinePresenceEvent) => {
+    const { presence, effects } = nextOnlinePresence(get().presence, event);
+    set({ presence, count: onlineCountOf(presence), isDown: presence.kind === "down" });
+    for (const effect of effects) {
+      if (effect.kind === "close") {
+        closePlayerSocket();
+        continue;
+      }
+      openPlayerSocket(effect.url, {
+        receive: ({ count }) => dispatch({ kind: "count", count }),
+        link: (link) => dispatch({ kind: "link", link }),
+      });
+    }
+  };
+
+  return {
+    presence: GUEST_PRESENCE,
+    count: null,
+    isDown: false,
+    follow: (playerId, socketUrl) => dispatch({ kind: "follow", playerId, socketUrl }),
+    retry: () => retryPlayerSocket(),
+  };
+});

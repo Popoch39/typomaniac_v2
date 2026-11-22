@@ -89,3 +89,37 @@ test("signing out while the server is down stops the retries", async () => {
   expect(store.getState().isDown).toBe(false);
   expect(store.getState().count).toBeNull();
 });
+
+test("signing in, switching Player and signing out move the Online store through its variants", async () => {
+  count = 4;
+  expect(store.getState().presence).toEqual({ kind: "guest" });
+
+  store.getState().follow("player-1", url);
+  expect(store.getState().presence).toEqual({ kind: "connecting", playerId: "player-1" });
+  await until(() => store.getState().presence.kind === "live");
+  expect(store.getState().presence).toEqual({ kind: "live", playerId: "player-1", count: 4 });
+
+  store.getState().follow("player-2", url);
+  expect(store.getState().presence).toEqual({ kind: "connecting", playerId: "player-2" });
+  await until(() => store.getState().presence.kind === "live");
+  expect(store.getState().presence).toEqual({ kind: "live", playerId: "player-2", count: 4 });
+
+  store.getState().follow(null, url);
+  expect(store.getState().presence).toEqual({ kind: "guest" });
+});
+
+test("an outage moves the Online store down with the last count, and a reopening back live", async () => {
+  count = 3;
+  store.getState().follow("player-1", url);
+  await until(() => store.getState().presence.kind === "live");
+
+  await goDown();
+  expect(store.getState().presence).toEqual({ kind: "down", playerId: "player-1", lastCount: 3 });
+
+  refusing = false;
+  count = 6;
+  await Bun.sleep(50);
+  store.getState().retry();
+  await until(() => store.getState().presence.kind === "live");
+  expect(store.getState().presence).toEqual({ kind: "live", playerId: "player-1", count: 6 });
+});
