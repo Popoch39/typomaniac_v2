@@ -6,6 +6,7 @@ import type { Protection } from "../auth/index.ts";
 import { logSocketFailure } from "../http/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
+import { createSocketPhases } from "../lifecycle/socketPhase.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { createPlayerChannels, type PlayerServerMessage } from "./channel.ts";
 import * as OnlineModel from "./model.ts";
@@ -38,6 +39,7 @@ export const createOnlineRoutes = (
   // What each open socket holds, set on open and read on close.
   const holdings = new Map<string, Holding>();
   const closing = new Set<string>();
+  const phases = createSocketPhases();
 
   return (
     new Elysia({ prefix: "/api/online" })
@@ -70,20 +72,31 @@ export const createOnlineRoutes = (
         message() {},
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          const send = (message: PlayerServerMessage) => ws.send(message);
-          const holding: Holding = {
-            playerId: ws.player.id,
-            send,
-            tellCount: (count) => send({ type: "onlineCount", count }),
-            overCap: rateLimiter.socketMessageWindow(),
-          };
-          holdings.set(ws.id, holding);
-          logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
-          await channels.hold(holding);
-          // A close during the await found no presence to release: holding it now would keep the
-          // Player Online until the instance stops.
-          if (holdings.get(ws.id) !== holding) return;
-          await presence.hold(holding);
+          phases.open(ws.id);
+          try {
+            const send = (message: PlayerServerMessage) => ws.send(message);
+            const holding: Holding = {
+              playerId: ws.player.id,
+              send,
+              tellCount: (count) => send({ type: "onlineCount", count }),
+              overCap: rateLimiter.socketMessageWindow(),
+            };
+            holdings.set(ws.id, holding);
+            logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
+            // Closed while opening: what the open took is let go of here, its close having left it.
+            // Holding the presence regardless would keep the Player Online until the instance stops.
+            const closed = () => !phases.isOpening(ws.id);
+            const abandon = async () => {
+              holdings.delete(ws.id);
+              await Promise.all([channels.release(holding), presence.release(holding)]);
+            };
+            await channels.hold(holding);
+            if (closed()) return await abandon();
+            await presence.hold(holding);
+            if (closed()) return await abandon();
+          } finally {
+            phases.advance(ws.id, { kind: "opened" });
+          }
         },
         async close(ws, code) {
           lifecycle.release(ws.id);
@@ -92,10 +105,15 @@ export const createOnlineRoutes = (
             playerId: ws.player.id,
             code,
           });
-          const holding = holdings.get(ws.id);
-          if (!holding) return;
-          holdings.delete(ws.id);
-          await Promise.all([channels.release(holding), presence.release(holding)]);
+          if (phases.advance(ws.id, { kind: "close" }) !== "release") return;
+          try {
+            const holding = holdings.get(ws.id);
+            if (!holding) return;
+            holdings.delete(ws.id);
+            await Promise.all([channels.release(holding), presence.release(holding)]);
+          } finally {
+            phases.advance(ws.id, { kind: "released" });
+          }
         },
         error: logSocketFailure(logger, "Player socket failed"),
       })
