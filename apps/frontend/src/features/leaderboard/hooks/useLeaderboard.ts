@@ -1,12 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
-import { readStage } from "../../../shared/api/readStage.ts";
-import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
+import { type ReadyData, readGate, readStage } from "../../../shared/api/readStage.ts";
+import { useSession } from "../../auth/hooks/useSession.ts";
 import { leaderboardQueryOptions } from "../api/leaderboardQueryOptions.ts";
 import { pageToReplace } from "../page/pageToReplace.ts";
 
-export type Leaderboard = NonNullable<ReturnType<typeof useLeaderboard>["leaderboard"]>;
+export type Leaderboard = ReadyData<ReturnType<typeof useLeaderboard>["gate"]>;
 
 export type LeaderboardPlayer = Leaderboard["podium"][number];
 
@@ -18,15 +18,17 @@ export type LeaderboardPlayer = Leaderboard["podium"][number];
  */
 export function useLeaderboard() {
   const { page } = useSearch({ from: "/_shell/leaderboard" });
-  const me = useQuery(meQueryOptions());
+  const { session } = useSession();
   const read = useQuery({ ...leaderboardQueryOptions(page), placeholderData: keepPreviousData });
   const { data, isPlaceholderData, error } = read;
   return {
-    leaderboard: data ?? null,
-    stage: readStage([read]),
-    isGuest: me.data === null,
-    failure: error === null ? null : describeApiError(error),
-    retry: () => void read.refetch(),
+    gate: readGate(
+      readStage([read]),
+      data,
+      error === null ? null : describeApiError(error),
+      () => void read.refetch(),
+    ),
+    isGuest: session.kind === "guest",
     replacingPage:
       data === undefined
         ? null

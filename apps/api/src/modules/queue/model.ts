@@ -82,6 +82,7 @@ export const Socket = {
         type: t.Literal("proposed"),
         pairingId: t.String(),
         acceptWithinMs: t.Number(),
+        accepted: t.Boolean(),
         players: t.Object({ self: pairingSide, opponent: pairingSide }),
       }),
       t.Object({ type: t.Literal("requeued"), queuedAt: t.Number(), serverAt: t.Number() }),
