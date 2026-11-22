@@ -14,21 +14,19 @@ interface ReviewDetailProps {
 }
 
 export function ReviewDetail({ reviewId }: ReviewDetailProps) {
-  const { review, stage, failure, retry } = useReview(reviewId);
+  const gate = useReview(reviewId);
 
   return (
     <ReadGate
-      stage={stage}
+      state={gate}
       pending={
         <Panel title="Review" flat>
           <LoadingState message="Reading the Review…" />
         </Panel>
       }
       title="Review"
-      failure={failure}
-      retry={retry}
     >
-      {review !== null && (
+      {(review) => (
         <Panel title="Review" flat>
           <ReviewSummary review={review} />
           <ReviewDuels duels={review.duels} />

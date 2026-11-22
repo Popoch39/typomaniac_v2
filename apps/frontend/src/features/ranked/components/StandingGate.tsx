@@ -22,14 +22,11 @@ interface StandingGateProps {
 // Shows its content once the Player's Standing and their fair-play state are both read, and a way to
 // read them again when that fails.
 export function StandingGate({ player, pending, children }: StandingGateProps) {
-  const { standing, voidedDuels, suspension, stage, failure, retry } = useRankedReads(player);
+  const gate = useRankedReads(player);
 
   return (
-    <ReadGate stage={stage} pending={pending} title="Standing" failure={failure} retry={retry}>
-      {standing !== null &&
-        voidedDuels !== null &&
-        player !== null &&
-        children(standing, player, voidedDuels, suspension)}
+    <ReadGate state={gate} pending={pending} title="Standing">
+      {(ranked) => children(ranked.standing, ranked.player, ranked.voidedDuels, ranked.suspension)}
     </ReadGate>
   );
 }

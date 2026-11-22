@@ -23,13 +23,13 @@ interface ProfileGateProps {
 
 // Holds the Profile back until every panel can be drawn whole, so that none is pushed in or grows later.
 export function ProfileGate({ player, pending, children }: ProfileGateProps) {
-  const { standing, progress, isProgressUpdating, stage, failure, retry } = useProfileReads(player);
+  const gate = useProfileReads(player);
 
   return (
-    <ReadGate stage={stage} pending={pending} title="Profile" failure={failure} retry={retry}>
-      {standing !== null &&
-        player !== null &&
-        children(standing, player, progress, isProgressUpdating)}
+    <ReadGate state={gate} pending={pending} title="Profile">
+      {(profile) =>
+        children(profile.standing, profile.player, profile.progress, profile.isProgressUpdating)
+      }
     </ReadGate>
   );
 }
