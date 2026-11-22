@@ -80,6 +80,9 @@ export const createOnlineRoutes = (
           holdings.set(ws.id, holding);
           logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
           await channels.hold(holding);
+          // A close during the await found no presence to release: holding it now would keep the
+          // Player Online until the instance stops.
+          if (holdings.get(ws.id) !== holding) return;
           await presence.hold(holding);
         },
         async close(ws, code) {
