@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import type { Db } from "../../db/client.ts";
 import type { Redis } from "../../redis/client.ts";
 import type { Protection } from "../auth/index.ts";
-import { pushToPlayer } from "../online/service.ts";
+import { cancelChallengesBetween, pushToPlayer } from "../online/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import * as FriendModel from "./model.ts";
 import {
@@ -187,7 +187,10 @@ export const createFriendRoutes = (
         if (refused) return refused;
         if (!(await removeFriend(db, player.id, params.playerId)))
           return status(404, { code: "FRIEND_NOT_FOUND" });
-        await pushToBoth("friendRemoved", player.id, params.playerId);
+        await Promise.all([
+          pushToBoth("friendRemoved", player.id, params.playerId),
+          cancelChallengesBetween(redis, player.id, params.playerId),
+        ]);
         return status(204, undefined);
       },
     );

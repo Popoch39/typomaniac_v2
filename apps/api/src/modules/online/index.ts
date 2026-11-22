@@ -7,18 +7,24 @@ import type { Protection } from "../auth/index.ts";
 import { logSocketFailure } from "../http/index.ts";
 import { CloseCode } from "../lifecycle/closeCode.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
+import { DUEL_EXPIRY_MS } from "../duel/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
+import { createChallenges } from "./challenge.ts";
 import { createPlayerChannels } from "./channel.ts";
 import { createFriendWatch } from "./friendWatch.ts";
 import * as OnlineModel from "./model.ts";
 import { createOnlinePresence } from "./presence.ts";
-import { ONLINE_WINDOW_MS, type PlayerServerMessage } from "./service.ts";
+import { CHALLENGE_EXPIRY_MS, ONLINE_WINDOW_MS, type PlayerServerMessage } from "./service.ts";
 
 export type OnlineOptions = {
   /** How long a Player stays Online after their sockets stopped being refreshed. */
   readonly windowMs?: number;
   /** How often this instance refreshes the Players of its sockets; several times per window. */
   readonly refreshMs?: number;
+  /** How long a challenged Player has to answer. */
+  readonly challengeExpiryMs?: number;
+  /** How long the Custom Duel of an accepted Challenge can be joined, as any Custom Duel. */
+  readonly duelExpiryMs?: number;
 };
 
 export const createOnlineRoutes = (
@@ -28,13 +34,25 @@ export const createOnlineRoutes = (
   redis: Redis,
   logger: Logger,
   lifecycle: Lifecycle,
-  { windowMs = ONLINE_WINDOW_MS, refreshMs = windowMs / 3 }: OnlineOptions = {},
+  {
+    windowMs = ONLINE_WINDOW_MS,
+    refreshMs = windowMs / 3,
+    challengeExpiryMs = CHALLENGE_EXPIRY_MS,
+    duelExpiryMs = DUEL_EXPIRY_MS,
+  }: OnlineOptions = {},
 ) => {
   const friendWatch = createFriendWatch(db, redis, logger, { windowMs });
+  const challenges = createChallenges(db, redis, logger, rateLimiter, {
+    expiryMs: challengeExpiryMs,
+    windowMs,
+    duelExpiryMs,
+  });
   const presence = createOnlinePresence(redis, logger, {
     windowMs,
     intervalMs: refreshMs,
-    changed: friendWatch.announce,
+    changed: async (playerIds) => {
+      await Promise.all([friendWatch.announce(playerIds), challenges.whenChanged(playerIds)]);
+    },
   });
   const channels = createPlayerChannels(redis);
   type Holding = {
@@ -47,6 +65,7 @@ export const createOnlineRoutes = (
     /** What the Player's channel hands this socket. */
     readonly delivery: {
       readonly playerId: string;
+      readonly connection: string;
       readonly send: (message: PlayerServerMessage) => void;
     };
   };
@@ -58,12 +77,17 @@ export const createOnlineRoutes = (
     new Elysia({ prefix: "/api/online" })
       .use(protection)
       .use(websocket())
+      .onStart(challenges.start)
       // A stopped instance refreshes no Player any more, as if it had crashed.
-      .onStop(presence.stop)
+      .onStop(async () => {
+        presence.stop();
+        await challenges.stop();
+      })
       // One per tab of a signed-in Player, whose Nickname is not needed to be Online. Bun pings it at
       // the protocol level, which a browser answers even in a background tab.
       .ws("/socket", {
         signedIn: true,
+        body: OnlineModel.Socket.Body,
         response: OnlineModel.Socket.Response,
         async beforeHandle({ body, player, set }) {
           // Also runs before each message, which carries a body: the upgrade alone is counted.
@@ -81,8 +105,29 @@ export const createOnlineRoutes = (
           });
           ws.close(CloseCode.policyViolation, "message rate exceeded");
         },
-        // No message is acted on yet: each one only counts toward the cap, in `parse`.
-        message() {},
+        async message(ws, body) {
+          if (closing.has(ws.id)) return;
+          const tab = {
+            playerId: ws.player.id,
+            connection: ws.id,
+            send: (message: PlayerServerMessage) => ws.send(message),
+          };
+          // Nothing is returned: Elysia would send it back as a message.
+          switch (body.type) {
+            case "challenge":
+              await challenges.challenge(tab, body.playerId);
+              break;
+            case "cancelChallenge":
+              await challenges.cancel(tab, body.challengeId);
+              break;
+            case "acceptChallenge":
+              await challenges.accept(tab, body.challengeId);
+              break;
+            case "declineChallenge":
+              await challenges.decline(tab, body.challengeId);
+              break;
+          }
+        },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
           const send = (message: PlayerServerMessage) => ws.send(message);
@@ -93,7 +138,11 @@ export const createOnlineRoutes = (
             tellCount: (count) => send({ type: "onlineCount", count }),
             overCap: rateLimiter.socketMessageWindow(),
             befriendable: ws.player.nickname !== null,
-            delivery: { playerId, send: (message) => friendWatch.deliver(holding, message) },
+            delivery: {
+              playerId,
+              connection: ws.id,
+              send: (message) => friendWatch.deliver(holding, message),
+            },
           };
           holdings.set(ws.id, holding);
           logger.info("Player {playerId} opened a Player socket", { playerId: holding.playerId });
@@ -115,6 +164,7 @@ export const createOnlineRoutes = (
             channels.release(holding.delivery),
             presence.release(holding),
             friendWatch.release(holding),
+            challenges.release({ playerId: holding.playerId, connection: ws.id }),
           ]);
         },
         error: logSocketFailure(logger, "Player socket failed"),

@@ -81,15 +81,10 @@ export const createApp = (
       .use(createAdministrationRoutes(db, protection))
       .use(createFriendRoutes(db, protection, rateLimiter, redis))
       .use(
-        createOnlineRoutes(
-          db,
-          protection,
-          rateLimiter,
-          redis,
-          loggerOf("online"),
-          lifecycle,
-          onlineOptions,
-        ),
+        createOnlineRoutes(db, protection, rateLimiter, redis, loggerOf("online"), lifecycle, {
+          duelExpiryMs: duelOptions?.expiryMs,
+          ...onlineOptions,
+        }),
       )
       .use(
         createDuelRoutes(
