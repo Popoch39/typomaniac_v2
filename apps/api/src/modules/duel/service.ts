@@ -185,12 +185,8 @@ export const isInUnfinishedDuel = async (redis: Redis, playerId: string) => {
   const duelIds: string[] = await redis.client.send("HKEYS", [playerDuelsKey(redis, playerId)]);
   const unfinished = await Promise.all(
     duelIds.map(async (duelId) => {
-      const [round, end]: (string | null)[] = await redis.client.send("HMGET", [
-        duelKey(redis, duelId),
-        "round",
-        "end",
-      ]);
-      return round !== null && end === null;
+      const duel = await readDuel(redis, duelId);
+      return duel !== null && duel.phase.kind !== "finalised";
     }),
   );
   return unfinished.includes(true);
