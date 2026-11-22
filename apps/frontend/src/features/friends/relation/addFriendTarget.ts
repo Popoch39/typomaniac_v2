@@ -38,23 +38,28 @@ export type AddFriendTarget =
   | { kind: "none" }
   /** The relation is being read: the key's place is kept for it. */
   | { kind: "waiting" }
+  /** The relation could not be read: why, in words for the user, in the key's place. */
+  | { kind: "failed"; failure: string }
   | { kind: "key"; player: { id: string; relation: Relation } };
 
 /**
  * Whether the Player shown under `nickname` gets an Add Friend key: never on oneself, a Guest, or for
- * a viewer who cannot have Friends.
+ * a viewer who cannot have Friends. `failure` is why the relations could not be read, if they could not.
  */
 export function addFriendTarget({
   viewer,
   nickname,
   relations,
+  failure = null,
 }: {
   viewer: Viewer;
   nickname: string | null;
   relations: readonly LookedUpRelation[] | undefined;
+  failure?: string | null;
 }): AddFriendTarget {
   if (!signedInWithNickname(viewer) || !isOther(viewer, nickname)) return { kind: "none" };
-  if (relations === undefined) return { kind: "waiting" };
+  if (relations === undefined)
+    return failure === null ? { kind: "waiting" } : { kind: "failed", failure };
   const found = relations.find((each) => sameNickname(each.nickname, nickname));
   return found === undefined
     ? { kind: "none" }
