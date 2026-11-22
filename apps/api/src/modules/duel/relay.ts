@@ -26,6 +26,7 @@ type Published =
 export const createRelay = (redis: Redis) => {
   const deliveries = new Map<string, Set<Delivery>>();
   const listeners = new Map<string, (raw: string) => void>();
+  const subscriptions = new Map<string, Promise<unknown>>();
   const channel = (duelId: string) => redis.name("duel", duelId, "channel");
 
   const deliver = (duelId: string) => (raw: string) => {
@@ -44,16 +45,18 @@ export const createRelay = (redis: Redis) => {
   };
 
   return {
+    /** Resolves once this instance hears the Duel's channel, so that no message is missed by the socket. */
     join: async (duelId: string, delivery: Delivery) => {
       const local = deliveries.get(duelId);
       if (local) {
         local.add(delivery);
-        return;
+      } else {
+        deliveries.set(duelId, new Set([delivery]));
+        const listener = deliver(duelId);
+        listeners.set(duelId, listener);
+        subscriptions.set(duelId, redis.subscriber.subscribe(channel(duelId), listener));
       }
-      deliveries.set(duelId, new Set([delivery]));
-      const listener = deliver(duelId);
-      listeners.set(duelId, listener);
-      await redis.subscriber.subscribe(channel(duelId), listener);
+      await subscriptions.get(duelId);
     },
     leave: async (duelId: string, delivery: Delivery) => {
       const local = deliveries.get(duelId);
@@ -61,6 +64,7 @@ export const createRelay = (redis: Redis) => {
       deliveries.delete(duelId);
       const listener = listeners.get(duelId);
       listeners.delete(duelId);
+      subscriptions.delete(duelId);
       // Only this relay's listener: another relay on the same connection may still follow the Duel.
       if (listener) await redis.subscriber.unsubscribe(channel(duelId), listener);
     },
