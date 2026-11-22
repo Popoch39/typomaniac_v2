@@ -289,6 +289,35 @@ export const readRelations = async (
   return relations;
 };
 
+/**
+ * The Players the Nicknames name, whatever their case, each with its relation to the requester, in the
+ * order asked. The requester and a Player who may not appear publicly are left out, like a Nickname
+ * nobody holds.
+ */
+export const readRelationsByNickname = async (
+  db: Db,
+  playerId: string,
+  nicknames: readonly string[],
+) => {
+  const lowered = nicknames.map((nickname) => nickname.toLowerCase());
+  const players = await db
+    .select({ id: user.id, nickname: user.nickname })
+    .from(user)
+    .where(and(inArray(sql`lower(${user.nickname})`, lowered), ne(user.id, playerId), isListable));
+  const relations = await readRelations(
+    db,
+    playerId,
+    players.map(({ id }) => id),
+  );
+  return lowered.flatMap((wanted) =>
+    players.flatMap(({ id, nickname }) =>
+      nickname?.toLowerCase() === wanted
+        ? [{ id, nickname, relation: relations.get(id) ?? "none" }]
+        : [],
+    ),
+  );
+};
+
 /** The Players a Nickname prefix finds for the requester, each with its relation to them. */
 export const searchPlayers = async (db: Db, playerId: string, prefix: string) => {
   const players = listed(await searchablePlayers(db, playerId, prefix));

@@ -417,6 +417,76 @@ test("the search reads its Players from an index on the lowercase Nickname, not 
   }
 });
 
+const lookUp = (as: Requester, nicknames: string[], on = app) =>
+  call(
+    "GET",
+    `/api/friends/relations?${nicknames.map((nickname) => `nicknames=${encodeURIComponent(nickname)}`).join("&")}`,
+    as,
+    undefined,
+    on,
+  );
+
+const lookedUp = async (as: Requester, nicknames: string[]) => {
+  const response = await lookUp(as, nicknames);
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { players: Found[] }).players;
+};
+
+test("the relation lookup gives the requester's relation to each Player named, whatever the case of the Nickname", async () => {
+  const requester = await signInNamed();
+  const [friend, asked, asking, stranger] = [
+    await signInNamed(),
+    await signInNamed(),
+    await signInNamed(),
+    await signInNamed(),
+  ];
+  await sendRequest(requester, friend);
+  await accept(friend, requester);
+  await sendRequest(requester, asked);
+  await sendRequest(asking, requester);
+
+  expect(
+    await lookedUp(requester, [
+      stranger.nickname.toUpperCase(),
+      friend.nickname,
+      asked.nickname,
+      asking.nickname,
+    ]),
+  ).toEqual([
+    { id: stranger.id, nickname: stranger.nickname, relation: "none" },
+    { id: friend.id, nickname: friend.nickname, relation: "friend" },
+    { id: asked.id, nickname: asked.nickname, relation: "requestSent" },
+    { id: asking.id, nickname: asking.nickname, relation: "requestReceived" },
+  ]);
+});
+
+test("the relation lookup leaves out the requester, banned Players and Nicknames no Player holds", async () => {
+  const requester = await signInNamed();
+  const banned = await signInNamed();
+  await ban(banned);
+  const kept = await signInNamed();
+
+  expect(
+    idsOf(
+      await lookedUp(requester, [
+        requester.nickname,
+        banned.nickname,
+        "nobody_here",
+        kept.nickname,
+      ]),
+    ),
+  ).toEqual([kept.id]);
+});
+
+test("the relation lookup takes at most as many Nicknames as one read of the Leaderboard lists", async () => {
+  const requester = await signInNamed();
+  const nicknames = Array.from({ length: 21 }, (_, n) => `nobody_${n}`);
+
+  expect((await lookUp(requester, nicknames.slice(0, 20))).status).toBe(200);
+  for (const refused of [nicknames, [], ["a b"]])
+    await expectRefused(await lookUp(requester, refused), 422, "RELATIONS_INVALID");
+});
+
 test("every Friend route answers a Guest with 401 and a Player without a Nickname with 403", async () => {
   const nameless = await signInPlayer(auth);
   const other = { id: crypto.randomUUID() };
@@ -424,6 +494,7 @@ test("every Friend route answers a Guest with 401 and a Player without a Nicknam
     ["GET", "/api/friends"],
     ["GET", "/api/friends/requests"],
     ["GET", "/api/friends/search?nickname=ab"],
+    ["GET", "/api/friends/relations?nicknames=ab"],
     ["POST", "/api/friends/requests", { playerId: other.id }],
     ["POST", `/api/friends/requests/${other.id}/accept`],
     ["POST", `/api/friends/requests/${other.id}/decline`],
@@ -467,9 +538,14 @@ test("the Friend reads and the answers to requests are rate-limited per Player",
   await sendRequest(bob, reader);
 
   const reads = [];
-  for (const path of ["/api/friends", "/api/friends/requests", "/api/friends/search?nickname=ab"])
+  for (const path of [
+    "/api/friends",
+    "/api/friends/requests",
+    "/api/friends/search?nickname=ab",
+    "/api/friends/relations?nicknames=ab",
+  ])
     reads.push((await call("GET", path, reader, undefined, limited)).status);
-  expect(reads).toEqual([200, 200, 200]);
+  expect(reads).toEqual([200, 200, 200, 429]);
   await expectRefused(
     await call("GET", "/api/friends", reader, undefined, limited),
     429,
