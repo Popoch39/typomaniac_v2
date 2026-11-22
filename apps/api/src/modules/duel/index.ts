@@ -23,6 +23,7 @@ import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
 import type { RateLimiter } from "../rate-limit/index.ts";
 import { readWornOrnaments } from "../ornament/service.ts";
+import { isAnnounced, startOf } from "./lifecycle.ts";
 import * as DuelModel from "./model.ts";
 import { createRelay } from "./relay.ts";
 import {
@@ -228,7 +229,8 @@ export const createDuelRoutes = (
               ...personOf(ws),
             });
             const round = duel.round.number;
-            const { words, startAt, announced, anchorAts } = duel.round;
+            const { words, phase } = duel.round;
+            const startAt = startOf(phase);
             const rounds = finishedRounds(await readRounds(redis, ws.params.id, round));
             const journals = await readJournals(redis, ws.params.id, round);
             const lateStart = await startLateGame(redis, ws.params.id, round, self.seat, {
@@ -264,7 +266,11 @@ export const createDuelRoutes = (
               evict: () => ws.close(),
             };
             // A Game this opening started is anchored at the Start, as `startLateGame` keeps it.
-            const anchorAt = lateStart ? startAt : (anchorAts[self.seat] ?? null);
+            const anchorAt = lateStart
+              ? startAt
+              : phase.kind === "running"
+                ? (phase.anchors[self.seat] ?? null)
+                : null;
             const entry: Seating = {
               participant: self,
               round,
@@ -300,7 +306,7 @@ export const createDuelRoutes = (
               rounds,
               startAt,
               // Held back until the Countdown, which brings them to both Participants at once.
-              words: announced ? words : null,
+              words: isAnnounced(phase) ? words : null,
               participants: duel.participants,
               ranks: duel.ranks,
               journals,
@@ -314,7 +320,7 @@ export const createDuelRoutes = (
             if (closed()) return abandon();
             // A Round that has ended has no Countdown left to be told of.
             const start =
-              duel.round.end === null
+              phase.kind !== "ended"
                 ? await announceStart(redis, ws.params.id, round, {
                     startAt: Date.now() + countdownMs,
                     expiryMs,
@@ -332,7 +338,7 @@ export const createDuelRoutes = (
               if (start.announced) await relay.publish(ws.params.id, self.seat, countdown);
             }
             if (closed()) return abandon();
-            if (duel.end) send(duel.end);
+            if (duel.phase.kind === "finalised") send(duel.phase.end);
           } finally {
             opening.delete(ws.id);
           }
