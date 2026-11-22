@@ -1,11 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext } from "@tanstack/react-router";
-import { AppRoot } from "../features/shell/components/AppRoot.tsx";
+import { RootLayout } from "../shared/components/RootLayout.tsx";
 
 interface RouterContext {
   queryClient: QueryClient;
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  component: AppRoot,
+  component: RootLayout,
 });

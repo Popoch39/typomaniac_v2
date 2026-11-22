@@ -26,6 +26,8 @@ export const RATE_LIMITS = {
   duelSocket: { max: 20, windowSeconds: 60 },
   /** Upgrades to the Queue socket, per Player. */
   queueSocket: { max: 20, windowSeconds: 60 },
+  /** Upgrades to the Player socket, per Player: one per tab, and each tab reconnects after a drop. */
+  playerSocket: { max: 30, windowSeconds: 60 },
   /** Reports made, per Player: one per Duel already, this stops a Player spamming them across Duels. */
   report: { max: 10, windowSeconds: 60 },
   /** Friend requests sent, per Player, so that nobody floods others with them. */
