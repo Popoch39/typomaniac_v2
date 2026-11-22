@@ -7,6 +7,10 @@ export type FriendState = "online" | "inDuel" | "offline";
 export type ChallengeRefusal =
   | "NOT_FRIENDS"
   | "FRIEND_OFFLINE"
+  /** The Friend is In a Duel, or their Pairing awaits acceptance. */
+  | "FRIEND_BUSY"
+  /** The challenger is In a Duel. */
+  | "IN_DUEL"
   | "CHALLENGE_PENDING"
   | "RATE_LIMITED";
 
@@ -74,6 +78,8 @@ const FRIEND_STATES: readonly unknown[] = ["online", "inDuel", "offline"] satisf
 const CHALLENGE_REFUSALS: readonly unknown[] = [
   "NOT_FRIENDS",
   "FRIEND_OFFLINE",
+  "FRIEND_BUSY",
+  "IN_DUEL",
   "CHALLENGE_PENDING",
   "RATE_LIMITED",
 ] satisfies ChallengeRefusal[];
