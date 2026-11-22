@@ -12,6 +12,7 @@ import type { Rank } from "@repo/ranked-engine";
 import { applyEvent, createGame, type Game, type GameEvent } from "@repo/typing-engine";
 import { create } from "zustand";
 import { queryClient } from "../../../shared/api/queryClient.ts";
+import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { useOpponentCaretStore } from "../../../shared/store/useOpponentCaretStore.ts";
 import { eventTime, shiftEventTime } from "../../game/clock/eventTime.ts";
 import { useBrowserHintsStore } from "../../game/store/useBrowserHintsStore.ts";
@@ -270,19 +271,24 @@ export const useDuelStore = create<DuelState>()((set, get) => {
 
   const reconnect = () => {
     // The server closes nothing a finished Duel still needs.
-    if (get().phase === "finished") return false;
+    if (get().phase === "finished") return closeDuelSocket();
     stopFollowingSocket();
     // Keys typed now would never reach the server, which rebuilds the Game from its journal on
     // resume; buffering them would move them up to their receipt bound (ADR 0009).
     useGameStore.getState().freeze();
     set({ isReconnecting: true });
-    return true;
   };
 
   const disconnect = (closeReason: string) => {
     if (get().phase === "finished") return;
     stopFollowingSocket();
     set({ phase: "disconnected", closeReason, isReconnecting: false });
+  };
+
+  const followLink = (link: SocketLink) => {
+    if (link.kind === "refused") set({ phase: "refused", refusal: link.refusal });
+    else if (link.kind === "backoff") reconnect();
+    else if (link.kind === "down") disconnect(link.reason);
   };
 
   const leave = () => {
@@ -300,12 +306,7 @@ export const useDuelStore = create<DuelState>()((set, get) => {
   const join = (duelId: string) => {
     leave();
     set({ duelId });
-    openDuelSocket(duelId, {
-      receive,
-      refuse: (refusal) => set({ phase: "refused", refusal }),
-      reconnect,
-      disconnect,
-    });
+    openDuelSocket(duelId, { receive, link: followLink });
   };
 
   return {

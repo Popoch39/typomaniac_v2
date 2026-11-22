@@ -54,12 +54,12 @@ async function openSocket() {
       greet();
     },
     findRefusal: () => Promise.resolve("refused"),
-    refuse: () => undefined,
-    reconnect: () => {
+    // Counts the reopenings the socket would make, and makes none.
+    link: (link) => {
+      if (link.kind !== "backoff") return;
       reconnects += 1;
-      return false;
+      socket.close();
     },
-    disconnect: () => undefined,
   });
   await greeted;
   return { send: (message: object) => socket.send(JSON.stringify(message)), drop: socket.drop };

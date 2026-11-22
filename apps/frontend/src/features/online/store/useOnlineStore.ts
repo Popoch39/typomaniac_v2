@@ -25,14 +25,12 @@ export const useOnlineStore = create<OnlineState>()((set, get) => ({
     if (playerId === null) return;
     openPlayerSocket(socketUrl, {
       receive: ({ count }) => set({ count, isDown: false }),
-      refuse: () => set({ count: null }),
-      reconnect: (attempt) => {
-        if (get().playerId !== playerId) return false;
+      link: (link) => {
+        if (link.kind === "refused") set({ count: null });
         // The count stays shown through the first reopening, so that a server restart does not blank it.
-        if (attempt > 1) set({ isDown: true });
-        return true;
+        else if (link.kind === "backoff" && link.attempt > 1) set({ isDown: true });
+        else if (link.kind === "down") set({ count: null, isDown: false });
       },
-      disconnect: () => set({ count: null, isDown: false }),
     });
   },
   retry: () => retryPlayerSocket(),

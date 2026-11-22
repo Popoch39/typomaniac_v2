@@ -2,21 +2,18 @@ import type { QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-e
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket.ts";
+import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { queueQueryOptions } from "../api/queueQueryOptions.ts";
 import { accountAgeRefusalOf } from "../refusal/accountAgeRefusalOf.ts";
 import { parseQueueMessage } from "../message/parseQueueMessage.ts";
 
 type QueueSocketHandlers = {
   readonly receive: (message: QueueServerMessage) => void;
-  /** Told, in words for the user, why this Player could not enter the Queue. */
-  readonly refuse: (refusal: string) => void;
   /**
-   * The socket dropped and is about to be reopened, unless this answers `false` because the
-   * Player no longer needs it.
+   * Told each move of the link: a refusal says, in words for the user, why this Player could not
+   * enter the Queue. The Player closes the socket as it backs off once they no longer need it.
    */
-  readonly reconnect: () => boolean;
-  /** The socket closed after the Player was queued, and is not reopened. */
-  readonly disconnect: () => void;
+  readonly link: (link: SocketLink) => void;
 };
 
 const REFUSALS = {
@@ -57,8 +54,9 @@ export function openQueueSocket({ receive, ...handlers }: QueueSocketHandlers) {
   });
 }
 
+/** Whether `message` was sent: nothing is sent while the link is not open. */
 export function sendToQueue(message: QueueClientMessage) {
-  socket.send(JSON.stringify(message));
+  return socket.send(JSON.stringify(message));
 }
 
 export function closeQueueSocket() {
