@@ -171,6 +171,21 @@ test("closing the socket takes the Player out of the Queue", async () => {
   expect(await hasLeft(cookie)).toBe(true);
 });
 
+// Each socket is closed by the client as soon as it opens, while the server is still awaiting Redis
+// in its open. The close only sometimes lands there, so several Players race it, each on their own.
+test("Players whose socket closes while it is still opening are not left in the Queue", async () => {
+  const closeOnOpen = async () => {
+    const { cookie } = await signInPlayerWithNickname(auth, origin);
+    const socket = new WebSocket(queueSocketUrl(), { headers: { cookie } });
+    socket.addEventListener("open", () => socket.close(), { once: true });
+    await new Promise((resolve) => socket.addEventListener("close", resolve, { once: true }));
+    return cookie;
+  };
+  const cookies = await Promise.all(Array.from({ length: 5 }, closeOnOpen));
+
+  for (const cookie of cookies) expect(await hasLeft(cookie)).toBe(true);
+});
+
 test("a Player enters the Queue with the MMR of their Standing", async () => {
   const { player, cookie } = await signInPlayerWithNickname(auth, origin);
   await saveStanding(testDb.db, player.id, {

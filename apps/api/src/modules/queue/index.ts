@@ -12,6 +12,7 @@ import { readCurrentSuspension } from "../fair-play/service.ts";
 import { mayReconnect } from "../lifecycle/closeCode.ts";
 import { logSocketFailure } from "../http/index.ts";
 import type { Lifecycle } from "../lifecycle/service.ts";
+import { createSocketPhases } from "../lifecycle/socketPhase.ts";
 import { readStanding } from "../standing/service.ts";
 import { createEvictions } from "./eviction.ts";
 import * as QueueModel from "./model.ts";
@@ -67,6 +68,7 @@ export const createQueueRoutes = (
   };
   // The Queue presence of each open socket, set on open and read on close.
   const present = new Map<string, Presence>();
+  const phases = createSocketPhases();
 
   // One ranked Duel at a time: the Player is sent back to the one they are in.
   const refuseWhileInRankedDuel = async (playerId: string) => {
@@ -119,36 +121,52 @@ export const createQueueRoutes = (
         },
         async open(ws) {
           if (!lifecycle.hold(ws.id, ws)) return;
-          const send = (message: QueueServerMessage) => ws.send(message);
-          const presence: Presence = {
-            playerId: ws.player.id,
-            connection: crypto.randomUUID(),
-            evict: () => {
-              send({ type: "removed", reason: "replaced" });
-              ws.close();
-            },
-            send,
-            close: () => ws.close(),
-          };
-          present.set(ws.id, presence);
-          logger.info("Player {playerId} opened a Queue socket", { playerId: presence.playerId });
-          refreshes.hold(presence);
-          await Promise.all([evictions.hold(presence), pairings.follow(presence)]);
-          const { mmr } = await readStanding(db, presence.playerId);
-          const queuedAt = await enterQueue(redis, presence, {
-            mmr,
-            now: Date.now(),
-            expiryMs: entryExpiryMs,
-          });
-          // Closed while entering: its close found nothing to remove yet.
-          if (!present.has(ws.id)) return leaveQueue(redis, presence);
-          // A second tab or a reconnection: the socket that held the place until now is evicted.
-          await evictions.takeOver(presence);
-          // A reconnection during a Pairing: the Player must still be able to accept it, or to see
-          // that they already did, instead of being shown a waiting Queue.
-          const pairingId = await readEntryPairingId(redis, presence.playerId);
-          if (pairingId === null) send({ type: "queued", queuedAt, serverAt: Date.now() });
-          else pairings.repropose(presence, pairingId);
+          phases.open(ws.id);
+          try {
+            const send = (message: QueueServerMessage) => ws.send(message);
+            const presence: Presence = {
+              playerId: ws.player.id,
+              connection: crypto.randomUUID(),
+              evict: () => {
+                send({ type: "removed", reason: "replaced" });
+                ws.close();
+              },
+              send,
+              close: () => ws.close(),
+            };
+            present.set(ws.id, presence);
+            logger.info("Player {playerId} opened a Queue socket", { playerId: presence.playerId });
+            // Closed while opening: what the open took is let go of here, its close having left it.
+            const closed = () => !phases.isOpening(ws.id);
+            const abandon = async () => {
+              present.delete(ws.id);
+              refreshes.release(presence);
+              await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
+              await leaveQueue(redis, presence);
+            };
+            refreshes.hold(presence);
+            await Promise.all([evictions.hold(presence), pairings.follow(presence)]);
+            if (closed()) return await abandon();
+            const { mmr } = await readStanding(db, presence.playerId);
+            if (closed()) return await abandon();
+            const queuedAt = await enterQueue(redis, presence, {
+              mmr,
+              now: Date.now(),
+              expiryMs: entryExpiryMs,
+            });
+            if (closed()) return await abandon();
+            // A second tab or a reconnection: the socket that held the place until now is evicted.
+            await evictions.takeOver(presence);
+            if (closed()) return await abandon();
+            // A reconnection during a Pairing: the Player must still be able to accept it, or to see
+            // that they already did, instead of being shown a waiting Queue.
+            const pairingId = await readEntryPairingId(redis, presence.playerId);
+            if (closed()) return await abandon();
+            if (pairingId === null) send({ type: "queued", queuedAt, serverAt: Date.now() });
+            else pairings.repropose(presence, pairingId);
+          } finally {
+            phases.advance(ws.id, { kind: "opened" });
+          }
         },
         async message(ws, { pairingId }) {
           await acceptPairingAsPlayer(
@@ -164,15 +182,20 @@ export const createQueueRoutes = (
             playerId: ws.player.id,
             code,
           });
-          const presence = present.get(ws.id);
-          if (!presence) return;
-          present.delete(ws.id);
-          refreshes.release(presence);
-          await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
-          // A drop or a restart is followed by a reconnection, which reclaims the entry with its
-          // instant of entry and its Pairing: it is kept for a full expiry, then expires unclaimed.
-          if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
-          else await leaveQueue(redis, presence);
+          if (phases.advance(ws.id, { kind: "close" }) !== "release") return;
+          try {
+            const presence = present.get(ws.id);
+            if (!presence) return;
+            present.delete(ws.id);
+            refreshes.release(presence);
+            await Promise.all([evictions.release(presence), pairings.unfollow(presence)]);
+            // A drop or a restart is followed by a reconnection, which reclaims the entry with its
+            // instant of entry and its Pairing: it is kept for a full expiry, then expires unclaimed.
+            if (mayReconnect(code)) await refreshQueueEntry(redis, presence, entryExpiryMs);
+            else await leaveQueue(redis, presence);
+          } finally {
+            phases.advance(ws.id, { kind: "released" });
+          }
         },
         error: logSocketFailure(logger, "Queue socket failed"),
       })
