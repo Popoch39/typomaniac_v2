@@ -108,6 +108,20 @@ export const RelationsGet = {
   },
 };
 
+// The Players of the Leaderboard page the requester reads, found by the server: the page after the
+// Podium and, when the requester is off it, the Players around them, as the page's table lists them.
+export const RelationsLeaderboardGet = {
+  Query: t.Object({
+    // 1 when left out; a page past the last one is that of the last page, as the Leaderboard serves it.
+    page: t.Optional(t.Integer({ minimum: 1 })),
+  }),
+  Response: {
+    // In the order of the table, without the requester and banned Players.
+    200: RelationsGet.Response[200],
+    429: RateLimited,
+  },
+};
+
 export const RequestsGet = {
   Response: {
     200: t.Object({

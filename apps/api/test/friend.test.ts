@@ -487,6 +487,43 @@ test("the relation lookup takes at most as many Nicknames as one read of the Lea
     await expectRefused(await lookUp(requester, refused), 422, "RELATIONS_INVALID");
 });
 
+test("the Leaderboard relation lookup gives the reader's relation to each Player of the page they read, as the page lists them", async () => {
+  const master = (lp: number) =>
+    ({ mmr: 3000, duelsPlayed: 100, rank: { tier: "master", lp } }) as const;
+  const podium = [await signInNamed(), await signInNamed(), await signInNamed()];
+  for (const each of podium) await saveStanding(testDb.db, each.id, master(9000));
+  const [reader, friend, stranger] = [
+    await signInNamed(),
+    await signInNamed(),
+    await signInNamed(),
+  ];
+  for (const each of [reader, friend, stranger])
+    await saveStanding(testDb.db, each.id, master(8000));
+  await sendRequest(reader, friend);
+  await sendRequest(friend, reader);
+  const page = (await (await call("GET", "/api/leaderboard?page=1", reader)).json()) as {
+    players: { nickname: string | null }[];
+  };
+
+  const response = await call("GET", "/api/friends/relations/leaderboard?page=1", reader);
+
+  expect(response.status).toBe(200);
+  const { players } = (await response.json()) as {
+    players: { id: string; nickname: string; relation: string }[];
+  };
+  expect(players.map(({ nickname }) => nickname)).toEqual(
+    page.players.flatMap(({ nickname }) =>
+      nickname === null || nickname === reader.nickname ? [] : [nickname],
+    ),
+  );
+  expect(players).toContainEqual({ id: friend.id, nickname: friend.nickname, relation: "friend" });
+  expect(players).toContainEqual({
+    id: stranger.id,
+    nickname: stranger.nickname,
+    relation: "none",
+  });
+});
+
 test("every Friend route answers a Guest with 401 and a Player without a Nickname with 403", async () => {
   const nameless = await signInPlayer(auth);
   const other = { id: crypto.randomUUID() };
@@ -495,6 +532,7 @@ test("every Friend route answers a Guest with 401 and a Player without a Nicknam
     ["GET", "/api/friends/requests"],
     ["GET", "/api/friends/search?nickname=ab"],
     ["GET", "/api/friends/relations?nicknames=ab"],
+    ["GET", "/api/friends/relations/leaderboard?page=1"],
     ["POST", "/api/friends/requests", { playerId: other.id }],
     ["POST", `/api/friends/requests/${other.id}/accept`],
     ["POST", `/api/friends/requests/${other.id}/decline`],
