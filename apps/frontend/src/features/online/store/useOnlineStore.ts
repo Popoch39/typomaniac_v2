@@ -1,7 +1,11 @@
 import { create } from "zustand";
+import { useChallengeStore } from "../../challenge/store/useChallengeStore.ts";
+import { refreshFriendReads } from "../../friends/api/friendsQueryOptions.ts";
+import { useFriendStateStore } from "../../friends/store/useFriendStateStore.ts";
 import {
   GUEST_PRESENCE,
   type OnlinePresence,
+  type OnlinePresenceEffect,
   type OnlinePresenceEvent,
   nextOnlinePresence,
   onlineCountOf,
@@ -26,15 +30,34 @@ export const useOnlineStore = create<OnlineState>()((set, get) => {
   const dispatch = (event: OnlinePresenceEvent) => {
     const { presence, effects } = nextOnlinePresence(get().presence, event);
     set({ presence, count: onlineCountOf(presence), isDown: presence.kind === "down" });
-    for (const effect of effects) {
-      if (effect.kind === "close") {
-        closePlayerSocket();
-        continue;
-      }
-      openPlayerSocket(effect.url, {
-        receive: ({ count }) => dispatch({ kind: "count", count }),
-        link: (link) => dispatch({ kind: "link", link }),
-      });
+    for (const effect of effects) perform(effect);
+  };
+
+  const perform = (effect: OnlinePresenceEffect) => {
+    switch (effect.kind) {
+      case "close":
+        return closePlayerSocket();
+      case "open":
+        return openPlayerSocket(effect.url, {
+          receive: (message) => dispatch({ kind: "receive", message }),
+          link: (link) => dispatch({ kind: "link", link }),
+        });
+      case "relay":
+        useFriendStateStore.getState().receive(effect.message);
+        useChallengeStore.getState().receive(effect.message);
+        return;
+      case "refreshFriendReads":
+        return void refreshFriendReads();
+      case "forget":
+        useFriendStateStore.getState().reset();
+        useChallengeStore.getState().reset();
+        return;
+      case "giveUp":
+        useFriendStateStore.getState().giveUp();
+        useChallengeStore.getState().reset();
+        return;
+      case "dropChallenges":
+        return useChallengeStore.getState().drop();
     }
   };
 

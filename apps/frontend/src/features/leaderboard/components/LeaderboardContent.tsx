@@ -8,7 +8,7 @@ import { LeaderboardSkeleton } from "./LeaderboardSkeleton.tsx";
 // Until the reader is known to be a Guest, the skeleton reserves the box of "Your position", so that a
 // signed-in reader's Panel never pushes the list down when it arrives.
 export function LeaderboardContent() {
-  const { gate, isGuest, replacingPage } = useLeaderboard();
+  const { gate, addFriendOf, isGuest, replacingPage } = useLeaderboard();
 
   return (
     <ReadGate
@@ -28,7 +28,7 @@ export function LeaderboardContent() {
             {replacingPage !== null && (
               <Navigate to="/leaderboard" search={{ page: replacingPage }} replace />
             )}
-            <LeaderboardSections leaderboard={leaderboard} />
+            <LeaderboardSections leaderboard={leaderboard} addFriendOf={addFriendOf} />
           </>
         )
       }

@@ -8,7 +8,7 @@ import {
   standing,
   user,
 } from "../../db/client.ts";
-import { rankFromStored } from "../standing/service.ts";
+import { rankFromStored, readLeaderboard } from "../standing/service.ts";
 
 const listedColumns = {
   id: user.id,
@@ -42,6 +42,10 @@ const listed = (rows: ListedRow[]) =>
 // A Player who never played ranked has no Standing row and is Unranked.
 const selectListed = (db: Db) =>
   db.select(listedColumns).from(user).leftJoin(standing, eq(standing.playerId, user.id));
+
+/** The Player as a Friend sees them, `null` when they may not appear publicly. */
+export const readListedPlayer = async (db: Db, playerId: string) =>
+  listed(await selectListed(db).where(and(eq(user.id, playerId), isListable)))[0] ?? null;
 
 /** The Player's received and sent Friend requests, newest first, with the other Player of each. */
 export const readFriendRequests = async (db: Db, playerId: string) => {
@@ -116,6 +120,15 @@ const countPendingSent = async (tx: Transaction, playerId: string) => {
     .where(eq(friendRequest.senderId, playerId));
   return row?.pending ?? 0;
 };
+
+/** The ids of the Player's Friends, whether or not they may appear publicly. */
+export const readFriendIds = async (db: Db, playerId: string) =>
+  (
+    await db
+      .select({ lower: friendship.lowerPlayerId, higher: friendship.higherPlayerId })
+      .from(friendship)
+      .where(or(eq(friendship.lowerPlayerId, playerId), eq(friendship.higherPlayerId, playerId)))
+  ).map(({ lower, higher }) => (lower === playerId ? higher : lower));
 
 /** The Player's Friends, by Nickname. */
 export const readFriends = async (db: Db, playerId: string) =>
@@ -287,6 +300,47 @@ export const readRelations = async (
   for (const { lower, higher } of friends)
     relations.set(lower === playerId ? higher : lower, "friend");
   return relations;
+};
+
+/**
+ * The Players the Nicknames name, whatever their case, each with its relation to the requester, in the
+ * order asked. The requester and a Player who may not appear publicly are left out, like a Nickname
+ * nobody holds.
+ */
+export const readRelationsByNickname = async (
+  db: Db,
+  playerId: string,
+  nicknames: readonly string[],
+) => {
+  const lowered = nicknames.map((nickname) => nickname.toLowerCase());
+  const players = await db
+    .select({ id: user.id, nickname: user.nickname })
+    .from(user)
+    .where(and(inArray(sql`lower(${user.nickname})`, lowered), ne(user.id, playerId), isListable));
+  const relations = await readRelations(
+    db,
+    playerId,
+    players.map(({ id }) => id),
+  );
+  return lowered.flatMap((wanted) =>
+    players.flatMap(({ id, nickname }) =>
+      nickname?.toLowerCase() === wanted
+        ? [{ id, nickname, relation: relations.get(id) ?? "none" }]
+        : [],
+    ),
+  );
+};
+
+/**
+ * The requester's relation to each Player of the Leaderboard page they read: the page after the
+ * Podium and, when they are off it, the Players around them, in the order of the table.
+ */
+export const readLeaderboardRelations = async (db: Db, playerId: string, page: number) => {
+  const { players, around } = await readLeaderboard(db, playerId, page);
+  const nicknames = [...players, ...(around ?? [])].flatMap(({ nickname }) =>
+    nickname === null ? [] : [nickname],
+  );
+  return nicknames.length === 0 ? [] : readRelationsByNickname(db, playerId, nicknames);
 };
 
 /** The Players a Nickname prefix finds for the requester, each with its relation to them. */

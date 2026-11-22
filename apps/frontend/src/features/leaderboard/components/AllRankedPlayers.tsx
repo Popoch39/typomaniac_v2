@@ -1,3 +1,4 @@
+import type { AddFriendTarget } from "../../friends/relation/addFriendTarget.ts";
 import type { Leaderboard } from "../hooks/useLeaderboard.ts";
 import { rankedCount } from "../page/rankedCount.ts";
 import { LeaderboardPagination } from "./LeaderboardPagination.tsx";
@@ -6,10 +7,11 @@ import { SectionHeader } from "./SectionHeader.tsx";
 
 interface AllRankedPlayersProps {
   leaderboard: Leaderboard;
+  addFriendOf: (nickname: string | null) => AddFriendTarget;
 }
 
 // While the Podium holds every ranked Player, there is no table to page through.
-export function AllRankedPlayers({ leaderboard }: AllRankedPlayersProps) {
+export function AllRankedPlayers({ leaderboard, addFriendOf }: AllRankedPlayersProps) {
   const count = rankedCount(leaderboard.total);
 
   return (
@@ -21,6 +23,7 @@ export function AllRankedPlayers({ leaderboard }: AllRankedPlayersProps) {
             players={leaderboard.players}
             own={leaderboard.own}
             around={leaderboard.around}
+            addFriendOf={addFriendOf}
           />
           <LeaderboardPagination leaderboard={leaderboard} />
         </>

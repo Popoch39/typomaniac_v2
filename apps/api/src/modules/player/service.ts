@@ -1,6 +1,6 @@
 import { wornOrnament } from "@repo/ranked-engine";
 import { SQL } from "bun";
-import { and, DrizzleQueryError, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, DrizzleQueryError, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { type Db, nicknameUniqueIndex, standing, user } from "../../db/client.ts";
 import { readPeakTier } from "../ornament/service.ts";
 import { rankFromStored } from "../standing/service.ts";
@@ -61,6 +61,16 @@ export const readPublicPlayers = async (db: Db, playerIds: readonly string[]) =>
       nickname === null ? [] : [[id, { nickname, avatarUrl }] as const],
     ),
   );
+};
+
+/** Those of the Players who are banned. */
+export const readBannedPlayerIds = async (db: Db, playerIds: readonly string[]) => {
+  if (playerIds.length === 0) return new Set<string>();
+  const banned = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(and(inArray(user.id, [...playerIds]), isNotNull(user.bannedAt)));
+  return new Set(banned.map(({ id }) => id));
 };
 
 // Matched as the unique index on lower(nickname) holds Nicknames, so that the index serves it. A Ban

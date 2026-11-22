@@ -159,6 +159,43 @@ for seat = 0, 1 do
 end
 `;
 
+/**
+ * The Duels a Player holds a seat in, ranked or Custom, each a field, from the claim until the Duel
+ * is finalised or forgotten: what tells whether a Player is In a Duel.
+ */
+const playerDuelsKey = (redis: Redis, playerId: string) => redis.name("player", playerId, "duels");
+
+/**
+ * The Players seated in a Duel, each a field. It outlives the Duel, so that the sweep forgetting a
+ * Duel that expired unfinished still knows whom to take out of it.
+ */
+const seatedKey = (redis: Redis, duelId: string) => redis.name("duel", duelId, "seated");
+
+/** Where the Players whose Duel began or ended are announced, as a JSON array of their ids. */
+export const duelPlayersChannel = (redis: Redis) => redis.name("duel", "players");
+
+/** Announces that these Players were seated in a Duel, or that their Duel ended. */
+export const announceDuelPlayers = async (redis: Redis, playerIds: readonly string[]) => {
+  if (playerIds.length > 0)
+    await redis.client.publish(duelPlayersChannel(redis), JSON.stringify(playerIds));
+};
+
+/** Whether the Player holds a seat in a Duel, ranked or Custom, that has not ended. */
+export const isInUnfinishedDuel = async (redis: Redis, playerId: string) => {
+  const duelIds: string[] = await redis.client.send("HKEYS", [playerDuelsKey(redis, playerId)]);
+  const unfinished = await Promise.all(
+    duelIds.map(async (duelId) => {
+      const [round, end]: (string | null)[] = await redis.client.send("HMGET", [
+        duelKey(redis, duelId),
+        "round",
+        "end",
+      ]);
+      return round !== null && end === null;
+    }),
+  );
+  return unfinished.includes(true);
+};
+
 // One script, so the expiry is set with the Duel and its first Round: neither can outlive it. The
 // Duel is due once it has expired, when the sweep forgets it.
 const CREATE = `
@@ -218,6 +255,14 @@ export const draftRankedDuel = (
       fields: { words: JSON.stringify(drawWords(DUEL_WORD_COUNT, Math.random)) },
     },
     ...players.map(({ playerId }) => ({ key: rankedDuelKey(redis, playerId), fields: { duelId } })),
+    ...players.map(({ playerId }) => ({
+      key: playerDuelsKey(redis, playerId),
+      fields: { [duelId]: "1" },
+    })),
+    {
+      key: seatedKey(redis, duelId),
+      fields: Object.fromEntries(players.map(({ playerId }) => [playerId, "1"])),
+    },
   ];
   // Due once its Players had the time to connect: the sweep then announces the Countdown of its first
   // Round, whoever is there.
@@ -226,7 +271,9 @@ export const draftRankedDuel = (
 
 // Atomic, so two identities opening the same Duel at once never get the same seat. An identity
 // that holds a seat gets it back rather than the other one, even while it still looks connected
-// there: its old socket may sit on a crashed instance, or be half-open, and never be closed.
+// there: its old socket may sit on a crashed instance, or be half-open, and never be closed. A
+// Player's seat is recorded against them and the Duel for twice the Duel's time to live: a Duel that
+// moves on extends its own, and the sweep forgets the Duel only once it has expired.
 const CLAIM = `
 if redis.call('EXISTS', KEYS[1]) == 0 then return 'unknown' end
 for seat = 0, 1 do
@@ -238,10 +285,17 @@ end
 for seat = 0, 1 do
   if redis.call('HEXISTS', KEYS[1], 'holder' .. seat) == 0 then
     redis.call('HSET', KEYS[1], 'holder' .. seat, ARGV[1], 'name' .. seat, ARGV[2], 'connected' .. seat, '1')
-    if ARGV[3] ~= '' then redis.call('HSET', KEYS[1], 'player' .. seat, ARGV[3]) end
+    if ARGV[3] ~= '' then
+      redis.call('HSET', KEYS[1], 'player' .. seat, ARGV[3])
+      local keep = 2 * redis.call('PTTL', KEYS[1])
+      redis.call('HSET', KEYS[2], ARGV[3], '1')
+      redis.call('PEXPIRE', KEYS[2], keep)
+      redis.call('HSET', KEYS[3], ARGV[6], '1')
+      if redis.call('PTTL', KEYS[3]) < keep then redis.call('PEXPIRE', KEYS[3], keep) end
+    end
     if ARGV[4] ~= '' then redis.call('HSET', KEYS[1], 'avatar' .. seat, ARGV[4]) end
     redis.call('HSET', KEYS[1], 'ornament' .. seat, ARGV[5])
-    return tostring(seat)
+    return 'new' .. seat
   end
 end
 return 'full'
@@ -251,19 +305,23 @@ export const claimSeat = async (
   redis: Redis,
   duelId: string,
   identity: Identity,
-): Promise<Seat | "unknown" | "full"> => {
+): Promise<{ readonly seat: Seat; readonly isNew: boolean } | "unknown" | "full"> => {
   const claimed: string = await redis.client.eval(
     CLAIM,
-    1,
+    3,
     duelKey(redis, duelId),
+    seatedKey(redis, duelId),
+    // Never written for a Guest, who is never In a Duel for any Friend.
+    playerDuelsKey(redis, identity.playerId ?? identity.id),
     identity.id,
     identity.name,
     identity.playerId ?? "",
     identity.avatarUrl ?? "",
     JSON.stringify(identity.ornament),
+    duelId,
   );
-  if (claimed === "0") return 0;
-  if (claimed === "1") return 1;
+  if (claimed === "0" || claimed === "new0") return { seat: 0, isNew: claimed === "new0" };
+  if (claimed === "1" || claimed === "new1") return { seat: 1, isNew: claimed === "new1" };
   if (claimed === "unknown" || claimed === "full") return claimed;
   throw new Error(`Unexpected seat claim answer: ${claimed}`);
 };
@@ -347,7 +405,9 @@ export const readDuel = async (redis: Redis, duelId: string): Promise<Duel | nul
     const avatarUrl = fields[`avatar${seat}`] ?? null;
     const ornament = JSON.parse(fields[`ornament${seat}`] ?? "null") as Ornament;
     const connected = fields[`connected${seat}`] === "1";
-    return [{ seat, name, avatarUrl, ornament, connected }];
+    // A seat holds a Player id only when a Player sits on it.
+    const guest = fields[`player${seat}`] === undefined;
+    return [{ seat, name, avatarUrl, ornament, guest, connected }];
   });
   const holderIds = SEATS.map((seat) => fields[`holder${seat}`]);
   const playerIds = SEATS.map((seat) => fields[`player${seat}`] ?? null);
@@ -622,8 +682,10 @@ return 0
 const RECORD_END = `
 if redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'end', ARGV[1]) end
 redis.call('ZREM', KEYS[2], ARGV[2])
-for player = 3, #KEYS do
+redis.call('DEL', KEYS[3])
+for player = 4, #KEYS, 2 do
   if redis.call('HGET', KEYS[player], 'duelId') == ARGV[2] then redis.call('DEL', KEYS[player]) end
+  redis.call('HDEL', KEYS[player + 1], ARGV[2])
 end
 `;
 
@@ -640,10 +702,14 @@ export const recordEnd = async (
   const players = playerIds.filter((playerId) => playerId !== null);
   await redis.client.eval(
     RECORD_END,
-    2 + players.length,
+    3 + players.length * 2,
     duelKey(redis, duelId),
     dueKey(redis),
-    ...players.map((playerId) => rankedDuelKey(redis, playerId)),
+    seatedKey(redis, duelId),
+    ...players.flatMap((playerId) => [
+      rankedDuelKey(redis, playerId),
+      playerDuelsKey(redis, playerId),
+    ]),
     JSON.stringify(end),
     duelId,
   );
@@ -881,6 +947,10 @@ const finaliseDuel = async (
     } as const;
     await recordEnd(redis, duelId, end, playerIds);
     await relay.publish(duelId, null, end);
+    await announceDuelPlayers(
+      redis,
+      playerIds.filter((playerId) => playerId !== null),
+    );
   } catch (error) {
     await releaseFinalisation(redis, duelId);
     throw error;
@@ -1010,6 +1080,20 @@ const closeOverdueGames = async (
   await endRound(db, redis, relay, duelId, round, delays, now);
 };
 
+/**
+ * Stops sweeping a Duel that expired or was finalised, and takes the Players it seated out of it:
+ * the Players of a Duel that expired unfinished learn here that they are no longer In a Duel.
+ */
+const forgetDuel = async (redis: Redis, duelId: string) => {
+  const playerIds: string[] = await redis.client.send("HKEYS", [seatedKey(redis, duelId)]);
+  await Promise.all(
+    playerIds.map((playerId) => redis.client.hdel(playerDuelsKey(redis, playerId), duelId)),
+  );
+  await redis.client.del(seatedKey(redis, duelId));
+  await redis.client.send("ZREM", [dueKey(redis), duelId]);
+  await announceDuelPlayers(redis, playerIds);
+};
+
 /** How often an instance sweeps the Duels that have something due. */
 export const DUEL_SWEEP_INTERVAL_MS = 100;
 
@@ -1029,7 +1113,7 @@ const advanceDuel = async (
   const step = nextStep(await readDuel(redis, duelId), now, delays.countdownMs);
   switch (step?.kind) {
     case "forget":
-      await redis.client.send("ZREM", [dueKey(redis), duelId]);
+      await forgetDuel(redis, duelId);
       return;
     case "finalise":
       await finaliseDuel(db, redis, relay, duelId);

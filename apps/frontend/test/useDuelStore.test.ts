@@ -140,6 +140,7 @@ test("a Participant back mid-Round is no longer reconnecting once the state come
     name: "opponent",
     avatarUrl: null,
     ornament: null,
+    guest: false,
     connected: true,
   } as const;
   scripts.push(dropped, {

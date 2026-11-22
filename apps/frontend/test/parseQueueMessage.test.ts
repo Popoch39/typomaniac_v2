@@ -64,6 +64,12 @@ test("a message removing a Player who did not accept is read back as it was sent
   expect(parseQueueMessage(JSON.stringify(message))).toEqual(message);
 });
 
+test("a message removing a Player who accepted a Challenge is read back as it was sent", () => {
+  const message: QueueServerMessage = { type: "removed", reason: "challenged" };
+
+  expect(parseQueueMessage(JSON.stringify(message))).toEqual(message);
+});
+
 test("a frame that is not JSON is not a message", () => {
   expect(parseQueueMessage("Internal Server Error")).toBeNull();
 });

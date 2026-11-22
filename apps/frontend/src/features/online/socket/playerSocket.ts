@@ -3,6 +3,14 @@ import { createReconnectingSocket } from "../../../shared/lib/reconnectingSocket
 import type { SocketLink } from "../../../shared/link/socketLink.ts";
 import { type PlayerServerMessage, parsePlayerMessage } from "../message/parsePlayerMessage.ts";
 
+/** What a tab sends on the Player socket, each about a Challenge. */
+export type PlayerClientMessage =
+  | { readonly type: "challenge"; readonly playerId: string }
+  | {
+      readonly type: "cancelChallenge" | "acceptChallenge" | "declineChallenge";
+      readonly challengeId: string;
+    };
+
 type PlayerSocketHandlers = {
   readonly receive: (message: PlayerServerMessage) => void;
   /** Told each move of the link, until the Player socket is closed. */
@@ -29,6 +37,11 @@ export function openPlayerSocket(url: string, { receive, link }: PlayerSocketHan
 /** Tries to reopen a dropped Player socket now rather than after its delay. */
 export function retryPlayerSocket() {
   socket.retryNow();
+}
+
+/** Sends the message if the socket is open; a message sent while it reconnects is lost. */
+export function sendToPlayerSocket(message: PlayerClientMessage) {
+  socket.send(JSON.stringify(message));
 }
 
 export function closePlayerSocket() {

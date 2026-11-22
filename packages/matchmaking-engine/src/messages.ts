@@ -15,7 +15,9 @@ export type QueueRemovalReason =
   /** Another socket of the same Player took the place over. */
   | "replaced"
   /** The Player did not accept a Pairing in time. */
-  | "notAccepted";
+  | "notAccepted"
+  /** The Player accepted a Challenge, whose Custom Duel takes them out of the Queue. */
+  | "challenged";
 
 /** Instants are milliseconds since the epoch, on the server's clock. */
 export type QueueServerMessage =

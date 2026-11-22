@@ -36,6 +36,8 @@ export const RATE_LIMITS = {
   friendRead: { max: 120, windowSeconds: 60 },
   /** Friend requests accepted, declined or cancelled, and Friends removed, per Player. */
   friendChange: { max: 60, windowSeconds: 60 },
+  /** Challenges sent, per Player, so that nobody harasses a Friend with them. */
+  challenge: { max: 10, windowSeconds: 60 },
   /** Reads of a Player's public page and Progress, per Player or Guest. */
   publicReadPerRequester: { max: 60, windowSeconds: 60 },
   /** Reads of a Player's public page and Progress, per IP. */
@@ -78,6 +80,15 @@ export const createRateLimiter = (
     set.headers["retry-after"] = String(Math.max(1, secondsLeft));
     return status(429, { code: "RATE_LIMITED" });
   };
+  const consume = async (name: RateLimitName, key: string) => {
+    const { max, windowSeconds } = limitOf(name);
+    const { count, secondsLeft } = await consumeWindow(
+      redis,
+      redis.name("rate-limit", name, key),
+      windowSeconds,
+    );
+    return { over: count > max, secondsLeft };
+  };
   return {
     refuse,
     clientIp: (request: Request, server: SocketSource) =>
@@ -88,14 +99,18 @@ export const createRateLimiter = (
      */
     check: async (name: RateLimitName, key: string | null, set: Context["set"]) => {
       if (key === null) return;
-      const { max, windowSeconds } = limitOf(name);
-      const { count, secondsLeft } = await consumeWindow(
-        redis,
-        redis.name("rate-limit", name, key),
-        windowSeconds,
-      );
-      if (count <= max) return;
+      const { over, secondsLeft } = await consume(name, key);
+      if (!over) return;
       return refuse(name, key, secondsLeft, set);
+    },
+    /**
+     * Counts one action against `key` under the named limit, outside any HTTP request (a socket
+     * message), and tells whether it is over; logged like a refused request.
+     */
+    isOver: async (name: RateLimitName, key: string) => {
+      const { over } = await consume(name, key);
+      if (over) logger.warn("Rate limit {limit} exceeded by {key}", { limit: name, key });
+      return over;
     },
     /** A counter of one socket's messages, which tells when a message goes over the cap. */
     socketMessageWindow: () =>

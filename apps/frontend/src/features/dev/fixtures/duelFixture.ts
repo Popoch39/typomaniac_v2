@@ -5,6 +5,7 @@ const opener: Participant = {
   name: "Lumen",
   avatarUrl: null,
   ornament: { tier: "gold", division: 1 },
+  guest: false,
   connected: true,
 };
 

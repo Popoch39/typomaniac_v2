@@ -1,6 +1,6 @@
 import { RANKED_CONNECT_MS } from "@repo/duel-engine";
 import type { Logger } from "@repo/logger";
-import type { QueueServerMessage } from "@repo/matchmaking-engine";
+import type { QueueRemovalReason, QueueServerMessage } from "@repo/matchmaking-engine";
 import { Elysia, status } from "elysia";
 import { websocket } from "elysia/websocket";
 import type { Db } from "../../db/client.ts";
@@ -62,7 +62,7 @@ export const createQueueRoutes = (
     intervalMs: refreshMs,
   });
   type Presence = EntryHolder & {
-    readonly evict: () => void;
+    readonly evict: (reason: QueueRemovalReason) => void;
     readonly send: (message: QueueServerMessage) => void;
     readonly close: () => void;
   };
@@ -126,8 +126,8 @@ export const createQueueRoutes = (
             const presence: Presence = {
               playerId: ws.player.id,
               connection: crypto.randomUUID(),
-              evict: () => {
-                send({ type: "removed", reason: "replaced" });
+              evict: (reason) => {
+                send({ type: "removed", reason });
                 ws.close();
               },
               send,

@@ -286,9 +286,9 @@ A ranked Duel whose effect on both Standings is withdrawn where the cheating pai
 _Avoid_: cancelled duel, annulled duel, reverted duel, refund
 
 **Suspension**:
-A Sanction that keeps a Player out of the Queue for a set time; they can still sign in and play Practice and Custom Duels.
+A Sanction that keeps a Player out of the Queue for a set time; they can still sign in, play Practice and Custom Duels, and keep their Friends, challenge and be challenged.
 _Avoid_: timeout, temporary ban, cooldown
 
 **Ban**:
-A permanent Sanction: the Player can no longer sign in, and the GitHub and Discord accounts and the e-mail they signed in with can never be used to sign in again.
+A permanent Sanction: the Player can no longer sign in, and the GitHub and Discord accounts and the e-mail they signed in with can never be used to sign in again. Their Friends and Friend requests are deleted and their waiting Challenges cancelled; lifting the Ban brings none of them back.
 _Avoid_: permanent suspension, block, exclusion

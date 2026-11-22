@@ -1,6 +1,6 @@
 import type { Logger } from "@repo/logger";
 import type { Redis } from "../../redis/client.ts";
-import { refreshOnline } from "./service.ts";
+import { onlineWindowNow, refreshOnline } from "./service.ts";
 
 type Holder = {
   readonly playerId: string;
@@ -16,7 +16,19 @@ type Holder = {
 export const createOnlinePresence = (
   redis: Redis,
   logger: Logger,
-  { windowMs, intervalMs }: { readonly windowMs: number; readonly intervalMs: number },
+  {
+    windowMs,
+    intervalMs,
+    changed,
+    refreshed,
+  }: {
+    readonly windowMs: number;
+    readonly intervalMs: number;
+    /** Told the Players who came Online or left, as a refresh found them. */
+    readonly changed: (playerIds: readonly string[]) => Promise<void>;
+    /** Told the Players of this instance's sockets, at each refresh. */
+    readonly refreshed: (playerIds: readonly string[]) => Promise<void>;
+  },
 ) => {
   const held = new Set<Holder>();
   // The last count each socket was sent, so that none is told the same count twice.
@@ -41,7 +53,8 @@ export const createOnlinePresence = (
   };
   const refreshAll = async () => {
     const playerIds = new Set([...held].map(({ playerId }) => playerId));
-    await announce(await refreshOnline(redis, playerIds, { now: Date.now(), windowMs }));
+    const found = await refreshOnline(redis, playerIds, onlineWindowNow(windowMs));
+    await Promise.all([announce(found.count), changed(found.changed), refreshed([...playerIds])]);
   };
   const stop = () => {
     if (refreshing !== null) clearInterval(refreshing);
@@ -63,9 +76,13 @@ export const createOnlinePresence = (
           ),
         intervalMs,
       );
-      const count = await refreshOnline(redis, [holder.playerId], { now: Date.now(), windowMs });
+      const { count, changed: found } = await refreshOnline(
+        redis,
+        [holder.playerId],
+        onlineWindowNow(windowMs),
+      );
       if (held.has(holder)) tell(holder, count);
-      await announce(count);
+      await Promise.all([announce(count), changed(found)]);
     },
     /** Stops refreshing for the socket; its Player leaves the count once no socket refreshes them. */
     release: async (holder: Holder) => {

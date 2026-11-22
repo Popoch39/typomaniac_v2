@@ -3,7 +3,7 @@ import { LoadingState } from "../../../shared/components/LoadingState.tsx";
 import { TryAgainKey } from "../../../shared/components/TryAgainKey.tsx";
 import { LeaderboardSections } from "../../leaderboard/components/LeaderboardSections.tsx";
 import { LeaderboardSkeleton } from "../../leaderboard/components/LeaderboardSkeleton.tsx";
-import { leaderboardFixture } from "../fixtures/leaderboardFixture.ts";
+import { leaderboardAddFriendFixture, leaderboardFixture } from "../fixtures/leaderboardFixture.ts";
 import { useDevFailedRead } from "../hooks/useDevFailedRead.ts";
 import { DevStateColumn } from "./DevStateColumn.tsx";
 
@@ -18,7 +18,10 @@ export function DevLeaderboardStates() {
           <LeaderboardSkeleton withYourPosition />
         </DevStateColumn>
         <DevStateColumn label="Loaded">
-          <LeaderboardSections leaderboard={leaderboardFixture} />
+          <LeaderboardSections
+            leaderboard={leaderboardFixture}
+            addFriendOf={leaderboardAddFriendFixture}
+          />
         </DevStateColumn>
       </div>
       <DevStateColumn label="Error">

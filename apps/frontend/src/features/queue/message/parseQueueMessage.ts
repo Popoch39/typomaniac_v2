@@ -48,7 +48,9 @@ const FIELDS: Record<QueueServerMessage["type"], Record<string, Check>> = {
     players: (players) => hasFields(players, { self: isPairingSide, opponent: isPairingSide }),
   },
   requeued: { queuedAt: isNumber, serverAt: isNumber },
-  removed: { reason: (value) => value === "replaced" || value === "notAccepted" },
+  removed: {
+    reason: (value) => value === "replaced" || value === "notAccepted" || value === "challenged",
+  },
   paired: { duelId: isString },
 };
 

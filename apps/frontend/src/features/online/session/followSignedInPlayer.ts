@@ -1,7 +1,7 @@
 import { hashKey } from "@tanstack/react-query";
 import { queryClient } from "../../../shared/api/queryClient.ts";
 import { meQueryOptions } from "../../auth/api/meQueryOptions.ts";
-import { useOnlineStore } from "./useOnlineStore.ts";
+import { useOnlineStore } from "../store/useOnlineStore.ts";
 
 const socketUrl = () => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

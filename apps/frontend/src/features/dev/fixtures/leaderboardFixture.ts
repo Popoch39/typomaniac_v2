@@ -1,5 +1,9 @@
 import type { Rank } from "@repo/ranked-engine";
+import type { AddFriendTarget } from "../../friends/relation/addFriendTarget.ts";
 import type { Leaderboard, LeaderboardPlayer } from "../../leaderboard/hooks/useLeaderboard.ts";
+
+/** No Add Friend key on the fixture's Players, who are nobody's to befriend. */
+export const leaderboardAddFriendFixture = (): AddFriendTarget => ({ kind: "none" });
 
 const NICKNAMES = [
   "Lumen",

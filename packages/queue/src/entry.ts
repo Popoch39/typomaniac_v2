@@ -87,7 +87,7 @@ export const readQueueEntry = async (redis: Redis, playerId: string) => {
   return { mmr: Number(mmr), queuedAt: Number(queuedAt) };
 };
 
-/** The Pairing the Player's entry names, `null` when they are not queued or await none. */
+/** The Pairing the Player's entry awaits acceptance of, `null` when they are not queued or await none. */
 export const readEntryPairingId = (redis: Redis, playerId: string) =>
   redis.client.hget(entryKey(redis, playerId), "pairing");
 
