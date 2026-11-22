@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "../../../shared/lib/utils.ts";
 import { PlayerNickname } from "../../auth/components/PlayerNickname.tsx";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import { OrnamentedAvatar } from "../../ornament/components/OrnamentedAvatar.tsx";
 import { playerChipClassName } from "../chip/playerChipClassName.ts";
 import { PlayerStandingLine } from "./PlayerStandingLine.tsx";

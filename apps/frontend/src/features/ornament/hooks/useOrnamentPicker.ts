@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeApiError } from "../../../shared/api/describeApiError.ts";
 import { readStage, retryFailed } from "../../../shared/api/readStage.ts";
-import type { SignedInPlayer } from "../../auth/hooks/useSignedInPlayer.ts";
+import type { SignedInPlayer } from "../../auth/session/sessionOf.ts";
 import { useStanding } from "../../ranked/hooks/useStanding.ts";
 import { ornamentQueryOptions } from "../api/ornamentQueryOptions.ts";
 import { ornamentOptions } from "../picker/ornamentOptions.ts";

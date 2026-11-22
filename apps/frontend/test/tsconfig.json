@@ -36,6 +36,7 @@
     "../src/features/admin/store/useReplayStore.ts",
     "../src/features/admin/review",
     "../src/features/auth/refusal",
+    "../src/features/auth/session",
     "../src/features/fair-play/notice",
     "../src/features/friends/relation",
     "../src/features/friends/request",
