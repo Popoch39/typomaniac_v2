@@ -1,32 +1,34 @@
 import type { Redis } from "../../redis/client.ts";
 
 /**
- * How long a ping keeps a Player Online. Several of the app's 30 s pings, since a browser slows the
- * timers of a background tab to one a minute and a Player in such a tab still has Typomaniac open.
+ * How long a Player stays Online after their last socket stopped being refreshed. The server refreshes
+ * every open socket itself, so a background tab whose timers the browser slows to one a minute stays
+ * Online: Bun's protocol pings, which the browser answers outside page timers, keep the socket open.
  */
-export const ONLINE_WINDOW_MS = 120_000;
+export const ONLINE_WINDOW_MS = 60_000;
 
-// One step, so that two instances pinging at once never count a Player the other just dropped.
-const PING_ONLINE = `
-redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
-redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', '(' .. (tonumber(ARGV[1]) - tonumber(ARGV[3])))
-redis.call('PEXPIRE', KEYS[1], ARGV[3])
+// One step, so that two instances refreshing at once never count a Player the other just dropped.
+const REFRESH_ONLINE = `
+local now = tonumber(ARGV[1])
+for index = 3, #ARGV do redis.call('ZADD', KEYS[1], now, ARGV[index]) end
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', '(' .. (now - tonumber(ARGV[2])))
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
 return redis.call('ZCARD', KEYS[1])
 `;
 
-/** Marks the Player Online at `now` and counts the Players who pinged within the window. */
-export const pingOnline = async (
+/** Marks the Players Online at `now` and counts the Players refreshed within the window. */
+export const refreshOnline = async (
   redis: Redis,
-  playerId: string,
-  { now, windowMs }: { now: number; windowMs: number },
+  playerIds: Iterable<string>,
+  { now, windowMs }: { readonly now: number; readonly windowMs: number },
 ) => {
   const count: number = await redis.client.send("EVAL", [
-    PING_ONLINE,
+    REFRESH_ONLINE,
     "1",
     redis.name("online"),
     String(now),
-    playerId,
     String(windowMs),
+    ...playerIds,
   ]);
-  return { count };
+  return count;
 };

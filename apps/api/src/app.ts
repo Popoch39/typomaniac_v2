@@ -35,7 +35,7 @@ export type AppOptions = {
   readonly rateLimit?: RateLimitOptions;
   /** The entry reads it from the configuration; a test that shows no Sanction may leave it out. */
   readonly fairPlay?: FairPlayConfig;
-  /** Lets a test shorten how long a ping keeps a Player Online. */
+  /** Lets a test shorten how long a Player stays Online after their sockets. */
   readonly online?: OnlineOptions;
 };
 
@@ -78,7 +78,16 @@ export const createApp = (
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
       .use(createAdministrationRoutes(db, protection))
-      .use(createOnlineRoutes(protection, redis, onlineOptions))
+      .use(
+        createOnlineRoutes(
+          protection,
+          rateLimiter,
+          redis,
+          loggerOf("online"),
+          lifecycle,
+          onlineOptions,
+        ),
+      )
       .use(
         createDuelRoutes(
           db,
