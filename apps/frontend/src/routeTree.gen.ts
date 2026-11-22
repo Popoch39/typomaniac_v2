@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as ShellAdminRouteImport } from './routes/_shell/admin'
 import { Route as ShellCustomRouteImport } from './routes/_shell/custom'
+import { Route as ShellFriendsRouteImport } from './routes/_shell/friends'
 import { Route as ShellLeaderboardRouteImport } from './routes/_shell/leaderboard'
 import { Route as ShellPracticeRouteImport } from './routes/_shell/practice'
 import { Route as ShellProfileRouteImport } from './routes/_shell/profile'
@@ -40,6 +41,11 @@ const ShellAdminRoute = ShellAdminRouteImport.update({
 const ShellCustomRoute = ShellCustomRouteImport.update({
   id: '/custom',
   path: '/custom',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellFriendsRoute = ShellFriendsRouteImport.update({
+  id: '/friends',
+  path: '/friends',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellLeaderboardRoute = ShellLeaderboardRouteImport.update({
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof ShellAdminRoute
   '/custom': typeof ShellCustomRoute
+  '/friends': typeof ShellFriendsRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
   '/profile': typeof ShellProfileRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof ShellAdminRoute
   '/custom': typeof ShellCustomRoute
+  '/friends': typeof ShellFriendsRoute
   '/leaderboard': typeof ShellLeaderboardRoute
   '/practice': typeof ShellPracticeRoute
   '/profile': typeof ShellProfileRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_shell': typeof ShellRouteWithChildren
   '/_shell/admin': typeof ShellAdminRoute
   '/_shell/custom': typeof ShellCustomRoute
+  '/_shell/friends': typeof ShellFriendsRoute
   '/_shell/leaderboard': typeof ShellLeaderboardRoute
   '/_shell/practice': typeof ShellPracticeRoute
   '/_shell/profile': typeof ShellProfileRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/custom'
+    | '/friends'
     | '/leaderboard'
     | '/practice'
     | '/profile'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/custom'
+    | '/friends'
     | '/leaderboard'
     | '/practice'
     | '/profile'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/_shell'
     | '/_shell/admin'
     | '/_shell/custom'
+    | '/_shell/friends'
     | '/_shell/leaderboard'
     | '/_shell/practice'
     | '/_shell/profile'
@@ -214,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/custom'
       fullPath: '/custom'
       preLoaderRoute: typeof ShellCustomRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/friends': {
+      id: '/_shell/friends'
+      path: '/friends'
+      fullPath: '/friends'
+      preLoaderRoute: typeof ShellFriendsRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/leaderboard': {
@@ -285,6 +304,7 @@ declare module '@tanstack/react-router' {
 interface ShellRouteChildren {
   ShellAdminRoute: typeof ShellAdminRoute
   ShellCustomRoute: typeof ShellCustomRoute
+  ShellFriendsRoute: typeof ShellFriendsRoute
   ShellLeaderboardRoute: typeof ShellLeaderboardRoute
   ShellPracticeRoute: typeof ShellPracticeRoute
   ShellProfileRoute: typeof ShellProfileRoute
@@ -296,6 +316,7 @@ interface ShellRouteChildren {
 const ShellRouteChildren: ShellRouteChildren = {
   ShellAdminRoute: ShellAdminRoute,
   ShellCustomRoute: ShellCustomRoute,
+  ShellFriendsRoute: ShellFriendsRoute,
   ShellLeaderboardRoute: ShellLeaderboardRoute,
   ShellPracticeRoute: ShellPracticeRoute,
   ShellProfileRoute: ShellProfileRoute,

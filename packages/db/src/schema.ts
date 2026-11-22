@@ -56,6 +56,9 @@ export const user = pgTable(
   (table) => [
     // Hand-written too. On the lowercase form so two Nicknames differing only by case collide, while the column keeps the chosen case.
     uniqueIndex(nicknameUniqueIndex).on(sql`lower(${table.nickname})`),
+    // The Nickname search's prefix: under the database's collation, the unique index above cannot
+    // bound a `like 'prefix%'`, only this operator class can.
+    index("user_nickname_lower_pattern_idx").on(sql`lower(${table.nickname}) text_pattern_ops`),
     check(
       "user_ornament_choice",
       sql`${table.ornament} in ('auto', 'none', 'unranked', 'bronze', 'silver', 'gold', 'platinum', 'diamond', 'master')`,
@@ -351,6 +354,51 @@ export const report = pgTable(
     uniqueIndex("report_duel_reporter_idx").on(table.duelId, table.reporterId),
     // The Reports against a Player, read by the fair-play pass and by their Review.
     index("report_reported_idx").on(table.reportedId, table.reportedAt),
+  ],
+);
+
+// A Player's offer to become another Player's Friend, waiting until the receiver accepts or declines
+// it; either answer, or the sender cancelling it, deletes the row, so that it may be sent again.
+export const friendRequest = pgTable(
+  "friend_request",
+  {
+    senderId: text("sender_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    receiverId: text("receiver_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.senderId, table.receiverId] }),
+    // The requests a Player received; their sent ones are read from the primary key.
+    index("friend_request_receiver_idx").on(table.receiverId),
+  ],
+);
+
+// Two Players who are Friends, stored once per pair with the lower id first, so that the link can
+// never be held twice as A to B and B to A.
+export const friendship = pgTable(
+  "friendship",
+  {
+    lowerPlayerId: text("lower_player_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    higherPlayerId: text("higher_player_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.lowerPlayerId, table.higherPlayerId] }),
+    // Byte order, the one JavaScript's comparison of these ASCII ids gives, whatever the database's collation.
+    check(
+      "friendship_ordered",
+      sql`${table.lowerPlayerId} collate "C" < ${table.higherPlayerId} collate "C"`,
+    ),
+    // A Player's Friends where they hold the higher id; the primary key serves the lower one.
+    index("friendship_higher_player_idx").on(table.higherPlayerId),
   ],
 );
 

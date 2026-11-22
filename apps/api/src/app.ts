@@ -9,6 +9,7 @@ import type { DevOptions } from "./modules/dev/config.ts";
 import { createDuelRoutes, type DuelOptions } from "./modules/duel/index.ts";
 import type { FairPlayConfig } from "./modules/fair-play/config.ts";
 import { createFairPlayRoutes } from "./modules/fair-play/index.ts";
+import { createFriendRoutes } from "./modules/friend/index.ts";
 import { createRequestLog } from "./modules/http/index.ts";
 import { createLifecycleRoutes } from "./modules/lifecycle/index.ts";
 import { createLifecycle, type Lifecycle } from "./modules/lifecycle/service.ts";
@@ -78,6 +79,7 @@ export const createApp = (
       .use(createFairPlayRoutes(db, protection, fairPlay))
       .use(createReportRoutes(db, protection, rateLimiter))
       .use(createAdministrationRoutes(db, protection))
+      .use(createFriendRoutes(db, protection, rateLimiter))
       .use(
         createOnlineRoutes(
           protection,
