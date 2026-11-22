@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { getLogger } from "@repo/logger";
 import { createApp } from "../src/app.ts";
 import type { DuelOptions } from "../src/modules/duel/index.ts";
+import type { QueueOptions } from "../src/modules/queue/index.ts";
 import { createRelay } from "../src/modules/duel/relay.ts";
 import { DUEL_EXPIRY_MS, sweepDuels } from "../src/modules/duel/service.ts";
 import { duel, duelGame, duelParticipant, duelRound, review, violation } from "../src/db/client.ts";
@@ -136,6 +137,7 @@ const pairRankedDuel = async (
     db = testDb.db,
     options = { countdownMs: 0, roundPauseMs: 0 } as DuelOptions,
     images = [] as readonly [string?, string?],
+    queue = {} as QueueOptions,
     beforeQueue = (async () => {}) as (
       origin: string,
       accounts: readonly Account[],
@@ -144,7 +146,7 @@ const pairRankedDuel = async (
 ) => {
   const testRedis = await createTestRedis();
   const apps = Array.from({ length: instances }, () =>
-    createApp(db, auth, testRedis.redis, getLogger("api"), { duel: options }).listen(0),
+    createApp(db, auth, testRedis.redis, getLogger("api"), { duel: options, queue }).listen(0),
   );
   closers.push(async () => {
     for (const app of apps) await app.stop(true);
@@ -546,6 +548,22 @@ test("the Queue refuses a Player while their ranked Duel is unfinished, says why
   );
   expect(await socket.next()).toMatchObject({ type: "queued" });
   socket.close();
+});
+
+test("the Queue still refuses a Player whose ranked Duel outlives the expiry it was created with", async () => {
+  // Created to expire shortly, then counted again from its Start for as long as a Duel lives.
+  const { duelId, origins, origin, accounts } = await pairRankedDuel([], {
+    options: { countdownMs: 0, roundPauseMs: 0, expiryMs: 60_000 },
+    queue: { duelExpiryMs: 1000 },
+  });
+  const players = await seat(origins, duelId, accounts);
+  for (const player of players) await nextOfType(player, "countdown");
+
+  await Bun.sleep(1500);
+
+  const refused = await requestUpgrade(queueSocketUrl(origin), players[0].cookie);
+  expect(refused.status).toBe(409);
+  expect(await refused.json()).toEqual({ code: "RANKED_DUEL_UNFINISHED", duelId });
 });
 
 test("the first Round of a ranked Duel starts as soon as both Players are connected", async () => {

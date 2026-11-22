@@ -138,8 +138,26 @@ const dueKey = (redis: Redis) => redis.name("duels", "due");
  * The ranked Duel a Player is in, recorded against them from its creation until it is finalised:
  * what the Queue reads to refuse them. It expires with the Duel, should the Duel never be finalised.
  */
-const rankedDuelKey = (redis: Redis, playerId: string) =>
-  redis.name("player", playerId, "rankedDuel");
+const rankedDuelKeyEnds = (redis: Redis) => [redis.name("player", ""), ":rankedDuel"] as const;
+
+const rankedDuelKey = (redis: Redis, playerId: string) => {
+  const [prefix, suffix] = rankedDuelKeyEnds(redis);
+  return `${prefix}${playerId}${suffix}`;
+};
+
+// Lua run with each expiry of a Duel, so that the record against its Players never expires before
+// it: the Queue would accept them again while the Duel goes on. The keys are built from the Player
+// ids the Duel holds, between the two ends of `rankedDuelKeyEnds`. A Player recorded against
+// another Duel keeps that one's expiry.
+const refreshRankedDuelKeys = (ends: string, duelId: string, expiryMs: string) => `
+for seat = 0, 1 do
+  local player = redis.call('HGET', KEYS[1], 'player' .. seat)
+  if player then
+    local marker = ARGV[${ends}] .. player .. ARGV[${ends} + 1]
+    if redis.call('HGET', marker, 'duelId') == ${duelId} then redis.call('PEXPIRE', marker, ${expiryMs}) end
+  end
+end
+`;
 
 /** From the Start of a Round to the instant the server closes the Games still open. */
 const CLOSE_AFTER_MS = DUEL_GAME_CONFIG.seconds * 1000 + END_GRACE_MS;
@@ -379,6 +397,7 @@ redis.call('ZADD', KEYS[3], tonumber(ARGV[1]) + tonumber(ARGV[4]), ARGV[5])
 -- Counted again from the Start, so that a Duel joined late does not expire before it is finalised.
 redis.call('PEXPIRE', KEYS[1], ARGV[2])
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
+${refreshRankedDuelKeys("7", "ARGV[5]", "ARGV[2]")}
 return {ARGV[1], '1'}
 `;
 
@@ -410,6 +429,7 @@ export const announceStart = async (
     CLOSE_AFTER_MS,
     duelId,
     forced ? "1" : "0",
+    ...rankedDuelKeyEnds(redis),
   );
   const [announcedAt, announced] = answer;
   if (announcedAt === undefined) return null;
@@ -591,6 +611,7 @@ else
 end
 redis.call('PEXPIRE', KEYS[1], ARGV[6])
 redis.call('PEXPIRE', KEYS[2], ARGV[6])
+${refreshRankedDuelKeys("9", "ARGV[8]", "ARGV[6]")}
 redis.call('ZADD', KEYS[4], ARGV[7], ARGV[8])
 return 1
 `;
@@ -932,6 +953,7 @@ export const endRound = async (
       expiryMs,
       nextStartAt === null ? endedAt : nextStartAt - countdownMs,
       duelId,
+      ...rankedDuelKeyEnds(redis),
     );
     if (ended === 1)
       await relay.publish(duelId, null, {

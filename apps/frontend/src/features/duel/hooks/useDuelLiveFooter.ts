@@ -4,6 +4,7 @@ import { bothWpmHistories } from "../chart/bothWpmHistories.ts";
 import { drawnCurves } from "../chart/drawnCurves.ts";
 import { wpmChart } from "../chart/wpmChart.ts";
 import { wpmChartLabel } from "../chart/wpmChartLabel.ts";
+import { roundOf } from "../phase/duelPhase.ts";
 import { useDuelStore } from "../store/useDuelStore.ts";
 import { useDuelLivePoints } from "./useDuelLivePoints.ts";
 
@@ -15,7 +16,7 @@ export function useDuelLiveFooter() {
   const game = useGameStore((state) => state.game);
   const readAt = useGameStore((state) => state.readAt);
   const opponentGame = useDuelStore((state) => state.opponentGame);
-  const round = useDuelStore((state) => state.round);
+  const round = useDuelStore((state) => roundOf(state.lifecycle));
   const live = useDuelLivePoints();
   const self = { ...live.self, name: live.self.name ?? "" };
   const opponent = { ...live.opponent, name: live.opponent.name ?? "" };
