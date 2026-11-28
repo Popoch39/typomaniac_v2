@@ -9,16 +9,17 @@ import { PairingPromptBody } from "./PairingPromptBody.tsx";
 
 /** The Pairing prompt over any page of the shell, as a modal dialog. */
 export function PairingDialog() {
-  const { keepOpen, focusDialog, keepFocus, acceptFromKey, swallowPress } = usePairingDialog();
+  const { keepOpen, focusDialog, leaveFocusToGame, acceptFromKey, blockNativePress } =
+    usePairingDialog();
 
   return (
     <Dialog open>
       <DialogContent
         showCloseButton={false}
         onOpenAutoFocus={focusDialog}
-        onCloseAutoFocus={keepFocus}
+        onCloseAutoFocus={leaveFocusToGame}
         onKeyDown={acceptFromKey}
-        onKeyUp={swallowPress}
+        onKeyUp={blockNativePress}
         onEscapeKeyDown={keepOpen}
         onInteractOutside={keepOpen}
         className="gap-5 rounded-3xl border-3 border-key-outline bg-surface-card p-7 text-base text-ink ring-0 sm:max-w-xl"

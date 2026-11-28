@@ -1,5 +1,6 @@
 import type { PairingSide, QueueRemovalReason, QueueServerMessage } from "@repo/matchmaking-engine";
 import type { SocketLink } from "../../../shared/link/socketLink.ts";
+import { type PromptKey, acceptsPairing } from "../accept/acceptsPairing.ts";
 import { type AcceptWindow, acceptSecondsLeft } from "../clock/acceptSecondsLeft.ts";
 import type { QueueEntry } from "../clock/waitingSeconds.ts";
 
@@ -39,11 +40,11 @@ export type QueuePhase =
   /** The socket closed for good while the Player was in the Queue. */
   | { readonly kind: "disconnected" };
 
+const QUEUE_NOTICE_KINDS = ["removed", "refused", "disconnected"] as const;
+const queueNoticeKinds: ReadonlySet<string> = new Set(QUEUE_NOTICE_KINDS);
+
 /** A phase that tells the Player why they are not queued, until they close it or enter again. */
-export type QueueNoticePhase = Extract<
-  QueuePhase,
-  { kind: "removed" | "refused" | "disconnected" }
->;
+export type QueueNoticePhase = Extract<QueuePhase, { kind: (typeof QUEUE_NOTICE_KINDS)[number] }>;
 
 export type QueuePhaseEvent =
   | { readonly kind: "enter" }
@@ -53,10 +54,14 @@ export type QueuePhaseEvent =
   | { readonly kind: "link"; readonly link: SocketLink }
   /** The Player accepts the Pairing proposed to them. */
   | { readonly kind: "accept" }
+  /** A key pressed while the Pairing prompt is open, `at` on the clock the Pairing was received on. */
+  | { readonly kind: "press"; readonly key: PromptKey; readonly at: number }
   /** The Player's acceptance of the Pairing reached the socket. */
   | { readonly kind: "accepted"; readonly pairingId: string }
   /** The Player closes the notice telling them why they are not queued. */
-  | { readonly kind: "dismiss" };
+  | { readonly kind: "dismiss" }
+  /** The Player opens a Duel, which gives up an active Queue but keeps the notice of why they left it. */
+  | { readonly kind: "leaveForDuel" };
 
 /**
  * `close` closes the Queue socket, `open` opens it in place of any other. `sendAccept` sends the
@@ -88,7 +93,7 @@ export function shownQueuePhase(phase: QueuePhase) {
 }
 
 export const isQueueNotice = (phase: QueuePhase): phase is QueueNoticePhase =>
-  phase.kind === "removed" || phase.kind === "refused" || phase.kind === "disconnected";
+  queueNoticeKinds.has(phase.kind);
 
 /** Whether the socket holds the Player's place in the Queue, so that a drop is worth reopening. */
 const isInQueue = (phase: QueuePhase) =>
@@ -148,6 +153,11 @@ function nextOfLink(phase: QueuePhase, link: SocketLink): QueueTransition {
   return { phase, effects: [] };
 }
 
+const acceptEffects = (phase: QueuePhase): readonly QueuePhaseEffect[] =>
+  phase.kind === "proposed" && !phase.accepted
+    ? [{ kind: "sendAccept", pairingId: phase.pairingId }]
+    : [];
+
 function nextOfEvent(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition {
   switch (event.kind) {
     case "enter":
@@ -167,11 +177,13 @@ function nextOfEvent(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition
     case "link":
       return nextOfLink(phase, event.link);
     case "accept":
+      return { phase, effects: acceptEffects(phase) };
+    case "press":
       return {
         phase,
         effects:
-          phase.kind === "proposed" && !phase.accepted
-            ? [{ kind: "sendAccept", pairingId: phase.pairingId }]
+          phase.kind === "proposed" && acceptsPairing(event.key, event.at - phase.window.receivedAt)
+            ? acceptEffects(phase)
             : [],
       };
     case "accepted":
@@ -185,6 +197,11 @@ function nextOfEvent(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition
     case "dismiss":
       // The socket of a notice is already closed: a notice never outlives it on its own.
       return { phase: isQueueNotice(phase) ? IDLE_QUEUE : phase, effects: [] };
+    case "leaveForDuel":
+      // A Challenge accepted from the Queue opens its Duel: the notice saying so must survive it.
+      return isQueueNotice(phase)
+        ? { phase, effects: [] }
+        : { phase: IDLE_QUEUE, effects: [{ kind: "close" }] };
   }
 }
 
