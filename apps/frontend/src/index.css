@@ -278,6 +278,28 @@
 }
 
 /*
+ * The Queue panel of the Ranked page and the Queue toast share this name, never both on one page: a
+ * view transition between the two pages moves and resizes one into the other.
+ */
+@utility queue-morph {
+  view-transition-name: queue;
+}
+
+::view-transition-group(queue) {
+  animation-duration: 0.3s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Under reduced motion a view transition shows its final state directly. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+
+/*
  * The Rank up scene of a Tier promotion: a 1040×680 stage, scaled to cover the viewport, but never so
  * far that it cuts into the 880×580 box at its centre that holds the Ornament with its crown, the
  * Master keys and the title. tan(atan2()) turns the ratio of two lengths into the number `scale` needs.

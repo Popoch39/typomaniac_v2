@@ -2,6 +2,7 @@ import { Panel } from "../../../shared/components/Panel.tsx";
 import { ChooseNicknameNotice } from "../../auth/components/ChooseNicknameNotice.tsx";
 import type { SignedInSession } from "../../auth/session/sessionOf.ts";
 import { OnlinePlayers } from "../../online/components/OnlinePlayers.tsx";
+import { useQueueEntry } from "../hooks/useQueueEntry.ts";
 import { useQueuePanelTag } from "../hooks/useQueuePanelTag.ts";
 import { QueuePanel } from "./QueuePanel.tsx";
 
@@ -13,9 +14,15 @@ interface RankedQueueProps {
 // Every Player is told before queueing that ranked refuses on-screen keyboards (ADR 0016).
 export function RankedQueue({ session }: RankedQueueProps) {
   const tag = useQueuePanelTag();
+  const { shown } = useQueueEntry();
 
   return (
-    <Panel title="Queue" titleAside={<OnlinePlayers />} tag={tag}>
+    <Panel
+      title="Queue"
+      titleAside={<OnlinePlayers />}
+      tag={tag}
+      className={shown === "queued" ? "queue-morph" : undefined}
+    >
       {session.kind === "named" ? (
         <QueuePanel />
       ) : (

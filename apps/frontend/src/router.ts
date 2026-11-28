@@ -1,4 +1,6 @@
 import { createRouter } from "@tanstack/react-router";
+import { queueMorphTypes } from "./features/queue/morph/queueMorph.ts";
+import { useQueueStore } from "./features/queue/store/useQueueStore.ts";
 import { routeTree } from "./routeTree.gen";
 import { queryClient } from "./shared/api/queryClient.ts";
 import { RouteError } from "./shared/components/RouteError.tsx";
@@ -11,6 +13,14 @@ export const router = createRouter({
   // Query owns the cache and its staleness: the router must always call loaders on preload.
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
+  defaultViewTransition: {
+    types: ({ fromLocation, toLocation }) =>
+      queueMorphTypes({
+        phase: useQueueStore.getState().phase,
+        fromPath: fromLocation?.pathname,
+        toPath: toLocation.pathname,
+      }),
+  },
   defaultErrorComponent: RouteError,
   defaultNotFoundComponent: RouteNotFound,
 });

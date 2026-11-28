@@ -8,7 +8,9 @@ import { QueueToastPanel } from "./QueueToastPanel.tsx";
 /**
  * The Queue following the Player off the Ranked page, which its body leads back to. It stays mounted
  * so that it can slide out as well as in; dimming changes its opacity alone, never its place. Its slide
- * is shorter than the corner stack's gap, so that it never runs over the Challenge card below it.
+ * is shorter than the corner stack's gap, so that it never runs over the Challenge card below it. A
+ * change of page that morphs it from or into the Queue panel of the Ranked page plays no slide: the
+ * view transition needs the toast in its place at once.
  */
 export function QueueToast() {
   const { isShown, isDimmed, isReplaced, searching, leave } = useQueueToast();
@@ -17,7 +19,8 @@ export function QueueToast() {
     <div
       inert={!isShown}
       className={cn(
-        "starting:translate-y-4 starting:opacity-0",
+        "starting:translate-y-4 starting:opacity-0 [html:active-view-transition_&]:transition-none",
+        isShown && "queue-morph",
         !isReplaced &&
           "transition-[translate,opacity,display] transition-discrete duration-200 ease-out motion-reduce:transition-none",
         isDimmed && "opacity-40",
