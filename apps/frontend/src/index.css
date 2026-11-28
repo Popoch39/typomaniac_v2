@@ -290,6 +290,20 @@
   animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* Both cards fill the moving box: at its own ratio, the tall panel would hang out of the toast. */
+::view-transition-old(queue),
+::view-transition-new(queue) {
+  height: 100%;
+}
+
+/*
+ * Only the Queue card is captured: the page under it changes at once, as on any other change of page.
+ * Captured too, the root flashed the whole viewport white as the transition began.
+ */
+:root:active-view-transition-type(queue-morph) {
+  view-transition-name: none;
+}
+
 /* Under reduced motion a view transition shows its final state directly. */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
