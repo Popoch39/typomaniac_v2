@@ -8,18 +8,14 @@ import { QueueToast } from "./QueueToast.tsx";
 export function QueueLayer() {
   const layer = useQueueLayer();
 
-  switch (layer.kind) {
-    case "none":
-      return null;
-    case "searching":
-      return <QueueToast />;
-    case "pairing":
-      return <PairingDialog />;
-    case "entering":
-      return <QueueEnteringToast />;
-    case "removed":
-    case "disconnected":
-    case "refused":
-      return <QueueNoticeToast notice={layer} />;
-  }
+  return (
+    <>
+      <QueueToast />
+      {layer.kind === "pairing" && <PairingDialog />}
+      {layer.kind === "entering" && <QueueEnteringToast />}
+      {(layer.kind === "removed" || layer.kind === "disconnected" || layer.kind === "refused") && (
+        <QueueNoticeToast notice={layer} />
+      )}
+    </>
+  );
 }

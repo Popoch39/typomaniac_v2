@@ -18,12 +18,34 @@ const proposed = {
   accepted: false,
 } as const;
 
-const off = (phase: QueuePhase) => queueLayerContent({ phase, isOnRankedPage: false });
-const on = (phase: QueuePhase) => queueLayerContent({ phase, isOnRankedPage: true });
+const off = (phase: QueuePhase) =>
+  queueLayerContent({ phase, isOnRankedPage: false, isPracticeGameRunning: false });
+const on = (phase: QueuePhase) =>
+  queueLayerContent({ phase, isOnRankedPage: true, isPracticeGameRunning: false });
+const practising = (phase: QueuePhase) =>
+  queueLayerContent({ phase, isOnRankedPage: false, isPracticeGameRunning: true });
+
+const searching = { kind: "searching", isDimmed: false } as const;
 
 test("off the Ranked page, a queued Player sees the searching toast", () => {
-  expect(off(queued)).toEqual({ kind: "searching" });
-  expect(off({ ...queued, requeued: true })).toEqual({ kind: "searching" });
+  expect(off(queued)).toEqual(searching);
+  expect(off({ ...queued, requeued: true })).toEqual(searching);
+});
+
+test("the searching toast is dimmed exactly while a Practice Game is running", () => {
+  expect(practising(queued)).toEqual({ kind: "searching", isDimmed: true });
+  expect(practising({ kind: "reconnecting", held: queued })).toEqual({
+    kind: "searching",
+    isDimmed: true,
+  });
+  expect(off(queued)).toEqual({ kind: "searching", isDimmed: false });
+});
+
+test("a running Practice Game never dims the Pairing prompt nor shows the Queue on the Ranked page", () => {
+  expect(practising(proposed)).toEqual({ kind: "pairing" });
+  expect(
+    queueLayerContent({ phase: queued, isOnRankedPage: true, isPracticeGameRunning: true }),
+  ).toEqual({ kind: "none" });
 });
 
 test("off the Ranked page, a proposed Pairing opens the prompt, accepted or not", () => {
@@ -32,7 +54,7 @@ test("off the Ranked page, a proposed Pairing opens the prompt, accepted or not"
 });
 
 test("a reconnecting socket keeps the toast or the prompt it held", () => {
-  expect(off({ kind: "reconnecting", held: queued })).toEqual({ kind: "searching" });
+  expect(off({ kind: "reconnecting", held: queued })).toEqual(searching);
   expect(off({ kind: "reconnecting", held: proposed })).toEqual({ kind: "pairing" });
 });
 
