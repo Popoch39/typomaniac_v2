@@ -53,12 +53,14 @@ export type QueuePhaseEvent =
 /**
  * `close` closes the Queue socket, `open` opens it in place of any other. `sendAccept` sends the
  * acceptance, which is only one once the socket carried it. The clock runs from `startClock` to
- * `stopClock`, exactly while a waiting time or an accept countdown is on screen.
+ * `stopClock`, exactly while a waiting time or an accept countdown is on screen. `goToDuel` takes
+ * the Player to the ranked Duel both accepted, from whatever page they are on.
  */
 export type QueuePhaseEffect =
   | { readonly kind: "close" }
   | { readonly kind: "open" }
   | { readonly kind: "sendAccept"; readonly pairingId: string }
+  | { readonly kind: "goToDuel"; readonly duelId: string }
   | { readonly kind: "startClock" }
   | { readonly kind: "stopClock" };
 
@@ -141,7 +143,13 @@ function nextOfEvent(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition
     case "receive":
       // Only a socket the Player still needs is read: it is closed in every other phase.
       if (phase.kind !== "connecting" && !isInQueue(phase)) return { phase, effects: [] };
-      return { phase: nextOfMessage(phase, event.message, event.receivedAt), effects: [] };
+      return {
+        phase: nextOfMessage(phase, event.message, event.receivedAt),
+        effects:
+          event.message.type === "paired"
+            ? [{ kind: "goToDuel", duelId: event.message.duelId }]
+            : [],
+      };
     case "link":
       return nextOfLink(phase, event.link);
     case "accept":

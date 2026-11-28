@@ -1,4 +1,6 @@
+import { Link } from "@tanstack/react-router";
 import { Keycap } from "../../../shared/components/Keycap.tsx";
+import { PracticeIcon } from "../../shell/components/PracticeIcon.tsx";
 import { useQueueWaiting } from "../hooks/useQueueWaiting.ts";
 import { LoadingPixels } from "../../../shared/components/LoadingPixels.tsx";
 import { LeaveIcon } from "./LeaveIcon.tsx";
@@ -25,10 +27,17 @@ export function QueueWaiting() {
           {status}
         </p>
       </div>
-      <div className="pb-2">
+      <div className="flex flex-wrap gap-4 pb-2">
         <Keycap type="button" size="lg" onClick={leave}>
           <LeaveIcon />
           Leave
+        </Keycap>
+        {/* The Player keeps their place in the Queue while they train. */}
+        <Keycap asChild size="lg">
+          <Link to="/practice">
+            <PracticeIcon />
+            Practice while you wait
+          </Link>
         </Keycap>
       </div>
     </div>

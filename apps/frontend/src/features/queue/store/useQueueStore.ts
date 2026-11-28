@@ -23,6 +23,13 @@ const CLOCK_REFRESH_MS = 100;
 
 // Owned by the store because components may not run effects; one Queue is shown at a time.
 let clockTimer: ReturnType<typeof setInterval> | null = null;
+// Handed by the app's entry, since a store may not import the router.
+let goToDuel: (duelId: string) => void = () => {};
+
+/** How the store takes the Player into the ranked Duel both accepted, from any page. */
+export function setQueueDuelNavigation(navigate: (duelId: string) => void) {
+  goToDuel = navigate;
+}
 
 export const useQueueStore = create<QueueState>()((set, get) => {
   const dispatch = (event: QueuePhaseEvent) => {
@@ -46,6 +53,8 @@ export const useQueueStore = create<QueueState>()((set, get) => {
         if (sendToQueue({ type: "accept", pairingId })) dispatch({ kind: "accepted", pairingId });
         return;
       }
+      case "goToDuel":
+        return goToDuel(effect.duelId);
       case "startClock":
         if (clockTimer === null)
           clockTimer = setInterval(() => set({ now: eventTime() }), CLOCK_REFRESH_MS);
