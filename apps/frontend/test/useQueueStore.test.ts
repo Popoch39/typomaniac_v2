@@ -149,6 +149,39 @@ test("a Player removed for not accepting is told why, and the socket is not reop
   expect(openings).toBe(before);
 });
 
+test("a removed Player who closes the notice is back to idle, the socket left closed", async () => {
+  scripts.push({
+    messages: [queued, { type: "removed", reason: "replaced" }],
+    closeWith: 1000,
+  });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "removed");
+  const before = openings;
+  store.getState().dismiss();
+
+  expect(store.getState().phase).toEqual({ kind: "idle" });
+  // Past the first try a dropped socket would make to reopen.
+  await Bun.sleep(1200);
+  expect(openings).toBe(before);
+});
+
+test("a removed Player who enters again is back in the Queue on a new socket", async () => {
+  scripts.push(
+    { messages: [queued, { type: "removed", reason: "notAccepted" }], closeWith: 1000 },
+    { messages: [queued], closeWith: null },
+  );
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "removed");
+  const before = openings;
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+
+  expect(store.getState().phase).toMatchObject({ kind: "queued", requeued: false });
+  expect(openings).toBe(before + 1);
+});
+
 test("a Player whose Opponent did not accept is back in the Queue, the Pairing gone", async () => {
   scripts.push({ messages: [queued, proposed(true)], closeWith: null });
 

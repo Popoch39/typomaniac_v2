@@ -10,13 +10,15 @@ import { LeaveIcon } from "./LeaveIcon.tsx";
  * so that it can slide out as well as in; dimming changes its opacity alone, never its place.
  */
 export function QueueToast() {
-  const { isShown, isDimmed, status, waitingTime, leave } = useQueueToast();
+  const { isShown, isDimmed, isReplaced, status, waitingTime, leave } = useQueueToast();
 
   return (
     <div
       inert={!isShown}
       className={cn(
-        "transition-[translate,opacity,display] transition-discrete duration-200 ease-out starting:translate-y-6 starting:opacity-0 motion-reduce:transition-none",
+        "starting:translate-y-6 starting:opacity-0",
+        !isReplaced &&
+          "transition-[translate,opacity,display] transition-discrete duration-200 ease-out motion-reduce:transition-none",
         isDimmed && "opacity-40",
         !isShown && "hidden translate-y-6 opacity-0",
       )}

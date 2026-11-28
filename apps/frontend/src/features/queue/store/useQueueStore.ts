@@ -18,6 +18,8 @@ type QueueState = {
   readonly leave: () => void;
   /** Accepts the Pairing proposed to the Player, once the socket can carry it. */
   readonly accept: () => void;
+  /** Closes the notice telling the Player why they are not queued. */
+  readonly dismiss: () => void;
 };
 
 const CLOCK_REFRESH_MS = 100;
@@ -75,5 +77,6 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     enter: () => dispatch({ kind: "enter" }),
     leave: () => dispatch({ kind: "leave" }),
     accept: () => dispatch({ kind: "accept" }),
+    dismiss: () => dispatch({ kind: "dismiss" }),
   };
 });
