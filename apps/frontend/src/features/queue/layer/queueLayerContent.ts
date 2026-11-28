@@ -25,7 +25,7 @@ export type QueueLayerContent =
   | { readonly kind: "searching"; readonly isDimmed: boolean }
   | { readonly kind: "pairing" }
   | { readonly kind: "entering" }
-  | QueueNoticePhase;
+  | { readonly kind: "notice"; readonly notice: QueueNoticePhase };
 
 const NONE: QueueLayerContent = { kind: "none" };
 
@@ -44,6 +44,6 @@ export function queueLayerContent({
   if (shown.kind === "proposed") return { kind: "pairing" };
   // Entering again from the toast keeps it in place until the Queue answers.
   if (shown.kind === "connecting") return { kind: "entering" };
-  if (isQueueNotice(shown)) return shown;
+  if (isQueueNotice(shown)) return { kind: "notice", notice: shown };
   return NONE;
 }
