@@ -39,6 +39,12 @@ export type QueuePhase =
   /** The socket closed for good while the Player was in the Queue. */
   | { readonly kind: "disconnected" };
 
+/** A phase that tells the Player why they are not queued, until they close it or enter again. */
+export type QueueNoticePhase = Extract<
+  QueuePhase,
+  { kind: "removed" | "refused" | "disconnected" }
+>;
+
 export type QueuePhaseEvent =
   | { readonly kind: "enter" }
   | { readonly kind: "leave" }
@@ -48,7 +54,9 @@ export type QueuePhaseEvent =
   /** The Player accepts the Pairing proposed to them. */
   | { readonly kind: "accept" }
   /** The Player's acceptance of the Pairing reached the socket. */
-  | { readonly kind: "accepted"; readonly pairingId: string };
+  | { readonly kind: "accepted"; readonly pairingId: string }
+  /** The Player closes the notice telling them why they are not queued. */
+  | { readonly kind: "dismiss" };
 
 /**
  * `close` closes the Queue socket, `open` opens it in place of any other. `sendAccept` sends the
@@ -75,6 +83,9 @@ export const IDLE_QUEUE: QueuePhase = { kind: "idle" };
 export function shownQueuePhase(phase: QueuePhase) {
   return phase.kind === "reconnecting" ? phase.held : phase;
 }
+
+export const isQueueNotice = (phase: QueuePhase): phase is QueueNoticePhase =>
+  phase.kind === "removed" || phase.kind === "refused" || phase.kind === "disconnected";
 
 /** Whether the socket holds the Player's place in the Queue, so that a drop is worth reopening. */
 const isInQueue = (phase: QueuePhase) =>
@@ -168,6 +179,9 @@ function nextOfEvent(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition
             : phase,
         effects: [],
       };
+    case "dismiss":
+      // The socket of a notice is already closed: a notice never outlives it on its own.
+      return { phase: isQueueNotice(phase) ? IDLE_QUEUE : phase, effects: [] };
   }
 }
 

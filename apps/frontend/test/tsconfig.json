@@ -62,6 +62,7 @@
     "../src/features/queue/clock",
     "../src/features/queue/layer",
     "../src/features/queue/message",
+    "../src/features/queue/notice",
     "../src/features/queue/phase",
     "../src/features/queue/refusal",
     "../src/features/queue/socket",
