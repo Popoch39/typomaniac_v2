@@ -6,7 +6,10 @@ import { QueueToast } from "./QueueToast.tsx";
 export function QueueLayer() {
   const layer = useQueueLayer();
 
-  if (layer.kind === "searching") return <QueueToast />;
-  if (layer.kind === "pairing") return <PairingDialog />;
-  return null;
+  return (
+    <>
+      <QueueToast />
+      {layer.kind === "pairing" && <PairingDialog />}
+    </>
+  );
 }
