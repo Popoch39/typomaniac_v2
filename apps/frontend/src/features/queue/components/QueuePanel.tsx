@@ -1,6 +1,6 @@
 import { useQueueEntry } from "../hooks/useQueueEntry.ts";
 import { useUnfinishedRankedDuel } from "../hooks/useUnfinishedRankedDuel.ts";
-import { PairedDuelRedirect } from "./PairedDuelRedirect.tsx";
+import { PairedDuelStatus } from "./PairedDuelStatus.tsx";
 import { PairingPrompt } from "./PairingPrompt.tsx";
 import { QueueIdle } from "./QueueIdle.tsx";
 import { QueueWaiting } from "./QueueWaiting.tsx";
@@ -12,7 +12,7 @@ export function QueuePanel() {
 
   if (shown === "queued") return <QueueWaiting />;
   if (shown === "proposed") return <PairingPrompt />;
-  if (shown === "paired") return <PairedDuelRedirect />;
+  if (shown === "paired") return <PairedDuelStatus />;
   if (unfinishedDuelId !== null) return <UnfinishedRankedDuel duelId={unfinishedDuelId} />;
   return <QueueIdle enter={enter} isEntering={shown === "connecting"} />;
 }

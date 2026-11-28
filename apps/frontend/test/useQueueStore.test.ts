@@ -54,13 +54,18 @@ const page = new URL(`http://localhost:${server.port}/`);
 if (typeof window === "undefined")
   Object.defineProperty(globalThis, "window", { value: { location: page }, configurable: true });
 else window.location.host = page.host;
-const { useQueueStore } = await import("../src/features/queue/store/useQueueStore.ts");
+const { setQueueDuelNavigation, useQueueStore } =
+  await import("../src/features/queue/store/useQueueStore.ts");
 const store = useQueueStore;
+// The ranked Duels the store took the Player to, in order.
+const wentToDuels: string[] = [];
+setQueueDuelNavigation((duelId) => wentToDuels.push(duelId));
 
 afterEach(() => {
   store.getState().leave();
   scripts.length = 0;
   received.length = 0;
+  wentToDuels.length = 0;
 });
 
 /** Resolves once the store's state passes `predicate`. */
@@ -105,6 +110,24 @@ test("a Player goes from queued to proposed, accepts, and is paired", async () =
   current?.close(1000);
   await until(({ phase }) => phase.kind === "paired");
   expect(store.getState().phase).toEqual({ kind: "paired", duelId: "duel-1" });
+  expect(wentToDuels).toEqual(["duel-1"]);
+});
+
+test("a queued Player keeps their place while nothing tells them to leave", async () => {
+  scripts.push({ messages: [queued], closeWith: null });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+  const before = openings;
+  // Past the first try a dropped socket would make to reopen.
+  await Bun.sleep(1200);
+  expect(store.getState().phase).toMatchObject({ kind: "queued", requeued: false });
+  expect(openings).toBe(before);
+
+  // The socket is still the one that holds the place: a Pairing still reaches the Player.
+  serverSends(proposed(false));
+  await until(({ phase }) => phase.kind === "proposed");
+  expect(wentToDuels).toEqual([]);
 });
 
 test("a Player removed for not accepting is told why, and the socket is not reopened", async () => {
