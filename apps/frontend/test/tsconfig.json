@@ -58,6 +58,7 @@
     "../src/features/progress/summary",
     "../src/features/ranked/standing",
     "../src/features/ranked/api",
+    "../src/features/queue/accept",
     "../src/features/queue/api",
     "../src/features/queue/clock",
     "../src/features/queue/layer",

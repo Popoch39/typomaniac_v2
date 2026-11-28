@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { eventTime } from "../../game/clock/eventTime.ts";
+import { useGameStore } from "../../game/store/useGameStore.ts";
 import {
   IDLE_QUEUE,
   type QueuePhase,
@@ -62,6 +63,9 @@ export const useQueueStore = create<QueueState>()((set, get) => {
       case "stopClock":
         if (clockTimer !== null) clearInterval(clockTimer);
         clockTimer = null;
+        return;
+      case "leaveGame":
+        return useGameStore.getState().leave();
     }
   };
 
