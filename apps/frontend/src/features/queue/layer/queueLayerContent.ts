@@ -5,6 +5,8 @@ export type QueueLayerInput = {
   readonly phase: QueuePhase;
   /** The Ranked page shows the Queue in its own panel. */
   readonly isOnRankedPage: boolean;
+  /** Its ticking time would pull the eyes from the Target words. */
+  readonly isPracticeGameRunning: boolean;
 };
 
 /**
@@ -13,7 +15,8 @@ export type QueueLayerInput = {
  */
 export type QueueLayerContent =
   | { readonly kind: "none" }
-  | { readonly kind: "searching" }
+  /** Dimmed while a Practice Game runs, back at full strength when it is ready or finished. */
+  | { readonly kind: "searching"; readonly isDimmed: boolean }
   | { readonly kind: "pairing" };
 
 const NONE: QueueLayerContent = { kind: "none" };
@@ -22,10 +25,14 @@ const NONE: QueueLayerContent = { kind: "none" };
  * What the Queue layer shows: the Queue follows the Player off the Ranked page, where the panel no
  * longer shows it. A reconnect keeps showing the Queue or the Pairing it holds.
  */
-export function queueLayerContent({ phase, isOnRankedPage }: QueueLayerInput): QueueLayerContent {
+export function queueLayerContent({
+  phase,
+  isOnRankedPage,
+  isPracticeGameRunning,
+}: QueueLayerInput): QueueLayerContent {
   if (isOnRankedPage) return NONE;
   const shown = shownQueuePhase(phase);
-  if (shown.kind === "queued") return { kind: "searching" };
+  if (shown.kind === "queued") return { kind: "searching", isDimmed: isPracticeGameRunning };
   if (shown.kind === "proposed") return { kind: "pairing" };
   return NONE;
 }
