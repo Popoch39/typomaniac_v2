@@ -1,5 +1,7 @@
 import { afterAll, afterEach, expect, test } from "bun:test";
 import type { PairingSide, QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
+import { useGameStore } from "../src/features/game/store/useGameStore.ts";
+import { PAIRING_ACCEPT_GUARD_MS } from "../src/features/queue/accept/acceptsPairing.ts";
 
 const players: { readonly self: PairingSide; readonly opponent: PairingSide } = {
   self: { nickname: "ada", avatarUrl: null, rank: null, ornament: null },
@@ -54,13 +56,20 @@ const page = new URL(`http://localhost:${server.port}/`);
 if (typeof window === "undefined")
   Object.defineProperty(globalThis, "window", { value: { location: page }, configurable: true });
 else window.location.host = page.host;
-const { useQueueStore } = await import("../src/features/queue/store/useQueueStore.ts");
+const { setQueueDuelNavigation, useQueueStore } =
+  await import("../src/features/queue/store/useQueueStore.ts");
 const store = useQueueStore;
+// The ranked Duels the store took the Player to, in order.
+const wentToDuels: string[] = [];
+setQueueDuelNavigation((duelId) => wentToDuels.push(duelId));
 
 afterEach(() => {
   store.getState().leave();
+  // A started Game ticks on a timer: a new ready Game stops it so no test leaves one running.
+  useGameStore.getState().leave();
   scripts.length = 0;
   received.length = 0;
+  wentToDuels.length = 0;
 });
 
 /** Resolves once the store's state passes `predicate`. */
@@ -105,6 +114,24 @@ test("a Player goes from queued to proposed, accepts, and is paired", async () =
   current?.close(1000);
   await until(({ phase }) => phase.kind === "paired");
   expect(store.getState().phase).toEqual({ kind: "paired", duelId: "duel-1" });
+  expect(wentToDuels).toEqual(["duel-1"]);
+});
+
+test("a queued Player keeps their place while nothing tells them to leave", async () => {
+  scripts.push({ messages: [queued], closeWith: null });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+  const before = openings;
+  // Past the first try a dropped socket would make to reopen.
+  await Bun.sleep(1200);
+  expect(store.getState().phase).toMatchObject({ kind: "queued", requeued: false });
+  expect(openings).toBe(before);
+
+  // The socket is still the one that holds the place: a Pairing still reaches the Player.
+  serverSends(proposed(false));
+  await until(({ phase }) => phase.kind === "proposed");
+  expect(wentToDuels).toEqual([]);
 });
 
 test("a Player removed for not accepting is told why, and the socket is not reopened", async () => {
@@ -121,6 +148,74 @@ test("a Player removed for not accepting is told why, and the socket is not reop
 
   expect(store.getState().phase).toEqual({ kind: "removed", reason: "notAccepted" });
   expect(openings).toBe(before);
+});
+
+test("a removed Player who closes the notice is back to idle, the socket left closed", async () => {
+  scripts.push({
+    messages: [queued, { type: "removed", reason: "replaced" }],
+    closeWith: 1000,
+  });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "removed");
+  const before = openings;
+  store.getState().dismiss();
+
+  expect(store.getState().phase).toEqual({ kind: "idle" });
+  // Past the first try a dropped socket would make to reopen.
+  await Bun.sleep(1200);
+  expect(openings).toBe(before);
+});
+
+test("a removed Player who enters again is back in the Queue on a new socket", async () => {
+  scripts.push(
+    { messages: [queued, { type: "removed", reason: "notAccepted" }], closeWith: 1000 },
+    { messages: [queued], closeWith: null },
+  );
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "removed");
+  const before = openings;
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+
+  expect(store.getState().phase).toMatchObject({ kind: "queued", requeued: false });
+  expect(openings).toBe(before + 1);
+});
+
+test("a Player removed for a Challenge keeps the notice as its Duel opens", async () => {
+  scripts.push({ messages: [queued, { type: "removed", reason: "challenged" }], closeWith: 1000 });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "removed");
+  store.getState().leaveForDuel();
+
+  expect(store.getState().phase).toEqual({ kind: "removed", reason: "challenged" });
+});
+
+test("a queued Player who opens a Duel gives up their place", async () => {
+  scripts.push({ messages: [queued], closeWith: null });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+  store.getState().leaveForDuel();
+
+  expect(store.getState().phase).toEqual({ kind: "idle" });
+});
+
+test("Enter pressed past the guard delay accepts the Pairing", async () => {
+  scripts.push({ messages: [queued, proposed(false)], closeWith: null });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "proposed");
+  store.getState().press({ key: "Enter", repeat: false });
+  expect(store.getState().phase).toMatchObject({ kind: "proposed", accepted: false });
+  await Bun.sleep(PAIRING_ACCEPT_GUARD_MS);
+  store.getState().press({ key: "Enter", repeat: false });
+
+  expect(store.getState().phase).toMatchObject({ kind: "proposed", accepted: true });
+  await until(() => received.length === 1);
+  expect(received).toEqual([{ type: "accept", pairingId: "pairing-1" }]);
 });
 
 test("a Player whose Opponent did not accept is back in the Queue, the Pairing gone", async () => {
@@ -159,6 +254,65 @@ test("a Player whose socket drops during a Pairing reconnects to it with their a
     accepted: true,
   });
   expect(received).toEqual([]);
+});
+
+/** Starts a Practice Game and types into it, so that its clock runs. */
+function playPracticeGame() {
+  const at = performance.timeOrigin + performance.now();
+  useGameStore.getState().setConfig({ mode: "time", seconds: 30 });
+  useGameStore.getState().applyEvent({ type: "start", at });
+  useGameStore.getState().applyEvent({ type: "insert", at: at + 200, text: "a" });
+  expect(useGameStore.getState().game.status).toBe("running");
+}
+
+test("a proposed Pairing abandons the Practice Game being played", async () => {
+  scripts.push({ messages: [queued], closeWith: null });
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+  playPracticeGame();
+  const restartsBefore = useGameStore.getState().restartCount;
+
+  serverSends(proposed(false));
+  await until(({ phase }) => phase.kind === "proposed");
+
+  const { game, restartCount } = useGameStore.getState();
+  expect(game.status).toBe("ready");
+  expect(game.startedAt).toBeNull();
+  expect(restartCount).toBeGreaterThan(restartsBefore);
+});
+
+test("a Pairing proposed again after a reconnect leaves the Game alone", async () => {
+  scripts.push(
+    { messages: [queued, proposed(false)], closeWith: null },
+    { messages: [proposed(false)], closeWith: null },
+  );
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "proposed");
+  current?.close(1012);
+  await until(({ phase }) => phase.kind === "reconnecting");
+  const restartsBefore = useGameStore.getState().restartCount;
+
+  await until(({ phase }) => phase.kind === "proposed");
+
+  expect(useGameStore.getState().restartCount).toBe(restartsBefore);
+});
+
+test("a requeue gives a fresh ready Game that takes the typing area again", async () => {
+  scripts.push({ messages: [queued, proposed(true)], closeWith: null });
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "proposed");
+  // Whatever happened to the Game under the prompt, the Player finds a fresh one.
+  playPracticeGame();
+  const restartsBefore = useGameStore.getState().restartCount;
+
+  serverSends({ type: "requeued", queuedAt: 1_000, serverAt: 9_000 });
+  await until(({ phase }) => phase.kind === "queued");
+
+  const { game, restartCount } = useGameStore.getState();
+  expect(game.status).toBe("ready");
+  expect(game.startedAt).toBeNull();
+  // A new key remounts the typing area, whose input takes the focus as it mounts.
+  expect(restartCount).toBeGreaterThan(restartsBefore);
 });
 
 test("leaving the Queue closes the socket and goes back to idle", async () => {

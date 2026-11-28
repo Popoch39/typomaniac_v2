@@ -2,8 +2,8 @@ import { Outlet } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { SidebarInset, SidebarProvider } from "../../../shared/components/ui/sidebar.tsx";
 import { TooltipProvider } from "../../../shared/components/ui/tooltip.tsx";
-import { ChallengeLayer } from "../../challenge/components/ChallengeLayer.tsx";
 import { useSidebarOpen } from "../hooks/useSidebarOpen.ts";
+import { ShellCornerStack } from "./ShellCornerStack.tsx";
 import { ShellSidebar } from "./ShellSidebar.tsx";
 
 // Wider than shadcn's, so that the rail holds the 44px keys and their padding.
@@ -25,7 +25,7 @@ export function ShellLayout() {
           <Outlet />
         </SidebarInset>
       </SidebarProvider>
-      <ChallengeLayer />
+      <ShellCornerStack />
     </TooltipProvider>
   );
 }

@@ -248,7 +248,7 @@ _Avoid_: stats, history (reserved for the WPM history of a Game), career, record
 ### Matchmaking
 
 **Queue**:
-Where a Player waits to be paired for a ranked Duel.
+Where a Player waits to be paired for a ranked Duel. They keep their place while they use the rest of Typomaniac, Practice included, and give it up by opening a Duel.
 _Avoid_: lobby, pool, waiting room, search
 
 **Pairing**:

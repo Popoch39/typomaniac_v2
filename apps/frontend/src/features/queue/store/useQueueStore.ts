@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { eventTime } from "../../game/clock/eventTime.ts";
+import { useGameStore } from "../../game/store/useGameStore.ts";
+import type { PromptKey } from "../accept/acceptsPairing.ts";
 import {
   IDLE_QUEUE,
   type QueuePhase,
@@ -17,12 +19,25 @@ type QueueState = {
   readonly leave: () => void;
   /** Accepts the Pairing proposed to the Player, once the socket can carry it. */
   readonly accept: () => void;
+  /** A key pressed while the Pairing prompt is open, which may accept it. */
+  readonly press: (key: PromptKey) => void;
+  /** Closes the notice telling the Player why they are not queued. */
+  readonly dismiss: () => void;
+  /** Gives up an active Queue as a Duel opens, keeping the notice of why the Player left it. */
+  readonly leaveForDuel: () => void;
 };
 
 const CLOCK_REFRESH_MS = 100;
 
 // Owned by the store because components may not run effects; one Queue is shown at a time.
 let clockTimer: ReturnType<typeof setInterval> | null = null;
+// Handed by the app's entry, since a store may not import the router.
+let goToDuel: (duelId: string) => void = () => {};
+
+/** How the store takes the Player into the ranked Duel both accepted, from any page. */
+export function setQueueDuelNavigation(navigate: (duelId: string) => void) {
+  goToDuel = navigate;
+}
 
 export const useQueueStore = create<QueueState>()((set, get) => {
   const dispatch = (event: QueuePhaseEvent) => {
@@ -46,6 +61,8 @@ export const useQueueStore = create<QueueState>()((set, get) => {
         if (sendToQueue({ type: "accept", pairingId })) dispatch({ kind: "accepted", pairingId });
         return;
       }
+      case "goToDuel":
+        return goToDuel(effect.duelId);
       case "startClock":
         if (clockTimer === null)
           clockTimer = setInterval(() => set({ now: eventTime() }), CLOCK_REFRESH_MS);
@@ -53,6 +70,9 @@ export const useQueueStore = create<QueueState>()((set, get) => {
       case "stopClock":
         if (clockTimer !== null) clearInterval(clockTimer);
         clockTimer = null;
+        return;
+      case "leaveGame":
+        return useGameStore.getState().leave();
     }
   };
 
@@ -62,5 +82,9 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     enter: () => dispatch({ kind: "enter" }),
     leave: () => dispatch({ kind: "leave" }),
     accept: () => dispatch({ kind: "accept" }),
+    // Read on the clock the Pairing's receipt was stamped with, so the guard delay is measured on one clock.
+    press: (key) => dispatch({ kind: "press", key, at: eventTime() }),
+    dismiss: () => dispatch({ kind: "dismiss" }),
+    leaveForDuel: () => dispatch({ kind: "leaveForDuel" }),
   };
 });
