@@ -1,5 +1,6 @@
 import { afterAll, afterEach, expect, test } from "bun:test";
 import type { PairingSide, QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
+import { useGameStore } from "../src/features/game/store/useGameStore.ts";
 
 const players: { readonly self: PairingSide; readonly opponent: PairingSide } = {
   self: { nickname: "ada", avatarUrl: null, rank: null, ornament: null },
@@ -63,6 +64,8 @@ setQueueDuelNavigation((duelId) => wentToDuels.push(duelId));
 
 afterEach(() => {
   store.getState().leave();
+  // A started Game ticks on a timer: a new ready Game stops it so no test leaves one running.
+  useGameStore.getState().leave();
   scripts.length = 0;
   received.length = 0;
   wentToDuels.length = 0;
@@ -215,6 +218,65 @@ test("a Player whose socket drops during a Pairing reconnects to it with their a
     accepted: true,
   });
   expect(received).toEqual([]);
+});
+
+/** Starts a Practice Game and types into it, so that its clock runs. */
+function playPracticeGame() {
+  const at = performance.timeOrigin + performance.now();
+  useGameStore.getState().setConfig({ mode: "time", seconds: 30 });
+  useGameStore.getState().applyEvent({ type: "start", at });
+  useGameStore.getState().applyEvent({ type: "insert", at: at + 200, text: "a" });
+  expect(useGameStore.getState().game.status).toBe("running");
+}
+
+test("a proposed Pairing abandons the Practice Game being played", async () => {
+  scripts.push({ messages: [queued], closeWith: null });
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+  playPracticeGame();
+  const restartsBefore = useGameStore.getState().restartCount;
+
+  serverSends(proposed(false));
+  await until(({ phase }) => phase.kind === "proposed");
+
+  const { game, restartCount } = useGameStore.getState();
+  expect(game.status).toBe("ready");
+  expect(game.startedAt).toBeNull();
+  expect(restartCount).toBeGreaterThan(restartsBefore);
+});
+
+test("a Pairing proposed again after a reconnect leaves the Game alone", async () => {
+  scripts.push(
+    { messages: [queued, proposed(false)], closeWith: null },
+    { messages: [proposed(false)], closeWith: null },
+  );
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "proposed");
+  current?.close(1012);
+  await until(({ phase }) => phase.kind === "reconnecting");
+  const restartsBefore = useGameStore.getState().restartCount;
+
+  await until(({ phase }) => phase.kind === "proposed");
+
+  expect(useGameStore.getState().restartCount).toBe(restartsBefore);
+});
+
+test("a requeue gives a fresh ready Game that takes the typing area again", async () => {
+  scripts.push({ messages: [queued, proposed(true)], closeWith: null });
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "proposed");
+  // Whatever happened to the Game under the prompt, the Player finds a fresh one.
+  playPracticeGame();
+  const restartsBefore = useGameStore.getState().restartCount;
+
+  serverSends({ type: "requeued", queuedAt: 1_000, serverAt: 9_000 });
+  await until(({ phase }) => phase.kind === "queued");
+
+  const { game, restartCount } = useGameStore.getState();
+  expect(game.status).toBe("ready");
+  expect(game.startedAt).toBeNull();
+  // A new key remounts the typing area, whose input takes the focus as it mounts.
+  expect(restartCount).toBeGreaterThan(restartsBefore);
 });
 
 test("leaving the Queue closes the socket and goes back to idle", async () => {

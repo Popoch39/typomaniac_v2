@@ -62,7 +62,9 @@ export type QueuePhaseEvent =
  * `close` closes the Queue socket, `open` opens it in place of any other. `sendAccept` sends the
  * acceptance, which is only one once the socket carried it. The clock runs from `startClock` to
  * `stopClock`, exactly while a waiting time or an accept countdown is on screen. `goToDuel` takes
- * the Player to the ranked Duel both accepted, from whatever page they are on.
+ * the Player to the ranked Duel both accepted, from whatever page they are on. `leaveGame` abandons
+ * the Practice Game for a fresh ready one, when the Pairing prompt opens and when it closes on
+ * anything but the Duel.
  */
 export type QueuePhaseEffect =
   | { readonly kind: "close" }
@@ -70,7 +72,8 @@ export type QueuePhaseEffect =
   | { readonly kind: "sendAccept"; readonly pairingId: string }
   | { readonly kind: "goToDuel"; readonly duelId: string }
   | { readonly kind: "startClock" }
-  | { readonly kind: "stopClock" };
+  | { readonly kind: "stopClock" }
+  | { readonly kind: "leaveGame" };
 
 type QueueTransition = {
   readonly phase: QueuePhase;
@@ -190,13 +193,23 @@ const isShowingTime = (phase: QueuePhase) => {
   return kind === "queued" || kind === "proposed";
 };
 
+const isPrompting = (phase: QueuePhase) => shownQueuePhase(phase).kind === "proposed";
+
+/**
+ * The Practice Game is left as the prompt opens, so that no clock runs under it and no distorted
+ * Result follows, and again as it closes, so that the Player finds a ready Game whose typing area
+ * takes the focus back. The ranked Duel loads its own Game.
+ */
+function leavesGame(phase: QueuePhase, next: QueuePhase) {
+  return isPrompting(phase) !== isPrompting(next) && next.kind !== "paired";
+}
+
 export function nextQueuePhase(phase: QueuePhase, event: QueuePhaseEvent): QueueTransition {
   const next = nextOfEvent(phase, event);
+  const effects: QueuePhaseEffect[] = [...next.effects];
   const wasShowingTime = isShowingTime(phase);
   const showsTime = isShowingTime(next.phase);
-  if (wasShowingTime === showsTime) return next;
-  return {
-    phase: next.phase,
-    effects: [...next.effects, { kind: showsTime ? "startClock" : "stopClock" }],
-  };
+  if (wasShowingTime !== showsTime) effects.push({ kind: showsTime ? "startClock" : "stopClock" });
+  if (leavesGame(phase, next.phase)) effects.push({ kind: "leaveGame" });
+  return { phase: next.phase, effects };
 }
