@@ -85,21 +85,24 @@ const notices: QueuePhase[] = [
 
 test("off the Ranked page, the toast tells why the Player is not queued", () => {
   expect(off({ kind: "removed", reason: "notAccepted" })).toEqual({
-    kind: "removed",
-    reason: "notAccepted",
+    kind: "notice",
+    notice: { kind: "removed", reason: "notAccepted" },
   });
   expect(off({ kind: "removed", reason: "replaced" })).toEqual({
-    kind: "removed",
-    reason: "replaced",
+    kind: "notice",
+    notice: { kind: "removed", reason: "replaced" },
   });
   expect(off({ kind: "removed", reason: "challenged" })).toEqual({
-    kind: "removed",
-    reason: "challenged",
+    kind: "notice",
+    notice: { kind: "removed", reason: "challenged" },
   });
-  expect(off({ kind: "disconnected" })).toEqual({ kind: "disconnected" });
+  expect(off({ kind: "disconnected" })).toEqual({
+    kind: "notice",
+    notice: { kind: "disconnected" },
+  });
   expect(off({ kind: "refused", refusal: "Sign in to enter the Queue." })).toEqual({
-    kind: "refused",
-    refusal: "Sign in to enter the Queue.",
+    kind: "notice",
+    notice: { kind: "refused", refusal: "Sign in to enter the Queue." },
   });
 });
 

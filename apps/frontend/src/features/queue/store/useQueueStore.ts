@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { eventTime } from "../../game/clock/eventTime.ts";
 import { useGameStore } from "../../game/store/useGameStore.ts";
+import type { PromptKey } from "../accept/acceptsPairing.ts";
 import {
   IDLE_QUEUE,
   type QueuePhase,
@@ -18,8 +19,12 @@ type QueueState = {
   readonly leave: () => void;
   /** Accepts the Pairing proposed to the Player, once the socket can carry it. */
   readonly accept: () => void;
+  /** A key pressed while the Pairing prompt is open, which may accept it. */
+  readonly press: (key: PromptKey) => void;
   /** Closes the notice telling the Player why they are not queued. */
   readonly dismiss: () => void;
+  /** Gives up an active Queue as a Duel opens, keeping the notice of why the Player left it. */
+  readonly leaveForDuel: () => void;
 };
 
 const CLOCK_REFRESH_MS = 100;
@@ -77,6 +82,9 @@ export const useQueueStore = create<QueueState>()((set, get) => {
     enter: () => dispatch({ kind: "enter" }),
     leave: () => dispatch({ kind: "leave" }),
     accept: () => dispatch({ kind: "accept" }),
+    // Read on the clock the Pairing's receipt was stamped with, so the guard delay is measured on one clock.
+    press: (key) => dispatch({ kind: "press", key, at: eventTime() }),
     dismiss: () => dispatch({ kind: "dismiss" }),
+    leaveForDuel: () => dispatch({ kind: "leaveForDuel" }),
   };
 });

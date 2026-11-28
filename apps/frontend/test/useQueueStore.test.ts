@@ -1,6 +1,7 @@
 import { afterAll, afterEach, expect, test } from "bun:test";
 import type { PairingSide, QueueClientMessage, QueueServerMessage } from "@repo/matchmaking-engine";
 import { useGameStore } from "../src/features/game/store/useGameStore.ts";
+import { PAIRING_ACCEPT_GUARD_MS } from "../src/features/queue/accept/acceptsPairing.ts";
 
 const players: { readonly self: PairingSide; readonly opponent: PairingSide } = {
   self: { nickname: "ada", avatarUrl: null, rank: null, ornament: null },
@@ -180,6 +181,41 @@ test("a removed Player who enters again is back in the Queue on a new socket", a
 
   expect(store.getState().phase).toMatchObject({ kind: "queued", requeued: false });
   expect(openings).toBe(before + 1);
+});
+
+test("a Player removed for a Challenge keeps the notice as its Duel opens", async () => {
+  scripts.push({ messages: [queued, { type: "removed", reason: "challenged" }], closeWith: 1000 });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "removed");
+  store.getState().leaveForDuel();
+
+  expect(store.getState().phase).toEqual({ kind: "removed", reason: "challenged" });
+});
+
+test("a queued Player who opens a Duel gives up their place", async () => {
+  scripts.push({ messages: [queued], closeWith: null });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "queued");
+  store.getState().leaveForDuel();
+
+  expect(store.getState().phase).toEqual({ kind: "idle" });
+});
+
+test("Enter pressed past the guard delay accepts the Pairing", async () => {
+  scripts.push({ messages: [queued, proposed(false)], closeWith: null });
+
+  store.getState().enter();
+  await until(({ phase }) => phase.kind === "proposed");
+  store.getState().press({ key: "Enter", repeat: false });
+  expect(store.getState().phase).toMatchObject({ kind: "proposed", accepted: false });
+  await Bun.sleep(PAIRING_ACCEPT_GUARD_MS);
+  store.getState().press({ key: "Enter", repeat: false });
+
+  expect(store.getState().phase).toMatchObject({ kind: "proposed", accepted: true });
+  await until(() => received.length === 1);
+  expect(received).toEqual([{ type: "accept", pairingId: "pairing-1" }]);
 });
 
 test("a Player whose Opponent did not accept is back in the Queue, the Pairing gone", async () => {

@@ -13,9 +13,7 @@ export function QueueLayer() {
       <QueueToast />
       {layer.kind === "pairing" && <PairingDialog />}
       {layer.kind === "entering" && <QueueEnteringToast />}
-      {(layer.kind === "removed" || layer.kind === "disconnected" || layer.kind === "refused") && (
-        <QueueNoticeToast notice={layer} />
-      )}
+      {layer.kind === "notice" && <QueueNoticeToast notice={layer.notice} />}
     </>
   );
 }

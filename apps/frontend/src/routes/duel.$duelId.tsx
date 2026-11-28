@@ -5,7 +5,7 @@ import { useQueueStore } from "../features/queue/store/useQueueStore.ts";
 
 // Opening a Duel gives up the place in the Queue, so that no ranked Duel is proposed during it. Both
 // accepted closed the Queue already: the way into a ranked Duel finds nothing to leave.
-const leaveQueue = () => useQueueStore.getState().leave();
+const leaveQueue = () => useQueueStore.getState().leaveForDuel();
 
 export const Route = createFileRoute("/duel/$duelId")({
   // The socket follows the route rather than a component, since components may not run effects.
